@@ -189,13 +189,13 @@
                         </select>
                       </td>
 
-                      <!-- Days -->
+                      <!-- Days (stored as precise float, displayed to 1 decimal) -->
                       <td class="col-days">
                         <input
-                          type="number" min="0" step="0.5"
-                          :value="line.days"
+                          type="number" min="0" step="0.1"
+                          :value="parseFloat((line.days || 0).toFixed(1))"
                           class="cell-num"
-                          @input="rom.updateLine(line.id, { days: +$event.target.value })"
+                          @change="rom.updateLine(line.id, { days: +$event.target.value })"
                         />
                       </td>
 
@@ -468,9 +468,10 @@ function onLaborCatChange(lineId, catId) {
 // ── Total Hours bidirectional ────────────────────────────────────────
 // Editing Total Hrs → back-calculates Days (Hrs/Day stays fixed)
 function onTotalHrsChange(line, totalHrs) {
-  const snapped = Math.round(totalHrs * 2) / 2          // snap input to nearest 0.5
+  const snapped = Math.round(totalHrs * 2) / 2   // snap Total Hrs to nearest 0.5
   const hpd = line.hoursPerDay || 8
-  const newDays = hpd > 0 ? Math.round((snapped / hpd) * 2) / 2 : 0  // snap days to nearest 0.5
+  // Store raw Days — no rounding — so the reverse calc stays consistent
+  const newDays = hpd > 0 ? snapped / hpd : 0
   rom.updateLine(line.id, { days: newDays })
 }
 
