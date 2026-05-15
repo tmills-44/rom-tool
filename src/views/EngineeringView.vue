@@ -131,8 +131,22 @@
                       @dragleave="dragState.overId = null"
                       @drop.prevent="rom.reorderLine(dragState.dragId, line.id); dragState.dragId = null; dragState.overId = null"
                     >
-                      <!-- Drag handle -->
+                      <!-- Drag handle + status -->
                       <td class="col-move">
+                        <i
+                          class="ti row-status"
+                          :class="[
+                            `row-status--${lineStatus(line)}`,
+                            lineStatus(line) === 'complete' ? 'ti-circle-check-filled' :
+                            lineStatus(line) === 'partial'  ? 'ti-alert-circle-filled' :
+                                                              'ti-circle-dashed',
+                          ]"
+                          :title="
+                            lineStatus(line) === 'complete' ? 'Row complete' :
+                            lineStatus(line) === 'partial'  ? 'Row incomplete — fill all fields' :
+                                                              'Empty row'
+                          "
+                        ></i>
                         <span class="drag-handle" title="Drag to reorder">⠿</span>
                       </td>
 
@@ -394,6 +408,19 @@ function visibleLines(eid, pid) {
   return all.filter(l => l.role === active)
 }
 
+// Per-row completeness — 'complete' | 'partial' | 'empty'
+function lineStatus(line) {
+  const hasCat   = !!line.laborCat
+  const hasTask  = !!line.taskId
+  const hasDays  = (line.days || 0) > 0
+  const hasHrs   = (line.hoursPerDay || 0) > 0
+  const hasRate  = (line.rate || 0) > 0
+  const filled = [hasCat, hasTask, hasDays, hasHrs, hasRate].filter(Boolean).length
+  if (filled === 5) return 'complete'
+  if (filled === 0) return 'empty'
+  return 'partial'
+}
+
 
 // ── Phase hours/cost (sum across all roles) ──────────────────────────
 function phaseHours(eid, pid) {
@@ -612,7 +639,11 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .line-row:hover td { background: var(--rom-surface-alt); }
 
 /* Column widths */
-.col-move  { width: 36px; }
+.col-move  { width: 50px; white-space: nowrap; }
+.row-status { font-size: 14px; margin-right: 4px; vertical-align: -1px; }
+.row-status--complete { color: #2e7d32; }
+.row-status--partial  { color: #d97706; }
+.row-status--empty    { color: var(--rom-text-faint, #b4b2a9); }
 .col-role  { width: 52px; }
 .col-cat   { width: 120px; }
 .col-task  { min-width: 200px; }

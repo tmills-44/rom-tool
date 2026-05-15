@@ -464,15 +464,16 @@ body {
 }
 
 .val-banner {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 7px 18px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 3px 18px;
   background: #fff8e1;
   border-bottom: 1px solid #f59e0b;
-  font-size: 12px; color: #92400e;
+  font-size: 10px; color: #92400e;
+  line-height: 1.3;
   flex-shrink: 0;
 }
-.val-banner .ti-alert-triangle { font-size: 14px; color: #d97706; flex-shrink: 0; }
-.val-item::after { content: '·'; margin-left: 10px; color: #d97706; }
+.val-banner .ti-alert-triangle { font-size: 11px; color: #d97706; flex-shrink: 0; }
+.val-item::after { content: '·'; margin-left: 8px; color: #d97706; }
 .val-item:last-child::after { content: ''; }
 
 /* ─── Main content ───────────────────────────────────────────────── */
