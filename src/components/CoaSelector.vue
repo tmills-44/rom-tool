@@ -3,7 +3,6 @@
     <!-- Trigger chip -->
     <button class="coa-trigger" @click="open = !open" type="button" :aria-expanded="open">
       <i class="ti ti-list-check coa-trigger-icon" aria-hidden="true"></i>
-      <span class="coa-trigger-label">Working on:</span>
       <span class="coa-trigger-name">{{ rom.activeCoa.name }}</span>
       <span v-if="totalCoas > 1" class="coa-trigger-count">{{ includedCount }}/{{ totalCoas }} in quote</span>
       <i class="ti coa-trigger-chevron" :class="open ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true"></i>
@@ -44,7 +43,7 @@
                 ref="editInput"
               />
               <div v-else class="coa-row-name">
-                {{ coa.name }}
+                {{ coa.name && coa.name.trim() ? coa.name : 'Untitled scope' }}
                 <span v-if="coa.id === rom.activeCoaId" class="coa-row-active-tag">CURRENT</span>
               </div>
               <div class="coa-row-meta">
@@ -150,7 +149,7 @@ const vClickOutside = {
 </script>
 
 <style scoped>
-.coa-selector { position: relative; display: inline-block; }
+.coa-selector { position: relative; display: inline-block; z-index: 30; }
 
 .coa-trigger {
   display: inline-flex; align-items: center; gap: 8px;
@@ -177,14 +176,15 @@ const vClickOutside = {
 .coa-trigger-chevron { font-size: 12px; color: #7dd3fc; }
 
 .coa-panel {
-  position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
-  width: 380px;
-  background: var(--rom-surface, #fff);
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 200;
+  width: 420px; max-width: 90vw;
+  background: #ffffff;
   color: var(--rom-text, #1a2133);
   border: 1px solid var(--rom-border, #c4cede);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.22);
   overflow: hidden;
+  isolation: isolate;        /* own stacking context — keeps content above sibling pills */
 }
 .coa-panel-head {
   display: flex; align-items: center; justify-content: space-between;

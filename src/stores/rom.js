@@ -1205,6 +1205,26 @@ export const useRomStore = defineStore('rom', () => {
     })
     if (!Array.isArray(travel['cronos'])) travel['cronos'] = []
     const seedMonth = new Date().toLocaleString('en-US', { month: 'short' })
+
+    // Baselines A/B/C/D all run out of Fort Walton Beach, FL. Pre-fill the
+    // City/Base on the project info and the destination + state on every seeded
+    // trip so the GSA per-diem can resolve. Skip for Custom (X).
+    const isBaseline = (tmpl.id || '').startsWith('baseline-') && tmpl.id !== 'baseline-x'
+    const seedCity   = isBaseline ? 'Fort Walton Beach' : ''
+    const seedState  = isBaseline ? 'FL'                : ''
+    if (isBaseline && !project.cityBase) project.cityBase = 'Fort Walton Beach, FL'
+
+    // Try a local rates lookup so the trip lands with per-diem already populated
+    let seedLodging = 0, seedMie = 0, seedMonthly = null
+    if (isBaseline) {
+      const rate = lookupGSARate(seedCity, seedState)
+      if (rate) {
+        seedLodging = rate.lodging || 0
+        seedMie     = rate.mie     || 0
+        seedMonthly = rate.months  || null
+      }
+    }
+
     ;(tmpl.travelSeed ?? []).forEach(([travelerName, days, persons, travelHours, hotel, rentalCar, airfare]) => {
       // Each template travel seed becomes a trip with one traveler in the new shape.
       const tripId = uuid()
@@ -1213,14 +1233,14 @@ export const useRomStore = defineStore('rom', () => {
         entity: 'cronos',
         coaId: targetCoa,
         tripName: travelerName || '',
-        region: 'conus', country: '', destination: '', state: '',
+        region: 'conus', country: '', destination: seedCity, state: seedState,
         travelMonth: seedMonth,
-        lodgingRate: 0, mieRate: 0,
+        lodgingRate: seedLodging, mieRate: seedMie,
         defaultTravelHours: travelHours ?? 4,
         defaultCarRate:     75,
         defaultAirfareRate: 600,
         defaultMiscRate:    50,
-        gsaMonthlyRates: null,
+        gsaMonthlyRates: seedMonthly,
         travelers: [{
           id: uuid(),
           name: travelerName || '',
@@ -1232,8 +1252,8 @@ export const useRomStore = defineStore('rom', () => {
           car:     !!rentalCar,
           airfare: !!airfare,
           misc:    false,
-          lodgingRate: 0,
-          mieRate:     0,
+          lodgingRate: seedLodging,
+          mieRate:     seedMie,
           carRate:     75,
           airfareRate: 600,
           miscRate:    50,

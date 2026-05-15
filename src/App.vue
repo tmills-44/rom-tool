@@ -201,8 +201,12 @@
         </div>
         <div class="proj-field">
           <label>City / Base</label>
-          <input type="text" :value="rom.project.cityBase"
-            @input="rom.project.cityBase = $event.target.value" />
+          <input type="text"
+            :value="rom.project.cityBase"
+            list="gsa-city-list"
+            placeholder="Type to search GSA cities…"
+            @input="rom.project.cityBase = $event.target.value"
+            @change="onCityBaseCommit($event.target.value)" />
         </div>
         <div class="proj-field">
           <label>Building</label>
@@ -259,6 +263,11 @@
     </footer>
 
     </div><!-- /.main-col -->
+
+    <!-- ── GSA city typeahead list (used by Project Info → City / Base) ─── -->
+    <datalist id="gsa-city-list">
+      <option v-for="opt in gsaCityOptions" :key="opt" :value="opt" />
+    </datalist>
 
     <!-- ── Template picker modal ───────────────────────────────── -->
     <TemplatePicker
@@ -393,13 +402,66 @@ function tabStatus(tabId) {
   return 'empty'
 }
 
-// One-line synopsis of project info shown in the collapsed drawer tab so the
-// user can glance at the key fields without opening the drawer. Active scope
-// name leads off so the user always knows which scope they're working in.
+// All loaded GSA cities formatted "City, ST" for the typeahead datalist
+const gsaCityOptions = computed(() => {
+  const map = rom.gsaRateMap
+  if (!map) return []
+  const list = []
+  for (const key of Object.keys(map)) {
+    const [city, state] = key.split('|')
+    if (!city || !state) continue
+    const cityCap = city.replace(/\b\w/g, c => c.toUpperCase())
+    list.push(`${cityCap}, ${state.toUpperCase()}`)
+  }
+  return list.sort()
+})
+
+// Called when the user commits (Enter / blur / picks from the dropdown).
+// If the value matches a GSA entry, propagate destination + rates to every
+// trip in the active scope. If it's free text, do nothing — just save the text.
+function onCityBaseCommit(value) {
+  rom.project.cityBase = value
+  const v = String(value || '').trim()
+  if (!v) return
+  // Must look like "City, ST" to even try a GSA match
+  const m = v.match(/^(.+),\s*([A-Za-z]{2})\s*$/)
+  if (!m) return
+  const city  = m[1].trim()
+  const state = m[2].toUpperCase()
+  const rate  = rom.lookupGSARate(city, state)
+  if (!rate) return   // typed something that isn't in GSA — leave trips alone
+
+  // Pick the peak-month rate so quotes stay conservative
+  let lodging = rate.lodging || 0
+  let monthly = rate.months  || null
+  let peak    = null
+  if (monthly) {
+    const entries = Object.entries(monthly).sort((a, b) => b[1] - a[1])
+    if (entries[0]) { peak = entries[0][0]; lodging = entries[0][1] }
+  }
+  const mie = rate.mie || 0
+
+  // Propagate to every trip in the currently active scope
+  const coaId = rom.activeCoaId
+  rom.ENTITIES.forEach(e => {
+    (rom.travel[e.id] ?? []).forEach(trip => {
+      if ((trip.coaId ?? rom.coas[0]?.id) !== coaId) return
+      rom.updateTrip(e.id, trip.id, {
+        destination: city,
+        state, country: '', region: 'conus',
+        travelMonth: peak,
+        lodgingRate: lodging,
+        mieRate: mie,
+        gsaMonthlyRates: monthly,
+      })
+    })
+  })
+}
+
+// Synopsis pills shown inline next to the scope chip. The active scope name
+// already lives in the scope chip itself, so we don't repeat it here.
 const projectSynopsis = computed(() => {
   const items = []
-  const scope = rom.activeCoa
-  if (scope?.name) items.push({ label: 'Scope', value: scope.name })
   const order = [
     { key: 'sponsor',         label: 'Sponsor' },
     { key: 'roomName',        label: 'Project' },
