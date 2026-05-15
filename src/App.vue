@@ -18,6 +18,7 @@
       </div>
 
       <div class="topbar-right">
+        <CoaSelector />
         <div class="rates-chip rates-chip--load" :title="`Page loaded ${pageLoadedFull}`">
           <i class="ti ti-clock"></i>
           Loaded: {{ pageLoadedAt }}
@@ -189,6 +190,7 @@ import { generateExcel } from './utils/excelExport'
 import { loadAllRates }  from './utils/ratesLoader'
 import TemplatePicker from './components/TemplatePicker.vue'
 import SnapshotModal from './components/SnapshotModal.vue'
+import CoaSelector from './components/CoaSelector.vue'
 import EngineeringView from './views/EngineeringView.vue'
 import TravelView from './views/TravelView.vue'
 import MaterialView from './views/MaterialView.vue'

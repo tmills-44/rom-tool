@@ -493,7 +493,20 @@ export const useRomStore = defineStore('rom', () => {
     templateId: null, templateName: null,
   })
 
-  // line item shape: { id, role, phaseId, taskId, entity, laborCat, days, hoursPerDay, rate }
+  // ── Courses of Action ──────────────────────────────────────────────
+  // Each COA is a self-contained scenario the user can flip between.
+  // The user works on ONE COA at a time (activeCoaId) and ticks which
+  // COAs to roll into the final printed quote (includeInQuote).
+  const coas = reactive(saved?.coas ?? [
+    { id: 'coa-primary', name: 'COA 1 — Primary', description: '', includeInQuote: true }
+  ])
+  // Guarantee at least one COA exists so the rest of the store always has a current scope
+  if (coas.length === 0) coas.push({ id: 'coa-primary', name: 'COA 1 — Primary', description: '', includeInQuote: true })
+  const activeCoaId = ref(saved?.activeCoaId ?? coas[0].id)
+  // Sanity: if the saved active id no longer matches a COA, snap to the first one
+  if (!coas.some(c => c.id === activeCoaId.value)) activeCoaId.value = coas[0].id
+
+  // line item shape: { id, role, phaseId, taskId, entity, laborCat, days, hoursPerDay, rate, coaId }
   const wbs       = reactive(saved?.wbs      ?? deepClone(DEFAULT_WBS))
   const lineItems = reactive(saved?.lineItems ?? [])
   // Editable labor categories (rates, labels). Defaults seeded from LABOR_CATS, persisted across sessions.
@@ -506,6 +519,14 @@ export const useRomStore = defineStore('rom', () => {
     const cat = laborCats.find(c => c.id === l.laborCat)
     if (cat && l.role !== cat.role) l.role = cat.role
   })
+  // ── Migration: tag every existing line with a COA if it doesn't have one.
+  // Any pre-COA data gets attached to the first/default COA so it stays visible.
+  lineItems.forEach(l => { if (!l.coaId) l.coaId = coas[0].id })
+
+  // ── COA-derived accessors (declared early so later computeds can reference them) ──
+  const activeLineItems = computed(() => lineItems.filter(l => l.coaId === activeCoaId.value))
+  const activeCoa       = computed(() => coas.find(c => c.id === activeCoaId.value) ?? coas[0])
+  const quoteCoaIds     = computed(() => coas.filter(c => c.includeInQuote).map(c => c.id))
   const travel    = reactive(saved?.travel    ?? emptyTravelData())
   const gsaRateMap  = reactive(saved?.gsaRateMap ?? {})   // "city|ST" → { lodging, mie, months }
 
@@ -666,8 +687,16 @@ export const useRomStore = defineStore('rom', () => {
   function entityHours(eid) { return ROLES.reduce((s, r) => s + roleHours(r.id, eid), 0) }
   function entityCost(eid)  { return ROLES.reduce((s, r) => s + roleCost(r.id,  eid), 0) }
 
-  const engineeringTotal = computed(() => lineItems.reduce((s, l) => s + lineCost(l),  0))
-  const engineeringHours = computed(() => lineItems.reduce((s, l) => s + lineHours(l), 0))
+  // Scoped to the active COA — what the user is currently working on
+  const engineeringTotal = computed(() =>
+    lineItems.filter(l => l.coaId === activeCoaId.value).reduce((s, l) => s + lineCost(l),  0))
+  const engineeringHours = computed(() =>
+    lineItems.filter(l => l.coaId === activeCoaId.value).reduce((s, l) => s + lineHours(l), 0))
+  // Summed across all COAs flagged to print in the final quote
+  const engineeringTotalForQuote = computed(() =>
+    lineItems.filter(l => quoteCoaIds.value.includes(l.coaId)).reduce((s, l) => s + lineCost(l), 0))
+  const engineeringHoursForQuote = computed(() =>
+    lineItems.filter(l => quoteCoaIds.value.includes(l.coaId)).reduce((s, l) => s + lineHours(l), 0))
 
   // ── Trip cost calculation ────────────────────────────────────────
   function tripCost(trip) {
@@ -852,6 +881,7 @@ export const useRomStore = defineStore('rom', () => {
       hoursPerDay: opts.hoursPerDay ?? 0,
       rate:        opts.rate        ?? (laborCat ? laborCatRate(laborCat) : 0),
       sortOrder:   opts.sortOrder   ?? nextSortOrder(entity, phaseId),
+      coaId:       opts.coaId       ?? activeCoaId.value,
     })
   }
 
@@ -1003,6 +1033,60 @@ export const useRomStore = defineStore('rom', () => {
     try { localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshots.value)) } catch {}
   }
 
+  // ── COA mutations ─────────────────────────────────────────────────
+  function addCoa(name, description) {
+    const id = 'coa-' + uuid()
+    const nextNum = coas.length + 1
+    coas.push({
+      id,
+      name: name && name.trim() ? name.trim() : `COA ${nextNum}`,
+      description: description ?? '',
+      includeInQuote: true,
+    })
+    activeCoaId.value = id   // switch to it immediately so the user can start filling it in
+    return id
+  }
+  function removeCoa(id) {
+    if (coas.length <= 1) return       // never delete the last COA
+    const idx = coas.findIndex(c => c.id === id)
+    if (idx < 0) return
+    // Drop every line tagged to this COA
+    for (let i = lineItems.length - 1; i >= 0; i--) {
+      if (lineItems[i].coaId === id) lineItems.splice(i, 1)
+    }
+    coas.splice(idx, 1)
+    if (activeCoaId.value === id) activeCoaId.value = coas[0].id
+  }
+  function renameCoa(id, name, description) {
+    const c = coas.find(c => c.id === id)
+    if (!c) return
+    if (name        !== undefined) c.name = name
+    if (description !== undefined) c.description = description
+  }
+  function toggleCoaIncluded(id) {
+    const c = coas.find(c => c.id === id)
+    if (c) c.includeInQuote = !c.includeInQuote
+  }
+  function setActiveCoa(id) {
+    if (coas.some(c => c.id === id)) activeCoaId.value = id
+  }
+  function duplicateCoa(id) {
+    const src = coas.find(c => c.id === id)
+    if (!src) return
+    const newId = 'coa-' + uuid()
+    coas.push({
+      id: newId,
+      name: src.name + ' (copy)',
+      description: src.description,
+      includeInQuote: true,
+    })
+    // Clone every line from src to the new COA
+    lineItems.filter(l => l.coaId === id).forEach(l => {
+      lineItems.push({ ...l, id: uuid(), coaId: newId })
+    })
+    activeCoaId.value = newId
+  }
+
   function resetAll() {
     Object.assign(project, { sponsor: '', roomName: '', date: new Date().toISOString().split('T')[0], projectEngineer: '', anticipatedFYFunds: 5_000_000, templateId: null, templateName: null })
     lineItems.splice(0, lineItems.length)
@@ -1015,7 +1099,7 @@ export const useRomStore = defineStore('rom', () => {
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  watch([project, wbs, lineItems, travel, material, overhead, enabledEntities, selectedTabId, gsaRateMap, laborCats, showRates, showRowStatus], () => {
+  watch([project, wbs, lineItems, travel, material, overhead, enabledEntities, selectedTabId, gsaRateMap, laborCats, showRates, showRowStatus, coas, activeCoaId], () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         project: { ...project }, wbs: deepClone(wbs), lineItems: deepClone(lineItems),
@@ -1025,6 +1109,8 @@ export const useRomStore = defineStore('rom', () => {
         laborCats: deepClone(laborCats),
         showRates: showRates.value,
         showRowStatus: showRowStatus.value,
+        coas: deepClone(coas),
+        activeCoaId: activeCoaId.value,
       }))
     } catch {}
   }, { deep: true })
@@ -1044,6 +1130,9 @@ export const useRomStore = defineStore('rom', () => {
     lineHours, lineCost, tasksFor, linesForPhase, linesForRole,
     phaseHours, phaseCost, roleHours, roleCost, entityHours, entityCost, travelLineCost,
     addLine, duplicateLine, removeLine, updateLine, swapLineOrder, reorderLine, enableEntity, disableEntity, applyTemplate, resetAll,
+    coas, activeCoaId, activeCoa, activeLineItems, quoteCoaIds,
+    engineeringTotalForQuote, engineeringHoursForQuote,
+    addCoa, removeCoa, renameCoa, toggleCoaIncluded, setActiveCoa, duplicateCoa,
     showRates, showRowStatus, undo, redo, canUndo, canRedo,
     addMaterialItem, updateMaterialItem, removeMaterialItem,
     addTrip, updateTrip, removeTrip, tripCost,

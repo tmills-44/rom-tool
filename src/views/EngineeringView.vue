@@ -437,10 +437,11 @@ function closeAllPhases(eid) {
 function getActiveRole(eid, pid) { return activeRoleState[phaseKey(eid, pid)] ?? 'all' }
 function setActiveRole(eid, pid, role) { activeRoleState[phaseKey(eid, pid)] = role }
 
-// ── Lines for a phase — sorted by sortOrder ──────────────────────────
+// ── Lines for a phase — sorted by sortOrder, scoped to the active COA ──
 function linesForPhase(eid, pid) {
+  const coaId = rom.activeCoaId
   return rom.lineItems
-    .filter(l => l.entity === eid && l.phaseId === pid)
+    .filter(l => l.entity === eid && l.phaseId === pid && l.coaId === coaId)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 }
 
