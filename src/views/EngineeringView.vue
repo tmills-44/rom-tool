@@ -117,13 +117,17 @@
                   </thead>
                   <tbody>
                     <tr
-                      v-for="line in visibleLines(entity.id, phase.id)"
+                      v-for="(line, idx) in visibleLines(entity.id, phase.id)"
                       :key="line.id"
                       class="line-row"
-                      :class="{
-                        'line-row--dragging':  dragState.dragId  === line.id,
-                        'line-row--drag-over': dragState.overId  === line.id && dragState.dragId !== line.id
-                      }"
+                      :class="[
+                        `line-row--${line.role}`,
+                        {
+                          'line-row--dragging':  dragState.dragId  === line.id,
+                          'line-row--drag-over': dragState.overId  === line.id && dragState.dragId !== line.id,
+                          'line-row--role-change': idx > 0 && visibleLines(entity.id, phase.id)[idx - 1].role !== line.role,
+                        }
+                      ]"
                       draggable="true"
                       @dragstart="dragState.dragId = line.id"
                       @dragend="dragState.dragId = null; dragState.overId = null"
@@ -693,7 +697,16 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 }
 .role-badge--engineering { background: #dce8fb; color: #1a5fb4; }
 .role-badge--pm          { background: #d4edda; color: #2e7d32; }
+.role-badge--programming { background: #ede0f5; color: #6a1b9a; }
 .role-badge--technician  { background: #fdf6e3; color: #8a6508; }
+
+/* Role group dividers: when the role changes from the previous row,
+   draw a thicker colored line above to visually break the categories. */
+.line-row--role-change td { border-top: 3px solid var(--rom-border, #d8d6cd) !important; padding-top: 8px; }
+.line-row--engineering.line-row--role-change td { border-top-color: #1a5fb4 !important; }
+.line-row--pm.line-row--role-change td          { border-top-color: #2e7d32 !important; }
+.line-row--programming.line-row--role-change td { border-top-color: #6a1b9a !important; }
+.line-row--technician.line-row--role-change td  { border-top-color: #b8860b !important; }
 
 /* Cell inputs */
 .cell-select {
