@@ -631,8 +631,8 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 /* Phase sections — each phase is its own clearly bordered block */
 .phases-wrap {
   display: flex; flex-direction: column;
-  gap: 18px;
-  padding: 16px;
+  gap: 6px;
+  padding: 8px;
   background: #e9edf5;
   border-top: 1px solid var(--rom-border);
 }
@@ -654,7 +654,7 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 
 .phase-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 18px; cursor: pointer; user-select: none;
+  padding: 8px 16px; cursor: pointer; user-select: none;
   transition: background .12s;
 }
 .phase-head:hover { background: var(--rom-surface-alt); }
