@@ -90,7 +90,7 @@
               </div>
 
               <!-- Lines table -->
-              <div v-if="linesForPhase(entity.id, phase.id).length" class="lines-wrap">
+              <div v-if="visibleLines(entity.id, phase.id).length" class="lines-wrap">
                 <table class="lines-table">
                   <thead>
                     <tr>
@@ -106,7 +106,7 @@
                   </thead>
                   <tbody>
                     <tr
-                      v-for="line in linesForPhase(entity.id, phase.id)"
+                      v-for="line in visibleLines(entity.id, phase.id)"
                       :key="line.id"
                       class="line-row"
                     >
@@ -226,6 +226,15 @@
                 </table>
               </div>
 
+              <!-- Hidden rows hint -->
+              <div
+                v-if="getActiveRole(entity.id, phase.id) !== 'all' && linesForPhase(entity.id, phase.id).length > visibleLines(entity.id, phase.id).length"
+                class="hidden-rows-hint"
+              >
+                {{ linesForPhase(entity.id, phase.id).length - visibleLines(entity.id, phase.id).length }}
+                row(s) hidden by filter — switch to <strong>All</strong> to see them
+              </div>
+
               <!-- Add row button -->
               <div class="phase-add-row">
                 <button class="add-line-btn" @click="addLine(entity.id, phase.id)">
@@ -274,9 +283,17 @@ function togglePhase(eid, pid) {
 function getActiveRole(eid, pid) { return activeRoleState[phaseKey(eid, pid)] ?? 'all' }
 function setActiveRole(eid, pid, role) { activeRoleState[phaseKey(eid, pid)] = role }
 
-// ── Lines for a phase (all roles) ───────────────────────────────────
+// ── Lines for a phase — all roles (used for totals) ─────────────────
 function linesForPhase(eid, pid) {
   return rom.lineItems.filter(l => l.entity === eid && l.phaseId === pid)
+}
+
+// ── Visible lines — respects the active role filter ──────────────────
+function visibleLines(eid, pid) {
+  const active = getActiveRole(eid, pid)
+  const all = linesForPhase(eid, pid)
+  if (active === 'all') return all
+  return all.filter(l => l.role === active)
 }
 
 // ── Phase hours/cost (sum across all roles) ──────────────────────────
@@ -504,6 +521,15 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   background: transparent; color: var(--rom-text-faint); cursor: pointer; font-size: 12px;
 }
 .del-btn:hover { background: #fff0f0; color: var(--rom-danger); }
+
+/* Hidden rows hint */
+.hidden-rows-hint {
+  margin: 6px 16px 0;
+  padding: 6px 10px;
+  font-size: 11px; color: var(--rom-text-muted); font-style: italic;
+  background: var(--rom-surface-alt); border-radius: 4px;
+  border-left: 3px solid var(--rom-border);
+}
 
 /* Add row */
 .phase-add-row { padding: 10px 16px 12px; }
