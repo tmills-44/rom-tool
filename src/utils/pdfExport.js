@@ -20,6 +20,25 @@ const TEXT   = [26,  33,  51]
 function fmt(n) { return n ? '$' + Math.round(n).toLocaleString() : '$0' }
 function pct(v) { return ((v || 0) * 100).toFixed(0) + '%' }
 
+// Build the overhead breakdown rows for the PDF breakdown table.
+// When showLineItems is false, collapse to a single "Contract Fee" row.
+function buildOverheadRows(oh, t) {
+  if (oh?.showLineItems === false) {
+    return [['Contract Fee', fmt(t.ohTotal + t.scr)]]
+  }
+  const items = Array.isArray(oh?.items) ? oh.items : []
+  return items
+    .filter(it => it.enabled)
+    .map(it => {
+      const cost = it.base === 'withOverhead'
+        ? t.withOh * (it.pct || 0)
+        : t.unloaded * (it.pct || 0)
+      const label = it.label || 'Overhead item'
+      const suffix = (it.pct || 0) > 0 ? ` (${pct(it.pct)})` : ''
+      return [label + suffix, fmt(cost)]
+    })
+}
+
 function loadImage(src) {
   return new Promise((resolve) => {
     const img = new Image()
@@ -330,11 +349,7 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
     [ sub('Unloaded Total'), sub(fmt(t.unloaded)) ],
 
     [ sec('Overhead & Rates') ],
-    [oh.scpLabel || 'SCP',  fmt(t.scp)],
-    ...((oh.globalPct ?? 0) > 0 ? [[oh.globalLabel || 'Global', fmt(t.glob)]] : []),
-    [oh.govLaborLabel || 'Gov Labor', fmt(t.govLab)],
-    ['Management Reserve',  fmt(t.mgmtRsv)],
-    [`Support Cost Rate (${pct(oh.scrPct)})`, fmt(t.scr)],
+    ...buildOverheadRows(oh, t),
     [ sub('Total Overhead'), sub(fmt(t.ohTotal + t.scr)) ],
 
     [ grand('LOADED TOTAL'), grand(fmt(t.totalLoaded)) ],

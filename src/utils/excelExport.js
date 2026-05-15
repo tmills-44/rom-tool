@@ -101,11 +101,16 @@ function buildScopeSheet(XLSX, rom, scope) {
   rows.push(['Unloaded Total',      t.unloaded])
   rows.push([])
   rows.push(['OVERHEAD & RATES'])
-  rows.push([oh.scpLabel || 'SCP', t.scp])
-  if ((oh.globalPct ?? 0) > 0) rows.push([oh.globalLabel || 'Global', t.glob])
-  rows.push([oh.govLaborLabel || 'Gov Labor', t.govLab])
-  rows.push(['Management Reserve', t.mgmtRsv])
-  rows.push([`Support Cost Rate (${pct(oh.scrPct)})`, t.scr])
+  if (oh?.showLineItems === false) {
+    rows.push(['Contract Fee', t.ohTotal + t.scr])
+  } else {
+    const items = Array.isArray(oh?.items) ? oh.items : []
+    items.filter(it => it.enabled).forEach(it => {
+      const cost = it.base === 'withOverhead' ? t.withOh * (it.pct || 0) : t.unloaded * (it.pct || 0)
+      const suffix = (it.pct || 0) > 0 ? ` (${pct(it.pct)})` : ''
+      rows.push([(it.label || 'Overhead item') + suffix, cost])
+    })
+  }
   rows.push(['Total Overhead', t.ohTotal + t.scr])
   rows.push([])
   rows.push(['LOADED TOTAL', t.totalLoaded])

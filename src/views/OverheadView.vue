@@ -32,98 +32,83 @@
         </label>
       </div>
 
-      <!-- Overhead items — each tickable independently. All percentages
-           apply to the unloaded project total. SCR additionally compounds
-           on top of the other enabled items. -->
+      <!-- Export display preference — controls what the printed quote shows -->
+      <div class="oh-section">
+        <div class="oh-section-head">On printed quote</div>
+        <div class="oh-display-body">
+          <label class="oh-display-opt">
+            <input type="radio" name="oh-display"
+              :checked="rom.overhead.showLineItems !== false"
+              @change="rom.overhead.showLineItems = true" />
+            <span class="oh-display-text">
+              <strong>Show all line items for contract fee</strong>
+              <span class="oh-display-sub">Each overhead row appears on the printed PDF / Excel / Word with its own dollar amount.</span>
+            </span>
+          </label>
+          <label class="oh-display-opt">
+            <input type="radio" name="oh-display"
+              :checked="rom.overhead.showLineItems === false"
+              @change="rom.overhead.showLineItems = false" />
+            <span class="oh-display-text">
+              <strong>Only show contract fee total on quote</strong>
+              <span class="oh-display-sub">The breakdown stays in this tool. Customer-facing docs show only the rolled-up Contract Fee.</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Overhead items — fully editable, deletable, addable. -->
       <div class="oh-section" :class="{ 'oh-section--off': !rom.overhead.overheadEnabled }">
-        <div class="oh-section-head">Overhead items <span class="oh-section-note">% of Unloaded Project Total · tick each to include in Contract Fee</span></div>
+        <div class="oh-section-head">
+          Overhead items
+          <span class="oh-section-note">% of Unloaded Project Total · tick each to include in Contract Fee</span>
+        </div>
 
-        <div class="oh-row">
+        <div v-for="(item, idx) in (rom.overhead.items || [])" :key="item.id" class="oh-row">
           <input type="checkbox" class="oh-tick"
-            :checked="rom.overhead.scpEnabled"
-            @change="rom.overhead.scpEnabled = $event.target.checked" />
+            :checked="item.enabled"
+            @change="rom.updateOverheadItem(rom.activeCoaId, item.id, { enabled: $event.target.checked })" />
           <div class="oh-label-wrap">
-            <input type="text" :value="rom.overhead.scpLabel" @input="rom.overhead.scpLabel = $event.target.value" class="oh-label-input" />
+            <input type="text" class="oh-label-input"
+              :value="item.label"
+              :placeholder="placeholderFor(idx)"
+              @input="rom.updateOverheadItem(rom.activeCoaId, item.id, { label: $event.target.value })" />
           </div>
           <div class="oh-pct-wrap">
             <input type="number" min="0" max="100" step="0.1"
-              :value="pctDisplay(rom.overhead.scpPct)"
-              @input="rom.overhead.scpPct = +$event.target.value / 100"
-              class="oh-input oh-input--pct" />
+              :value="pctDisplay(item.pct)"
+              class="oh-input oh-input--pct"
+              @input="rom.updateOverheadItem(rom.activeCoaId, item.id, { pct: (+$event.target.value || 0) / 100 })" />
             <span class="oh-suffix">%</span>
           </div>
-          <div class="oh-computed">{{ fmt(rom.scpCost) }}</div>
+          <select class="oh-base-select"
+            :value="item.base"
+            @change="rom.updateOverheadItem(rom.activeCoaId, item.id, { base: $event.target.value })"
+            title="Which base is this percentage applied to?">
+            <option value="unloaded">× Unloaded</option>
+            <option value="withOverhead">× Unloaded + Overhead</option>
+          </select>
+          <div class="oh-computed">{{ fmt(computeItemCost(item)) }}</div>
+          <button class="oh-row-del" type="button"
+            @click="rom.removeOverheadItem(rom.activeCoaId, item.id)"
+            title="Remove this overhead item">
+            <i class="ti ti-trash" aria-hidden="true"></i>
+          </button>
         </div>
 
-        <div class="oh-row">
-          <input type="checkbox" class="oh-tick"
-            :checked="rom.overhead.globalEnabled"
-            @change="rom.overhead.globalEnabled = $event.target.checked" />
-          <div class="oh-label-wrap">
-            <input type="text" :value="rom.overhead.globalLabel" @input="rom.overhead.globalLabel = $event.target.value" class="oh-label-input" />
-          </div>
-          <div class="oh-pct-wrap">
-            <input type="number" min="0" max="100" step="0.1"
-              :value="pctDisplay(rom.overhead.globalPct)"
-              @input="rom.overhead.globalPct = +$event.target.value / 100"
-              class="oh-input oh-input--pct" />
-            <span class="oh-suffix">%</span>
-          </div>
-          <div class="oh-computed">{{ fmt(rom.globalCost) }}</div>
-        </div>
-
-        <div class="oh-row">
-          <input type="checkbox" class="oh-tick"
-            :checked="rom.overhead.govLaborEnabled"
-            @change="rom.overhead.govLaborEnabled = $event.target.checked" />
-          <div class="oh-label-wrap">
-            <input type="text" :value="rom.overhead.govLaborLabel" @input="rom.overhead.govLaborLabel = $event.target.value" class="oh-label-input" />
-          </div>
-          <div class="oh-pct-wrap">
-            <input type="number" min="0" max="100" step="0.1"
-              :value="pctDisplay(rom.overhead.govLaborPct)"
-              @input="rom.overhead.govLaborPct = +$event.target.value / 100"
-              class="oh-input oh-input--pct" />
-            <span class="oh-suffix">%</span>
-          </div>
-          <div class="oh-computed">{{ fmt(rom.govLaborCost) }}</div>
-        </div>
-
-        <div class="oh-row">
-          <input type="checkbox" class="oh-tick"
-            :checked="rom.overhead.mgmtRsvEnabled"
-            @change="rom.overhead.mgmtRsvEnabled = $event.target.checked" />
-          <div class="oh-label-wrap"><span class="oh-label">Management Reserve</span></div>
-          <div class="oh-pct-wrap">
-            <input type="number" min="0" max="100" step="0.1"
-              :value="pctDisplay(rom.overhead.managementReservePct)"
-              @input="rom.overhead.managementReservePct = +$event.target.value / 100"
-              class="oh-input oh-input--pct" />
-            <span class="oh-suffix">%</span>
-          </div>
-          <div class="oh-computed">{{ fmt(rom.managementReserveCost) }}</div>
-        </div>
-
-        <div class="oh-row">
-          <input type="checkbox" class="oh-tick"
-            :checked="rom.overhead.scrEnabled"
-            @change="rom.overhead.scrEnabled = $event.target.checked" />
-          <div class="oh-label-wrap"><span class="oh-label">Support Cost Rate (SCR)</span></div>
-          <div class="oh-pct-wrap">
-            <input type="number" min="0" max="100" step="0.1"
-              :value="pctDisplay(rom.overhead.scrPct)"
-              @input="rom.overhead.scrPct = +$event.target.value / 100"
-              class="oh-input oh-input--pct" />
-            <span class="oh-suffix">%</span>
-          </div>
-          <div class="oh-computed">{{ fmt(rom.scrCost) }}</div>
+        <div class="oh-row oh-row--add">
+          <button class="oh-add-btn" type="button" @click="rom.addOverheadItem(rom.activeCoaId)">
+            <i class="ti ti-plus" aria-hidden="true"></i> Add overhead item
+          </button>
         </div>
 
         <div class="oh-row oh-row--fee">
           <div></div>
           <div class="oh-label-wrap"><strong class="oh-fee-label">Contract Fee</strong></div>
           <div class="oh-pct-wrap"><span class="oh-fee-hint">sum of ticked items</span></div>
+          <div></div>
           <div class="oh-computed oh-computed--fee">{{ fmt(rom.contractFee) }}</div>
+          <div></div>
         </div>
       </div>
 
@@ -145,6 +130,32 @@ import { useRomStore } from '../stores/rom'
 const rom = useRomStore()
 function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 function pctDisplay(v) { return ((v || 0) * 100).toFixed(1) }
+
+// Cost of one overhead item — accounts for master toggle, per-item enable,
+// and the item's base (unloaded vs unloaded + overhead).
+function computeItemCost(item) {
+  if (!rom.overhead?.overheadEnabled || !item.enabled) return 0
+  if (item.base === 'unloaded') {
+    return rom.unloadedProjectTotal * (item.pct || 0)
+  }
+  if (item.base === 'withOverhead') {
+    return rom.projectWithOverhead * (item.pct || 0)
+  }
+  return 0
+}
+
+// Placeholder text mirrors the legacy default contract-fee line labels.
+// Shows up faintly when the user clears or hasn't filled the field.
+const DEFAULT_OH_LABELS = [
+  'PM/Financial Support',
+  'Material Tracking',
+  'Government PM Labor',
+  'Management Reserve',
+  'Support Cost Rate (SCR)',
+]
+function placeholderFor(idx) {
+  return DEFAULT_OH_LABELS[idx] ?? 'Overhead item name'
+}
 </script>
 
 <style scoped>
@@ -201,12 +212,12 @@ function pctDisplay(v) { return ((v || 0) * 100).toFixed(1) }
   color: rgba(255,255,255,.6);
 }
 
-/* Rows — checkbox, label, percent, computed amount */
+/* Rows — checkbox, label, percent, base, computed amount, delete */
 .oh-row {
   display: grid;
-  grid-template-columns: 22px 1fr 130px 130px;
+  grid-template-columns: 22px 1fr 110px 160px 120px 32px;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--rom-border);
 }
@@ -249,6 +260,69 @@ function pctDisplay(v) { return ((v || 0) * 100).toFixed(1) }
   font-size: 18px !important; font-weight: 800 !important;
   color: #7dd3fc !important;
 }
+
+/* Base-type dropdown for each overhead item */
+.oh-base-select {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 11px;
+  border: 1px solid var(--rom-border);
+  border-radius: 4px;
+  background: var(--rom-surface);
+  color: var(--rom-text);
+  font-family: inherit;
+}
+.oh-base-select:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: var(--rom-accent); }
+
+/* Delete (trash) icon at the end of each row */
+.oh-row-del {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  background: transparent; border: none; border-radius: 4px;
+  color: var(--rom-text-faint, #8a9ab8);
+  cursor: pointer; font-size: 14px;
+}
+.oh-row-del:hover { background: #fff0f0; color: var(--rom-danger, #c0392b); }
+
+/* Add-row affordance */
+.oh-row--add { grid-template-columns: 1fr; padding: 10px 16px; }
+.oh-add-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  font-size: 12px; font-weight: 600;
+  border: 1px dashed var(--rom-accent);
+  border-radius: var(--rom-radius, 6px);
+  background: transparent; color: var(--rom-accent);
+  cursor: pointer; font-family: inherit;
+}
+.oh-add-btn:hover { background: var(--rom-accent-bg); }
+.oh-add-btn .ti { font-size: 14px; }
+
+/* "On printed quote" radio options — section-head stays as the navy banner;
+   the radio body sits below it inside the white surface of the section */
+.oh-display-body {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 12px 16px;
+}
+.oh-display-opt {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 6px 8px; cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: var(--rom-radius);
+  transition: background .12s, border-color .12s;
+}
+.oh-display-opt:hover { background: var(--rom-surface-alt); }
+.oh-display-opt:has(input:checked) {
+  background: var(--rom-accent-bg);
+  border-color: var(--rom-accent);
+}
+.oh-display-opt input[type="radio"] {
+  margin-top: 2px; cursor: pointer; flex-shrink: 0;
+  accent-color: var(--rom-accent-dark);
+}
+.oh-display-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.oh-display-text strong { font-size: 13px; color: var(--rom-text); font-weight: 600; }
+.oh-display-sub { font-size: 12px; color: var(--rom-text-muted); line-height: 1.4; }
 
 .oh-label-wrap { display: flex; align-items: center; }
 .oh-label { font-size: 13px; font-weight: 500; color: var(--rom-text); }

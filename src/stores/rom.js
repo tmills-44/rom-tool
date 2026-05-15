@@ -566,29 +566,37 @@ export const useRomStore = defineStore('rom', () => {
   if (Array.isArray(material.items)) {
     material.items.forEach(it => { if (!it.coaId) it.coaId = coas[0].id })
   }
-  // Each COA carries its own overhead percentages — defaults below.
-  // overheadEnabled is a master toggle; per-item *Enabled flags let users
-  // pick exactly which lines roll into the Contract Fee total.
+  // Each COA carries its own overhead — flexible list of items. Each item has
+  // { id, label, pct, enabled, base }. base is either 'unloaded' (pct of the
+  // unloaded project total) or 'withOverhead' (pct of unloaded + all enabled
+  // 'unloaded' items — typically SCR).
   function defaultOverhead() {
     return {
       overheadEnabled: true,
-      scpLabel: 'PM/Financial Support',     scpPct: 0.02,   scpEnabled: true,
-      globalLabel: 'Material Tracking',     globalPct: 0,   globalEnabled: true,
-      govLaborLabel: 'Government PM Labor', govLaborPct: 0.015, govLaborEnabled: true,
-      managementReservePct: 0.01,                          mgmtRsvEnabled: true,
-      scrPct: 0.12,                                        scrEnabled: true,
+      showLineItems:   true,    // export setting — show each line OR collapse to single Contract Fee
+      items: [
+        { id: 'oh-' + uuid(), label: 'PM/Financial Support',    pct: 0.02,  enabled: true, base: 'unloaded'     },
+        { id: 'oh-' + uuid(), label: 'Material Tracking',       pct: 0,     enabled: true, base: 'unloaded'     },
+        { id: 'oh-' + uuid(), label: 'Government PM Labor',     pct: 0.015, enabled: true, base: 'unloaded'     },
+        { id: 'oh-' + uuid(), label: 'Management Reserve',      pct: 0.01,  enabled: true, base: 'unloaded'     },
+        { id: 'oh-' + uuid(), label: 'Support Cost Rate (SCR)', pct: 0.12,  enabled: true, base: 'withOverhead' },
+      ],
     }
   }
-  // Migration: any overhead loaded from old saved state will be missing the
-  // *Enabled booleans. Backfill them so older data behaves identically (all on).
+  // Migration: convert legacy fixed-field overhead state into the flexible items shape.
   function backfillOverhead(oh) {
     if (!oh) return
-    if (typeof oh.overheadEnabled  !== 'boolean') oh.overheadEnabled  = true
-    if (typeof oh.scpEnabled       !== 'boolean') oh.scpEnabled       = true
-    if (typeof oh.globalEnabled    !== 'boolean') oh.globalEnabled    = true
-    if (typeof oh.govLaborEnabled  !== 'boolean') oh.govLaborEnabled  = true
-    if (typeof oh.mgmtRsvEnabled   !== 'boolean') oh.mgmtRsvEnabled   = true
-    if (typeof oh.scrEnabled       !== 'boolean') oh.scrEnabled       = true
+    if (typeof oh.overheadEnabled !== 'boolean') oh.overheadEnabled = true
+    if (typeof oh.showLineItems   !== 'boolean') oh.showLineItems   = true
+    if (!Array.isArray(oh.items)) {
+      oh.items = [
+        { id: 'oh-' + uuid(), label: oh.scpLabel      || 'PM/Financial Support',    pct: oh.scpPct        ?? 0.02,  enabled: oh.scpEnabled      ?? true, base: 'unloaded' },
+        { id: 'oh-' + uuid(), label: oh.globalLabel   || 'Material Tracking',       pct: oh.globalPct     ?? 0,     enabled: oh.globalEnabled   ?? true, base: 'unloaded' },
+        { id: 'oh-' + uuid(), label: oh.govLaborLabel || 'Government PM Labor',     pct: oh.govLaborPct   ?? 0.015, enabled: oh.govLaborEnabled ?? true, base: 'unloaded' },
+        { id: 'oh-' + uuid(), label: 'Management Reserve',                          pct: oh.managementReservePct ?? 0.01, enabled: oh.mgmtRsvEnabled ?? true, base: 'unloaded' },
+        { id: 'oh-' + uuid(), label: 'Support Cost Rate (SCR)',                     pct: oh.scrPct        ?? 0.12,  enabled: oh.scrEnabled      ?? true, base: 'withOverhead' },
+      ]
+    }
   }
   const overheadByCoa = reactive(saved?.overheadByCoa ?? {})
   // Migration: if a single saved.overhead exists from before COA support, move it onto the default COA
@@ -1067,22 +1075,49 @@ export const useRomStore = defineStore('rom', () => {
   }
   const materialTotalForQuote = computed(() =>
     quoteCoaIds.value.reduce((s, id) => s + materialTotalFor(id), 0))
-  // Per-item overhead helpers — return 0 when the master toggle or per-item
-  // toggle is off, OR when there's nothing to apply overhead to.
-  // All percentages now use unloaded project total as the base (no FY funds).
-  const unloadedProjectTotal  = computed(() => engineeringTotal.value + travelTotal.value + materialTotal.value)
-  function ohOn(field)        { return !!overhead.value?.overheadEnabled && !!overhead.value?.[field] }
-  const scpCost               = computed(() => ohOn('scpEnabled')      ? unloadedProjectTotal.value * (overhead.value?.scpPct        ?? 0) : 0)
-  const globalCost            = computed(() => ohOn('globalEnabled')   ? unloadedProjectTotal.value * (overhead.value?.globalPct     ?? 0) : 0)
-  const govLaborCost          = computed(() => ohOn('govLaborEnabled') ? unloadedProjectTotal.value * (overhead.value?.govLaborPct   ?? 0) : 0)
-  const managementReserveCost = computed(() => ohOn('mgmtRsvEnabled')  ? unloadedProjectTotal.value * (overhead.value?.managementReservePct ?? 0) : 0)
-  const projectOverheadTotal  = computed(() => scpCost.value + globalCost.value + govLaborCost.value + managementReserveCost.value)
-  const projectWithOverhead   = computed(() => unloadedProjectTotal.value + projectOverheadTotal.value)
-  const scrCost               = computed(() => ohOn('scrEnabled') ? projectWithOverhead.value * (overhead.value?.scrPct ?? 0) : 0)
-  // "Contract Fee" — total of everything overhead-flavored that's enabled
-  const totalOverhead         = computed(() => projectOverheadTotal.value + scrCost.value)
-  const contractFee           = totalOverhead
-  const totalLoadedCost       = computed(() => projectWithOverhead.value + scrCost.value)
+  // Overhead helpers — compute from the items[] array on the active scope.
+  // 'unloaded' base items multiply by the unloaded project total. 'withOverhead'
+  // items (typically SCR) multiply by unloaded + sum of enabled unloaded items.
+  const unloadedProjectTotal = computed(() => engineeringTotal.value + travelTotal.value + materialTotal.value)
+  const projectOverheadTotal = computed(() => {
+    const oh = overhead.value
+    if (!oh?.overheadEnabled) return 0
+    const items = oh.items ?? []
+    return items.reduce((s, it) => {
+      if (!it.enabled || it.base !== 'unloaded') return s
+      return s + unloadedProjectTotal.value * (it.pct || 0)
+    }, 0)
+  })
+  const projectWithOverhead = computed(() => unloadedProjectTotal.value + projectOverheadTotal.value)
+  const scrCost = computed(() => {
+    const oh = overhead.value
+    if (!oh?.overheadEnabled) return 0
+    const items = oh.items ?? []
+    return items.reduce((s, it) => {
+      if (!it.enabled || it.base !== 'withOverhead') return s
+      return s + projectWithOverhead.value * (it.pct || 0)
+    }, 0)
+  })
+  // "Contract Fee" — total of every enabled overhead item (both bases)
+  const totalOverhead = computed(() => projectOverheadTotal.value + scrCost.value)
+  const contractFee   = totalOverhead
+  const totalLoadedCost = computed(() => projectWithOverhead.value + scrCost.value)
+
+  // Backward-compat shims so existing exports that look up by these names
+  // still work (they read items by index from the default seed order).
+  function itemByIndex(oh, idx) { return oh?.items?.[idx] }
+  const scpCost      = computed(() => costForItem(overhead.value, 0))
+  const globalCost   = computed(() => costForItem(overhead.value, 1))
+  const govLaborCost = computed(() => costForItem(overhead.value, 2))
+  const managementReserveCost = computed(() => costForItem(overhead.value, 3))
+  function costForItem(oh, idx) {
+    if (!oh?.overheadEnabled) return 0
+    const it = itemByIndex(oh, idx)
+    if (!it?.enabled) return 0
+    if (it.base === 'unloaded')     return unloadedProjectTotal.value * (it.pct || 0)
+    if (it.base === 'withOverhead') return projectWithOverhead.value  * (it.pct || 0)
+    return 0
+  }
 
   // ── Mutations ─────────────────────────────────────────────────────
 
@@ -1401,22 +1436,68 @@ export const useRomStore = defineStore('rom', () => {
     const trips    = travelTotalFor(coaId)
     const mat      = materialTotalFor(coaId)
     const unloaded = labor + trips + mat
-    // Master toggle + per-item toggles. Each pct is applied to unloaded total.
-    const on = (f) => oh.overheadEnabled && oh[f]
-    const scp      = on('scpEnabled')      ? unloaded * (oh.scpPct        ?? 0) : 0
-    const glob     = on('globalEnabled')   ? unloaded * (oh.globalPct     ?? 0) : 0
-    const govLab   = on('govLaborEnabled') ? unloaded * (oh.govLaborPct   ?? 0) : 0
-    const mgmtRsv  = on('mgmtRsvEnabled')  ? unloaded * (oh.managementReservePct ?? 0) : 0
-    const ohTotal  = scp + glob + govLab + mgmtRsv
-    const withOh   = unloaded + ohTotal
-    const scr      = on('scrEnabled') ? withOh * (oh.scrPct ?? 0) : 0
+    const items    = Array.isArray(oh.items) ? oh.items : []
+    const masterOn = !!oh.overheadEnabled
+
+    // Sum all enabled 'unloaded'-base items
+    const ohTotal = items.reduce((s, it) => {
+      if (!masterOn || !it.enabled || it.base !== 'unloaded') return s
+      return s + unloaded * (it.pct || 0)
+    }, 0)
+    const withOh = unloaded + ohTotal
+    // Sum all enabled 'withOverhead'-base items (typically just SCR)
+    const scr = items.reduce((s, it) => {
+      if (!masterOn || !it.enabled || it.base !== 'withOverhead') return s
+      return s + withOh * (it.pct || 0)
+    }, 0)
+
+    // Back-compat fields for existing export code that reads by item index (default seed order)
+    const cost = (idx) => {
+      const it = items[idx]
+      if (!masterOn || !it?.enabled) return 0
+      if (it.base === 'unloaded')     return unloaded * (it.pct || 0)
+      if (it.base === 'withOverhead') return withOh   * (it.pct || 0)
+      return 0
+    }
+
     return {
       labor, trips, mat, unloaded,
-      scp, glob, govLab, mgmtRsv, ohTotal,
-      withOh, scr,
+      scp:     cost(0),
+      glob:    cost(1),
+      govLab:  cost(2),
+      mgmtRsv: cost(3),
+      ohTotal, withOh, scr,
       totalLoaded: withOh + scr,
       contractFee: ohTotal + scr,
+      items,                         // raw items, used by exports when showLineItems is true
+      showLineItems: oh.showLineItems !== false,
     }
+  }
+
+  // ── Overhead item mutations ───────────────────────────────────────
+  function addOverheadItem(coaId, opts = {}) {
+    const oh = overheadByCoa[coaId]
+    if (!oh) return
+    if (!Array.isArray(oh.items)) oh.items = []
+    oh.items.push({
+      id: 'oh-' + uuid(),
+      label: opts.label ?? 'New overhead item',
+      pct:   opts.pct   ?? 0,
+      enabled: true,
+      base:  opts.base ?? 'unloaded',
+    })
+  }
+  function removeOverheadItem(coaId, itemId) {
+    const oh = overheadByCoa[coaId]
+    if (!oh || !Array.isArray(oh.items)) return
+    const idx = oh.items.findIndex(i => i.id === itemId)
+    if (idx >= 0) oh.items.splice(idx, 1)
+  }
+  function updateOverheadItem(coaId, itemId, patch) {
+    const oh = overheadByCoa[coaId]
+    if (!oh || !Array.isArray(oh.items)) return
+    const it = oh.items.find(i => i.id === itemId)
+    if (it) Object.assign(it, patch)
   }
   // Grand total across every included scope (used by the topbar + summary)
   const totalLoadedForQuote = computed(() =>
@@ -1538,6 +1619,7 @@ export const useRomStore = defineStore('rom', () => {
     activeMaterialItems, materialUnloadedFor, materialTotalFor, materialTotalForQuote,
     overheadByCoa, laborTotalFor, laborHoursFor, travelTotalFor, coaTotals, totalLoadedForQuote,
     roleCostForCoa, phaseCostForCoa, entityCostForCoa,
+    addOverheadItem, removeOverheadItem, updateOverheadItem,
     addCoa, removeCoa, renameCoa, toggleCoaIncluded, setActiveCoa, duplicateCoa,
     exportStateForBackup, importStateFromBackup,
     showRates, showRowStatus, undo, redo, canUndo, canRedo,

@@ -13,6 +13,25 @@
 function fmt(n)    { return Math.round(n || 0) }
 function pct(v)    { return ((v || 0) * 100).toFixed(0) + '%' }
 function dollar(n) { return n ? '$' + Math.round(n).toLocaleString() : '$0' }
+// Build the overhead rows for the Word breakdown table. Collapses to a
+// single "Contract Fee" row when oh.showLineItems is false.
+function buildOverheadRowsHTML(oh, t) {
+  if (oh?.showLineItems === false) {
+    return `<tr><td>Contract Fee</td><td class="amt">${dollar(t.ohTotal + t.scr)}</td></tr>`
+  }
+  const items = Array.isArray(oh?.items) ? oh.items : []
+  return items
+    .filter(it => it.enabled)
+    .map(it => {
+      const cost = it.base === 'withOverhead'
+        ? t.withOh * (it.pct || 0)
+        : t.unloaded * (it.pct || 0)
+      const label = it.label || 'Overhead item'
+      const suffix = (it.pct || 0) > 0 ? ` (${pct(it.pct)})` : ''
+      return `<tr><td>${esc(label + suffix)}</td><td class="amt">${dollar(cost)}</td></tr>`
+    }).join('')
+}
+
 function esc(s)    {
   return String(s ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -104,11 +123,7 @@ function breakdownTable(rom, scope, t, oh) {
     <tr class="break-sub"><td>Unloaded Total</td><td class="amt">${dollar(t.unloaded)}</td></tr>
 
     <tr class="break-section"><td colspan="2">Overhead &amp; Rates</td></tr>
-    <tr><td>${esc(oh.scpLabel || 'SCP')}</td><td class="amt">${dollar(t.scp)}</td></tr>
-    ${(oh.globalPct ?? 0) > 0 ? `<tr><td>${esc(oh.globalLabel || 'Global')}</td><td class="amt">${dollar(t.glob)}</td></tr>` : ''}
-    <tr><td>${esc(oh.govLaborLabel || 'Gov Labor')}</td><td class="amt">${dollar(t.govLab)}</td></tr>
-    <tr><td>Management Reserve</td><td class="amt">${dollar(t.mgmtRsv)}</td></tr>
-    <tr><td>Support Cost Rate (${pct(oh.scrPct)})</td><td class="amt">${dollar(t.scr)}</td></tr>
+    ${buildOverheadRowsHTML(oh, t)}
     <tr class="break-sub"><td>Total Overhead</td><td class="amt">${dollar(t.ohTotal + t.scr)}</td></tr>
 
     <tr class="break-grand"><td>LOADED TOTAL</td><td class="amt">${dollar(t.totalLoaded)}</td></tr>

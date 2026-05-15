@@ -87,10 +87,6 @@
           <button class="btn btn-icon" :disabled="!rom.canRedo" @click="rom.redo" title="Redo">
             <i class="ti ti-arrow-forward-up" aria-hidden="true"></i>
           </button>
-          <button class="btn btn-snapshot" @click="showPicker = true" title="Rooms (templates + saved quotes)">
-            <i class="ti ti-layout-grid" aria-hidden="true"></i> Rooms
-            <span v-if="rom.snapshots.length > 0" class="snap-count">{{ rom.snapshots.length }}</span>
-          </button>
           <div class="save-split" v-click-outside="() => saveMenuOpen = false">
             <button class="btn btn-save btn-save--main" @click="downloadQuoteFile" title="Download this quote as a .rom.json file">
               <i class="ti ti-device-floppy" aria-hidden="true"></i> Save
