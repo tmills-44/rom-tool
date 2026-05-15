@@ -498,10 +498,10 @@ export const useRomStore = defineStore('rom', () => {
   // The user works on ONE COA at a time (activeCoaId) and ticks which
   // COAs to roll into the final printed quote (includeInQuote).
   const coas = reactive(saved?.coas ?? [
-    { id: 'coa-primary', name: 'COA 1 — Primary', description: '', includeInQuote: true }
+    { id: 'coa-primary', name: 'Scope 1 — Primary', description: '', includeInQuote: true }
   ])
-  // Guarantee at least one COA exists so the rest of the store always has a current scope
-  if (coas.length === 0) coas.push({ id: 'coa-primary', name: 'COA 1 — Primary', description: '', includeInQuote: true })
+  // Guarantee at least one scope exists so the rest of the store always has a current one
+  if (coas.length === 0) coas.push({ id: 'coa-primary', name: 'Scope 1 — Primary', description: '', includeInQuote: true })
   const activeCoaId = ref(saved?.activeCoaId ?? coas[0].id)
   // Sanity: if the saved active id no longer matches a COA, snap to the first one
   if (!coas.some(c => c.id === activeCoaId.value)) activeCoaId.value = coas[0].id
@@ -535,13 +535,29 @@ export const useRomStore = defineStore('rom', () => {
   const oconusCountries = ref([])        // sorted country names
   const oconusByCountry = reactive({})   // { "Japan": [{ location, lodging, mie }] }
   const material  = reactive(saved?.material  ?? { items: [], shippingPct: 0.03 })
-  const overhead  = reactive(saved?.overhead  ?? {
-    scpLabel: 'PM/Financial Support',     scpPct: 0.02,
-    globalLabel: 'Material Tracking',     globalPct: 0,
-    govLaborLabel: 'Government PM Labor', govLaborPct: 0.015,
-    managementReservePct: 0.01,
-    scrPct: 0.12,
-  })
+  // ── Migration: tag every existing material item with the default COA
+  if (Array.isArray(material.items)) {
+    material.items.forEach(it => { if (!it.coaId) it.coaId = coas[0].id })
+  }
+  // Each COA carries its own overhead percentages — defaults below.
+  function defaultOverhead() {
+    return {
+      scpLabel: 'PM/Financial Support',     scpPct: 0.02,
+      globalLabel: 'Material Tracking',     globalPct: 0,
+      govLaborLabel: 'Government PM Labor', govLaborPct: 0.015,
+      managementReservePct: 0.01,
+      scrPct: 0.12,
+    }
+  }
+  const overheadByCoa = reactive(saved?.overheadByCoa ?? {})
+  // Migration: if a single saved.overhead exists from before COA support, move it onto the default COA
+  if (Object.keys(overheadByCoa).length === 0) {
+    overheadByCoa[coas[0].id] = saved?.overhead ?? defaultOverhead()
+  }
+  // Make sure every COA has an overhead slot
+  coas.forEach(c => { if (!overheadByCoa[c.id]) overheadByCoa[c.id] = defaultOverhead() })
+  // Active-COA-scoped overhead — used everywhere existing code referenced `overhead.scpPct` etc.
+  const overhead = computed(() => overheadByCoa[activeCoaId.value] ?? overheadByCoa[coas[0].id])
 
   // Cronos is always on; gov and sub are opt-in
   const enabledEntities = ref(saved?.enabledEntities ?? ['cronos'])
@@ -686,6 +702,21 @@ export const useRomStore = defineStore('rom', () => {
   function roleCost(role, eid)      { return LIFECYCLE_PHASES.reduce((s, p) => s + phaseCost(role,  p.id, eid), 0) }
   function entityHours(eid) { return ROLES.reduce((s, r) => s + roleHours(r.id, eid), 0) }
   function entityCost(eid)  { return ROLES.reduce((s, r) => s + roleCost(r.id,  eid), 0) }
+
+  // Scope-aware variants (filtered to one scope) — used by exports for per-scope rollups
+  function roleCostForCoa(role, eid, coaId) {
+    return lineItems
+      .filter(l => l.role === role && (eid == null || l.entity === eid) && l.coaId === coaId)
+      .reduce((s, l) => s + lineCost(l), 0)
+  }
+  function phaseCostForCoa(role, phaseId, eid, coaId) {
+    return lineItems
+      .filter(l => l.role === role && l.phaseId === phaseId && (eid == null || l.entity === eid) && l.coaId === coaId)
+      .reduce((s, l) => s + lineCost(l), 0)
+  }
+  function entityCostForCoa(eid, coaId) {
+    return ROLES.reduce((s, r) => s + roleCostForCoa(r.id, eid, coaId), 0)
+  }
 
   // Scoped to the active COA — what the user is currently working on
   const engineeringTotal = computed(() =>
@@ -968,7 +999,7 @@ export const useRomStore = defineStore('rom', () => {
   function removeTravelLine() {}
 
   function addMaterialItem() {
-    material.items.push({ id: uuid(), description: '', qty: 1, unitCost: 0 })
+    material.items.push({ id: uuid(), description: '', qty: 1, unitCost: 0, coaId: activeCoaId.value })
   }
   function updateMaterialItem(id, patch) {
     const item = material.items.find(i => i.id === id)
@@ -979,17 +1010,29 @@ export const useRomStore = defineStore('rom', () => {
     if (idx >= 0) material.items.splice(idx, 1)
   }
 
-  const materialUnloaded      = computed(() => material.items.reduce((s, i) => s + (i.qty || 0) * (i.unitCost || 0), 0))
-  const shippingCost          = computed(() => materialUnloaded.value * material.shippingPct)
-  const materialTotal         = computed(() => materialUnloaded.value + shippingCost.value)
+  // Material totals scoped to the active COA
+  const activeMaterialItems = computed(() => material.items.filter(i => (i.coaId ?? coas[0].id) === activeCoaId.value))
+  const materialUnloaded    = computed(() => activeMaterialItems.value.reduce((s, i) => s + (i.qty || 0) * (i.unitCost || 0), 0))
+  const shippingCost        = computed(() => materialUnloaded.value * material.shippingPct)
+  const materialTotal       = computed(() => materialUnloaded.value + shippingCost.value)
+  // Helpers that compute material totals for any specific COA — used by Summary + exports
+  function materialUnloadedFor(coaId) {
+    return material.items.filter(i => (i.coaId ?? coas[0].id) === coaId).reduce((s, i) => s + (i.qty || 0) * (i.unitCost || 0), 0)
+  }
+  function materialTotalFor(coaId) {
+    const u = materialUnloadedFor(coaId)
+    return u + u * (material.shippingPct || 0)
+  }
+  const materialTotalForQuote = computed(() =>
+    quoteCoaIds.value.reduce((s, id) => s + materialTotalFor(id), 0))
   const unloadedProjectTotal  = computed(() => engineeringTotal.value + travelTotal.value + materialTotal.value)
-  const scpCost               = computed(() => project.anticipatedFYFunds * overhead.scpPct)
-  const globalCost            = computed(() => project.anticipatedFYFunds * overhead.globalPct)
-  const govLaborCost          = computed(() => project.anticipatedFYFunds * overhead.govLaborPct)
-  const managementReserveCost = computed(() => unloadedProjectTotal.value * overhead.managementReservePct)
+  const scpCost               = computed(() => project.anticipatedFYFunds * (overhead.value?.scpPct ?? 0))
+  const globalCost            = computed(() => project.anticipatedFYFunds * (overhead.value?.globalPct ?? 0))
+  const govLaborCost          = computed(() => project.anticipatedFYFunds * (overhead.value?.govLaborPct ?? 0))
+  const managementReserveCost = computed(() => unloadedProjectTotal.value * (overhead.value?.managementReservePct ?? 0))
   const projectOverheadTotal  = computed(() => scpCost.value + globalCost.value + govLaborCost.value + managementReserveCost.value)
   const projectWithOverhead   = computed(() => unloadedProjectTotal.value + projectOverheadTotal.value)
-  const scrCost               = computed(() => projectWithOverhead.value * overhead.scrPct)
+  const scrCost               = computed(() => projectWithOverhead.value * (overhead.value?.scrPct ?? 0))
   const totalOverhead         = computed(() => projectOverheadTotal.value + scrCost.value)
   const totalLoadedCost       = computed(() => projectWithOverhead.value + scrCost.value)
 
@@ -1088,34 +1131,70 @@ export const useRomStore = defineStore('rom', () => {
     const tmpl = TEMPLATES.find(t => t.id === templateId)
     if (!tmpl) return
 
-    // Clear labor
-    lineItems.splice(0, lineItems.length)
+    const targetCoa = activeCoaId.value   // template populates the currently-active scope
+
+    // Clear labor lines for THIS scope only (leave other scopes untouched)
+    for (let i = lineItems.length - 1; i >= 0; i--) {
+      if (lineItems[i].coaId === targetCoa) lineItems.splice(i, 1)
+    }
+    // Reset WBS to defaults (shared across scopes — same task catalog)
     Object.keys(wbs).forEach(k => delete wbs[k])
     Object.assign(wbs, deepClone(DEFAULT_WBS));
     (tmpl.seed ?? []).forEach(([role, taskId, days, hpd, laborCat]) => {
       let phaseId = null
       for (const p of LIFECYCLE_PHASES)
         if ((wbs[role]?.[p.id] ?? []).some(t => t.id === taskId)) { phaseId = p.id; break }
-      if (phaseId) addLine(role, phaseId, taskId, { entity: 'cronos', days, hoursPerDay: hpd, laborCat })
+      if (phaseId) addLine(role, phaseId, taskId, { entity: 'cronos', days, hoursPerDay: hpd, laborCat, coaId: targetCoa })
     })
 
-    // Clear travel and populate from travelSeed
-    ENTITIES.forEach(e => { travel[e.id] = [] })
+    // Clear travel for THIS scope only, then build new-shape trips from the legacy travelSeed
+    ENTITIES.forEach(e => {
+      const arr = travel[e.id]
+      if (!Array.isArray(arr)) return
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if ((arr[i].coaId ?? coas[0].id) === targetCoa) arr.splice(i, 1)
+      }
+    })
+    if (!Array.isArray(travel['cronos'])) travel['cronos'] = []
     const seedMonth = new Date().toLocaleString('en-US', { month: 'short' })
     ;(tmpl.travelSeed ?? []).forEach(([travelerName, days, persons, travelHours, hotel, rentalCar, airfare]) => {
+      // Each template travel seed becomes a trip with one traveler in the new shape.
+      const tripId = uuid()
       travel['cronos'].push({
-        id: uuid(), entity: 'cronos',
-        travelerName,
+        id: tripId,
+        entity: 'cronos',
+        coaId: targetCoa,
+        tripName: travelerName || '',
         region: 'conus', country: '', destination: '', state: '',
         travelMonth: seedMonth,
-        days, persons, travelHours,
         lodgingRate: 0, mieRate: 0,
-        hotel, rentalCar, airfare,
-        airfareRate: 600, baggageFees: 0,
-        rentalCarRate: 75, otherFees: 0,
+        defaultTravelHours: travelHours ?? 4,
+        defaultCarRate:     75,
+        defaultAirfareRate: 600,
+        defaultMiscRate:    50,
         gsaMonthlyRates: null,
+        travelers: [{
+          id: uuid(),
+          name: travelerName || '',
+          laborCat: '',
+          qty: Math.max(1, persons || 1),
+          days: days ?? 0,
+          travelHours: travelHours ?? 4,
+          hotel:   !!hotel,
+          car:     !!rentalCar,
+          airfare: !!airfare,
+          misc:    false,
+          lodgingRate: 0,
+          mieRate:     0,
+          carRate:     75,
+          airfareRate: 600,
+          miscRate:    50,
+        }],
       })
     })
+
+    // Make sure overhead has a slot for this scope
+    if (!overheadByCoa[targetCoa]) overheadByCoa[targetCoa] = defaultOverhead()
 
     project.templateId   = tmpl.id
     project.templateName = tmpl.name
@@ -1130,15 +1209,7 @@ export const useRomStore = defineStore('rom', () => {
       id: uuid(),
       name: name || 'Untitled',
       date: new Date().toISOString(),
-      state: {
-        project:       { ...project },
-        wbs:           deepClone(wbs),
-        lineItems:     deepClone(lineItems),
-        travel:        deepClone(travel),
-        material:      { ...material, items: deepClone(material.items) },
-        overhead:      { ...overhead },
-        enabledEntities: [...enabledEntities.value],
-      },
+      state: exportStateForBackup(),
     }
     snapshots.value.unshift(snap)
     try { localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshots.value)) } catch {}
@@ -1147,16 +1218,7 @@ export const useRomStore = defineStore('rom', () => {
   function restoreSnapshot(id) {
     const snap = snapshots.value.find(s => s.id === id)
     if (!snap) return
-    const s = snap.state
-    Object.assign(project, s.project)
-    lineItems.splice(0, lineItems.length, ...deepClone(s.lineItems))
-    Object.keys(wbs).forEach(k => delete wbs[k])
-    Object.assign(wbs, deepClone(s.wbs))
-    Object.keys(travel).forEach(k => delete travel[k])
-    Object.assign(travel, deepClone(s.travel))
-    Object.assign(material, { ...s.material, items: deepClone(s.material.items) })
-    Object.assign(overhead, s.overhead)
-    enabledEntities.value = [...s.enabledEntities]
+    importStateFromBackup(snap.state)
   }
 
   function deleteSnapshot(id) {
@@ -1170,21 +1232,32 @@ export const useRomStore = defineStore('rom', () => {
     const nextNum = coas.length + 1
     coas.push({
       id,
-      name: name && name.trim() ? name.trim() : `COA ${nextNum}`,
+      name: name && name.trim() ? name.trim() : `Scope ${nextNum}`,
       description: description ?? '',
       includeInQuote: true,
     })
+    overheadByCoa[id] = defaultOverhead()   // every new scope gets its own overhead settings
     activeCoaId.value = id   // switch to it immediately so the user can start filling it in
     return id
   }
   function removeCoa(id) {
-    if (coas.length <= 1) return       // never delete the last COA
+    if (coas.length <= 1) return       // never delete the last scope
     const idx = coas.findIndex(c => c.id === id)
     if (idx < 0) return
-    // Drop every line tagged to this COA
+    // Drop every line / trip / material item tagged to this scope, plus its overhead
     for (let i = lineItems.length - 1; i >= 0; i--) {
       if (lineItems[i].coaId === id) lineItems.splice(i, 1)
     }
+    ENTITIES.forEach(e => {
+      const arr = travel[e.id]
+      if (Array.isArray(arr)) {
+        for (let i = arr.length - 1; i >= 0; i--) if (arr[i].coaId === id) arr.splice(i, 1)
+      }
+    })
+    for (let i = material.items.length - 1; i >= 0; i--) {
+      if (material.items[i].coaId === id) material.items.splice(i, 1)
+    }
+    delete overheadByCoa[id]
     coas.splice(idx, 1)
     if (activeCoaId.value === id) activeCoaId.value = coas[0].id
   }
@@ -1211,11 +1284,130 @@ export const useRomStore = defineStore('rom', () => {
       description: src.description,
       includeInQuote: true,
     })
-    // Clone every line from src to the new COA
+    // Clone every line, trip, material item, and overhead settings from src to the new scope
     lineItems.filter(l => l.coaId === id).forEach(l => {
       lineItems.push({ ...l, id: uuid(), coaId: newId })
     })
+    ENTITIES.forEach(e => {
+      const arr = travel[e.id]
+      if (Array.isArray(arr)) {
+        arr.filter(t => t.coaId === id).forEach(t => {
+          const cloned = JSON.parse(JSON.stringify(t))
+          cloned.id = uuid()
+          cloned.coaId = newId
+          if (Array.isArray(cloned.travelers)) cloned.travelers.forEach(tr => { tr.id = uuid() })
+          arr.push(cloned)
+        })
+      }
+    })
+    material.items.filter(it => it.coaId === id).forEach(it => {
+      material.items.push({ ...it, id: uuid(), coaId: newId })
+    })
+    overheadByCoa[newId] = { ...(overheadByCoa[id] ?? defaultOverhead()) }
     activeCoaId.value = newId
+  }
+
+  // ── Per-COA aggregate totals (used by the upcoming Summary tab + exports) ──
+  function laborTotalFor(coaId) {
+    return lineItems.filter(l => l.coaId === coaId).reduce((s, l) => s + lineCost(l), 0)
+  }
+  function laborHoursFor(coaId) {
+    return lineItems.filter(l => l.coaId === coaId).reduce((s, l) => s + lineHours(l), 0)
+  }
+  function travelTotalFor(coaId) {
+    let t = 0
+    ENTITIES.forEach(e => (travel[e.id] ?? []).forEach(trip => {
+      if ((trip.coaId ?? coas[0].id) === coaId) t += tripCost(trip)
+    }))
+    return t
+  }
+  function coaTotals(coaId) {
+    const oh = overheadByCoa[coaId] ?? defaultOverhead()
+    const labor    = laborTotalFor(coaId)
+    const trips    = travelTotalFor(coaId)
+    const mat      = materialTotalFor(coaId)
+    const unloaded = labor + trips + mat
+    const scp      = project.anticipatedFYFunds * (oh.scpPct ?? 0)
+    const glob     = project.anticipatedFYFunds * (oh.globalPct ?? 0)
+    const govLab   = project.anticipatedFYFunds * (oh.govLaborPct ?? 0)
+    const mgmtRsv  = unloaded * (oh.managementReservePct ?? 0)
+    const ohTotal  = scp + glob + govLab + mgmtRsv
+    const withOh   = unloaded + ohTotal
+    const scr      = withOh * (oh.scrPct ?? 0)
+    return {
+      labor, trips, mat, unloaded,
+      scp, glob, govLab, mgmtRsv, ohTotal,
+      withOh, scr,
+      totalLoaded: withOh + scr,
+    }
+  }
+  // Grand total across every included scope (used by the topbar + summary)
+  const totalLoadedForQuote = computed(() =>
+    quoteCoaIds.value.reduce((s, id) => s + coaTotals(id).totalLoaded, 0))
+
+  // ── Backup file: export / import the entire project state ────────────
+  // Used by the "Save → Download backup" / "Load from backup" menu in the topbar.
+  function exportStateForBackup() {
+    return {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      project:         { ...project },
+      wbs:             deepClone(wbs),
+      lineItems:       deepClone(lineItems),
+      travel:          deepClone(travel),
+      material:        { ...material, items: deepClone(material.items) },
+      overheadByCoa:   deepClone(overheadByCoa),
+      enabledEntities: enabledEntities.value.slice(),
+      laborCats:       deepClone(laborCats),
+      coas:            deepClone(coas),
+      activeCoaId:     activeCoaId.value,
+      selectedTabId:   selectedTabId.value,
+      showRates:       showRates.value,
+      showRowStatus:   showRowStatus.value,
+    }
+  }
+  function importStateFromBackup(payload) {
+    if (!payload || typeof payload !== 'object') throw new Error('Empty or invalid file.')
+    // Reset every reactive container, then replace the contents.
+    if (payload.project)         Object.assign(project, payload.project)
+    if (payload.wbs) {
+      Object.keys(wbs).forEach(k => delete wbs[k])
+      Object.assign(wbs, deepClone(payload.wbs))
+    }
+    if (Array.isArray(payload.lineItems)) {
+      lineItems.splice(0, lineItems.length, ...deepClone(payload.lineItems))
+    }
+    if (payload.travel) {
+      Object.keys(travel).forEach(k => delete travel[k])
+      Object.assign(travel, deepClone(payload.travel))
+      Object.values(travel).forEach(arr => Array.isArray(arr) && arr.forEach(migrateTrip))
+    }
+    if (payload.material) {
+      Object.assign(material, { ...payload.material, items: deepClone(payload.material.items ?? []) })
+    }
+    if (payload.overheadByCoa) {
+      Object.keys(overheadByCoa).forEach(k => delete overheadByCoa[k])
+      Object.assign(overheadByCoa, deepClone(payload.overheadByCoa))
+    } else if (payload.overhead) {
+      // Older single-overhead backups — drop onto the first scope
+      Object.keys(overheadByCoa).forEach(k => delete overheadByCoa[k])
+      overheadByCoa[(payload.coas?.[0]?.id) || coas[0]?.id || 'coa-primary'] = deepClone(payload.overhead)
+    }
+    if (Array.isArray(payload.enabledEntities)) enabledEntities.value = payload.enabledEntities.slice()
+    if (Array.isArray(payload.laborCats)) {
+      laborCats.splice(0, laborCats.length, ...deepClone(payload.laborCats))
+    }
+    if (Array.isArray(payload.coas)) {
+      coas.splice(0, coas.length, ...deepClone(payload.coas))
+    }
+    if (payload.activeCoaId && coas.some(c => c.id === payload.activeCoaId)) {
+      activeCoaId.value = payload.activeCoaId
+    } else if (coas.length) {
+      activeCoaId.value = coas[0].id
+    }
+    if (payload.selectedTabId) selectedTabId.value = payload.selectedTabId
+    if (typeof payload.showRates    === 'boolean') showRates.value     = payload.showRates
+    if (typeof payload.showRowStatus === 'boolean') showRowStatus.value = payload.showRowStatus
   }
 
   function resetAll() {
@@ -1224,18 +1416,21 @@ export const useRomStore = defineStore('rom', () => {
     Object.keys(wbs).forEach(k => delete wbs[k]); Object.assign(wbs, deepClone(DEFAULT_WBS))
     Object.keys(travel).forEach(k => delete travel[k]); Object.assign(travel, emptyTravelData())
     Object.assign(material, { items: [], shippingPct: 0.03 })
-    Object.assign(overhead, { scpLabel: 'PM/Financial Support', scpPct: 0.02, globalLabel: 'Material Tracking', globalPct: 0, govLaborLabel: 'Government PM Labor', govLaborPct: 0.015, managementReservePct: 0.01, scrPct: 0.12 })
+    // Reset overhead for every scope
+    Object.keys(overheadByCoa).forEach(k => delete overheadByCoa[k])
+    coas.forEach(c => { overheadByCoa[c.id] = defaultOverhead() })
     enabledEntities.value = ['cronos']
     selectedTabId.value   = 'engineering'
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  watch([project, wbs, lineItems, travel, material, overhead, enabledEntities, selectedTabId, gsaRateMap, laborCats, showRates, showRowStatus, coas, activeCoaId], () => {
+  watch([project, wbs, lineItems, travel, material, overheadByCoa, enabledEntities, selectedTabId, gsaRateMap, laborCats, showRates, showRowStatus, coas, activeCoaId], () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         project: { ...project }, wbs: deepClone(wbs), lineItems: deepClone(lineItems),
         travel: deepClone(travel), material: { ...material, items: deepClone(material.items) },
-        overhead: { ...overhead }, enabledEntities: enabledEntities.value, selectedTabId: selectedTabId.value,
+        overheadByCoa: deepClone(overheadByCoa),
+        enabledEntities: enabledEntities.value, selectedTabId: selectedTabId.value,
         gsaRateMap: { ...gsaRateMap },
         laborCats: deepClone(laborCats),
         showRates: showRates.value,
@@ -1263,7 +1458,11 @@ export const useRomStore = defineStore('rom', () => {
     addLine, duplicateLine, removeLine, updateLine, swapLineOrder, reorderLine, enableEntity, disableEntity, applyTemplate, resetAll,
     coas, activeCoaId, activeCoa, activeLineItems, quoteCoaIds,
     engineeringTotalForQuote, engineeringHoursForQuote,
+    activeMaterialItems, materialUnloadedFor, materialTotalFor, materialTotalForQuote,
+    overheadByCoa, laborTotalFor, laborHoursFor, travelTotalFor, coaTotals, totalLoadedForQuote,
+    roleCostForCoa, phaseCostForCoa, entityCostForCoa,
     addCoa, removeCoa, renameCoa, toggleCoaIncluded, setActiveCoa, duplicateCoa,
+    exportStateForBackup, importStateFromBackup,
     showRates, showRowStatus, undo, redo, canUndo, canRedo,
     addMaterialItem, updateMaterialItem, removeMaterialItem,
     addTrip, updateTrip, removeTrip, tripCost, travelerCost, travelerRate, travelLaborCost,

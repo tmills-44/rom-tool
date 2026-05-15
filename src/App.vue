@@ -4,7 +4,7 @@
     <!-- ── Top bar ─────────────────────────────────────────────── -->
     <header class="topbar">
       <div class="topbar-left">
-        <i class="ti ti-anchor app-logo" aria-hidden="true"></i>
+        <img src="/logo.png" alt="Cronos" class="app-logo-img" />
         <div class="app-title">
           <div class="app-name">ROM Tool</div>
           <div class="app-sub">Rough Order of Magnitude Estimator</div>
@@ -19,14 +19,6 @@
 
       <div class="topbar-right">
         <CoaSelector />
-        <div class="rates-chip rates-chip--load" :title="`Page loaded ${pageLoadedFull}`">
-          <i class="ti ti-clock"></i>
-          Loaded: {{ pageLoadedAt }}
-        </div>
-        <div class="rates-chip" :title="ratesChipDetail">
-          <i class="ti ti-database"></i>
-          Rates: {{ ratesLoadedAt }}
-        </div>
         <div class="quote-total">
           <span class="quote-total-label">QUOTE TOTAL</span>
           <span class="quote-total-value">{{ fmt(rom.totalLoadedCost) }}</span>
@@ -37,16 +29,63 @@
         <button class="btn btn-icon" :disabled="!rom.canRedo" @click="rom.redo" title="Redo">
           <i class="ti ti-arrow-forward-up" aria-hidden="true"></i>
         </button>
-        <button class="btn btn-snapshot" @click="showSnapshots = true" title="Snapshots">
-          <i class="ti ti-camera" aria-hidden="true"></i> Snapshots
+        <button class="btn btn-snapshot" @click="showPicker = true" title="Rooms (templates + saved quotes)">
+          <i class="ti ti-layout-grid" aria-hidden="true"></i> Rooms
           <span v-if="rom.snapshots.length > 0" class="snap-count">{{ rom.snapshots.length }}</span>
         </button>
+        <div class="save-split" v-click-outside="() => saveMenuOpen = false">
+          <button class="btn btn-save btn-save--main" @click="downloadQuoteFile" title="Download this quote as a .rom.json file">
+            <i class="ti ti-device-floppy" aria-hidden="true"></i> Save
+          </button>
+          <button class="btn btn-save btn-save--caret" @click="saveMenuOpen = !saveMenuOpen" title="Save / load options" :aria-expanded="saveMenuOpen">
+            <i class="ti ti-chevron-down" aria-hidden="true"></i>
+          </button>
+          <div v-if="saveMenuOpen" class="save-menu">
+            <button class="save-menu-item" @click="downloadQuoteFile(); saveMenuOpen = false">
+              <i class="ti ti-download" aria-hidden="true"></i>
+              <div>
+                <div class="save-menu-title">Download backup</div>
+                <div class="save-menu-sub">Save this quote to a .rom.json file on your computer</div>
+              </div>
+            </button>
+            <button class="save-menu-item" @click="pickQuoteFile(); saveMenuOpen = false">
+              <i class="ti ti-upload" aria-hidden="true"></i>
+              <div>
+                <div class="save-menu-title">Load from backup</div>
+                <div class="save-menu-sub">Replace the current quote with one from a .rom.json file</div>
+              </div>
+            </button>
+          </div>
+          <input ref="loadFileInput" type="file" accept=".json,.rom.json,application/json"
+            style="display:none" @change="onQuoteFilePicked" />
+        </div>
         <button class="btn" @click="exportExcel" title="Export to Excel">
           <i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Excel
         </button>
-        <button class="btn btn-pdf" @click="exportPDF" title="Export to PDF">
-          <i class="ti ti-file-type-pdf" aria-hidden="true"></i> PDF
-        </button>
+        <div class="pdf-split" v-click-outside="() => pdfMenuOpen = false">
+          <button class="btn btn-pdf btn-pdf--main" @click="exportPDF('separate')" title="Export each included scope as a separate PDF">
+            <i class="ti ti-file-type-pdf" aria-hidden="true"></i> PDF
+          </button>
+          <button class="btn btn-pdf btn-pdf--caret" @click="pdfMenuOpen = !pdfMenuOpen" title="PDF export options" :aria-expanded="pdfMenuOpen">
+            <i class="ti ti-chevron-down" aria-hidden="true"></i>
+          </button>
+          <div v-if="pdfMenuOpen" class="pdf-menu">
+            <button class="pdf-menu-item" @click="exportPDF('separate'); pdfMenuOpen = false">
+              <i class="ti ti-files" aria-hidden="true"></i>
+              <div>
+                <div class="pdf-menu-title">Separate files</div>
+                <div class="pdf-menu-sub">One PDF per included scope</div>
+              </div>
+            </button>
+            <button class="pdf-menu-item" @click="exportPDF('combined'); pdfMenuOpen = false">
+              <i class="ti ti-file-stack" aria-hidden="true"></i>
+              <div>
+                <div class="pdf-menu-title">Combined document</div>
+                <div class="pdf-menu-sub">All scopes in one PDF + rollup page</div>
+              </div>
+            </button>
+          </div>
+        </div>
         <button class="btn" @click="exportPpt" title="Export to PowerPoint">
           <i class="ti ti-presentation" aria-hidden="true"></i> PPT
         </button>
@@ -161,12 +200,6 @@
       @close="showPicker = false"
     />
 
-    <!-- ── Snapshot modal ────────────────────────────────────────── -->
-    <SnapshotModal
-      v-if="showSnapshots"
-      @close="showSnapshots = false"
-    />
-
     <!-- ── Reset confirm modal ─────────────────────────────────── -->
     <div v-if="showReset" class="modal-backdrop" @click.self="showReset = false">
       <div class="confirm-modal">
@@ -189,7 +222,6 @@ import { generatePDF }   from './utils/pdfExport'
 import { generateExcel } from './utils/excelExport'
 import { loadAllRates }  from './utils/ratesLoader'
 import TemplatePicker from './components/TemplatePicker.vue'
-import SnapshotModal from './components/SnapshotModal.vue'
 import CoaSelector from './components/CoaSelector.vue'
 import EngineeringView from './views/EngineeringView.vue'
 import TravelView from './views/TravelView.vue'
@@ -202,7 +234,6 @@ const rom = useRomStore()
 
 const showPicker    = ref(false)
 const showReset     = ref(false)
-const showSnapshots = ref(false)
 const ratesStatus   = reactive({ conus: '', oconus: '', errors: [] })
 const ratesLoadedAt   = ref('')   // e.g. "May 15 · 2:34 PM"
 const ratesChipDetail = ref('')   // tooltip detail
@@ -280,12 +311,67 @@ async function exportExcel() {
 async function exportPpt() {
   alert('PowerPoint export — coming soon.')
 }
-async function exportPDF() {
+const pdfMenuOpen  = ref(false)
+const saveMenuOpen = ref(false)
+const loadFileInput = ref(null)
+
+async function exportPDF(mode = 'separate') {
   try {
-    await generatePDF(rom)
+    await generatePDF(rom, { mode })
   } catch (e) {
     alert('PDF export error: ' + e.message)
   }
+}
+
+// ── Quote backup file: download + load ─────────────────────────────────
+function downloadQuoteFile() {
+  try {
+    const payload = rom.exportStateForBackup()
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    const sponsor = (rom.project.sponsor || 'quote').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40)
+    const date    = (rom.project.date || new Date().toISOString().split('T')[0]).replace(/-/g, '')
+    a.download = `ROM_${sponsor}_${date}.rom.json`
+    document.body.appendChild(a)
+    a.click()
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 0)
+  } catch (e) {
+    alert('Could not save quote file: ' + e.message)
+  }
+}
+function pickQuoteFile() {
+  loadFileInput.value?.click()
+}
+function onQuoteFilePicked(ev) {
+  const file = ev.target.files?.[0]
+  if (!file) return
+  if (!window.confirm(`Loading "${file.name}" will replace the current quote. Continue?`)) {
+    ev.target.value = ''
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = () => {
+    try {
+      const payload = JSON.parse(reader.result)
+      rom.importStateFromBackup(payload)
+    } catch (e) {
+      alert('Could not load quote file: ' + e.message)
+    } finally {
+      ev.target.value = ''
+    }
+  }
+  reader.readAsText(file)
+}
+
+// Lightweight click-outside directive used by the PDF split-button menu
+const vClickOutside = {
+  mounted(el, binding) {
+    el.__clickOutside = (ev) => { if (!el.contains(ev.target)) binding.value() }
+    document.addEventListener('mousedown', el.__clickOutside)
+  },
+  unmounted(el) { document.removeEventListener('mousedown', el.__clickOutside) },
 }
 function confirmReset() { showReset.value = true }
 function doReset() {
@@ -386,7 +472,15 @@ body {
   font-weight: 600;
 }
 
-.app-logo { font-size: 22px; }
+.app-logo-img {
+  height: 36px; width: auto;
+  display: block;
+  /* The PNG has a white background. mix-blend-mode: multiply makes white
+     pixels multiply by the navy topbar color (so they vanish into it),
+     while the colored "C" and CRONOS text stay legible. */
+  mix-blend-mode: multiply;
+  filter: brightness(1.15) contrast(1.15);
+}
 .app-title { display: flex; flex-direction: column; line-height: 1.2; }
 .app-name  { font-size: 14px; font-weight: 500; }
 .app-sub   { font-size: 10px; color: rgba(255,255,255,.65); letter-spacing: .3px; }
@@ -424,6 +518,72 @@ body {
 .btn.btn-snapshot:hover { background: rgba(125,211,252,.15); }
 .btn.btn-pdf        { background: rgba(180,30,30,.35); border-color: rgba(220,80,80,.5); }
 .btn.btn-pdf:hover  { background: rgba(180,30,30,.55); }
+
+/* PDF split button */
+.pdf-split { position: relative; display: inline-flex; align-items: stretch; }
+.btn-pdf--main  { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.btn-pdf--caret {
+  padding: 6px 8px;
+  border-top-left-radius: 0; border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(220,80,80,.7);
+}
+.btn-pdf--caret i { font-size: 14px; }
+.pdf-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 60;
+  width: 260px;
+  background: var(--rom-surface, #fff);
+  color: var(--rom-text, #1a2133);
+  border: 1px solid var(--rom-border, #c4cede);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  overflow: hidden;
+}
+.pdf-menu-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  width: 100%; padding: 10px 14px;
+  background: transparent; border: none; border-bottom: 1px solid var(--rom-border, #c4cede);
+  font-family: inherit; text-align: left; cursor: pointer;
+  color: inherit;
+}
+.pdf-menu-item:last-child { border-bottom: none; }
+.pdf-menu-item:hover { background: var(--rom-accent-bg, #e8f0fe); }
+.pdf-menu-item i { font-size: 18px; color: var(--rom-accent, #1a5fb4); margin-top: 2px; flex-shrink: 0; }
+.pdf-menu-title { font-size: 13px; font-weight: 600; color: var(--rom-text, #1a2133); }
+.pdf-menu-sub   { font-size: 11px; color: var(--rom-text-muted, #4a5a78); margin-top: 1px; }
+
+/* Save split button */
+.save-split { position: relative; display: inline-flex; align-items: stretch; }
+.btn.btn-save        { background: rgba(125,211,252,.12); border-color: rgba(125,211,252,.4); }
+.btn.btn-save:hover  { background: rgba(125,211,252,.22); }
+.btn-save--main      { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.btn-save--caret     {
+  padding: 6px 8px;
+  border-top-left-radius: 0; border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(125,211,252,.5);
+}
+.btn-save--caret i   { font-size: 14px; }
+.save-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 60;
+  width: 280px;
+  background: var(--rom-surface, #fff);
+  color: var(--rom-text, #1a2133);
+  border: 1px solid var(--rom-border, #c4cede);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  overflow: hidden;
+}
+.save-menu-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  width: 100%; padding: 10px 14px;
+  background: transparent; border: none; border-bottom: 1px solid var(--rom-border, #c4cede);
+  font-family: inherit; text-align: left; cursor: pointer;
+  color: inherit;
+}
+.save-menu-item:last-child { border-bottom: none; }
+.save-menu-item:hover { background: var(--rom-accent-bg, #e8f0fe); }
+.save-menu-item i { font-size: 18px; color: var(--rom-accent, #1a5fb4); margin-top: 2px; flex-shrink: 0; }
+.save-menu-title { font-size: 13px; font-weight: 600; color: var(--rom-text, #1a2133); }
+.save-menu-sub   { font-size: 11px; color: var(--rom-text-muted, #4a5a78); margin-top: 1px; }
 .btn.btn-icon       { padding: 6px 8px; }
 .btn.btn-icon i     { font-size: 16px; }
 .btn:disabled       { opacity: .35; cursor: not-allowed; background: rgba(255,255,255,.05); }

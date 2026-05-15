@@ -12,7 +12,7 @@
     <!-- Dropdown panel -->
     <div v-if="open" class="coa-panel">
       <div class="coa-panel-head">
-        <span>Courses of Action</span>
+        <span>Scopes</span>
         <span class="coa-panel-hint">tick = include in printed quote</span>
       </div>
 
@@ -53,20 +53,24 @@
             </div>
           </button>
           <button class="coa-row-icon" @click.stop="startEdit(coa.id)" type="button" title="Rename"><i class="ti ti-edit" aria-hidden="true"></i></button>
-          <button class="coa-row-icon" @click.stop="rom.duplicateCoa(coa.id); open = false" type="button" title="Duplicate this COA"><i class="ti ti-copy" aria-hidden="true"></i></button>
+          <button class="coa-row-icon" @click.stop="rom.duplicateCoa(coa.id); open = false" type="button" title="Duplicate this scope"><i class="ti ti-copy" aria-hidden="true"></i></button>
           <button
             class="coa-row-icon coa-row-icon--danger"
+            :class="{ 'coa-row-icon--arm': armedDeleteId === coa.id }"
             @click.stop="confirmDelete(coa)"
             type="button"
             :disabled="rom.coas.length <= 1"
-            :title="rom.coas.length <= 1 ? 'Cannot delete the last COA' : 'Delete this COA'"
-          ><i class="ti ti-trash" aria-hidden="true"></i></button>
+            :title="rom.coas.length <= 1 ? 'Cannot delete the last scope' : (armedDeleteId === coa.id ? 'Click again to confirm' : 'Delete this scope')"
+          >
+            <i v-if="armedDeleteId !== coa.id" class="ti ti-trash" aria-hidden="true"></i>
+            <i v-else class="ti ti-check" aria-hidden="true"></i>
+          </button>
         </div>
       </div>
 
       <button class="coa-add" @click="rom.addCoa(); open = false" type="button">
         <i class="ti ti-plus" aria-hidden="true"></i>
-        Add another course of action
+        Add another scope
       </button>
     </div>
   </div>
@@ -80,6 +84,10 @@ const rom = useRomStore()
 const open = ref(false)
 const editingId = ref(null)
 const editInput = ref(null)
+// Inline "click twice to delete" — no Chrome popup. First click arms the row,
+// second click within 2.5s actually deletes. Clicking anywhere else cancels.
+const armedDeleteId = ref(null)
+let armTimer = null
 
 const totalCoas     = computed(() => rom.coas.length)
 const includedCount = computed(() => rom.coas.filter(c => c.includeInQuote).length)
@@ -98,13 +106,24 @@ function startEdit(id) {
 }
 function confirmDelete(coa) {
   if (rom.coas.length <= 1) return
-  const lines = coaLineCount(coa.id)
-  const msg = lines > 0
-    ? `Delete "${coa.name}" and its ${lines} line${lines === 1 ? '' : 's'}? This can't be undone.`
-    : `Delete "${coa.name}"?`
-  if (window.confirm(msg)) rom.removeCoa(coa.id)
+  if (armedDeleteId.value === coa.id) {
+    // Second click → actually delete
+    if (armTimer) { clearTimeout(armTimer); armTimer = null }
+    armedDeleteId.value = null
+    rom.removeCoa(coa.id)
+    return
+  }
+  // First click → arm and start the cancel timer
+  armedDeleteId.value = coa.id
+  if (armTimer) clearTimeout(armTimer)
+  armTimer = setTimeout(() => { armedDeleteId.value = null; armTimer = null }, 2500)
 }
-function close() { open.value = false; editingId.value = null }
+function close() {
+  open.value = false
+  editingId.value = null
+  armedDeleteId.value = null
+  if (armTimer) { clearTimeout(armTimer); armTimer = null }
+}
 
 function coaLineCount(id) {
   return rom.lineItems.filter(l => l.coaId === id).length
@@ -231,6 +250,15 @@ const vClickOutside = {
 .coa-row-icon:hover { background: var(--rom-surface-alt, #eaf0fb); color: var(--rom-accent, #1a5fb4); }
 .coa-row-icon--danger:hover:not(:disabled) { background: #fff0f0; color: var(--rom-danger, #c0392b); }
 .coa-row-icon:disabled { opacity: .3; cursor: not-allowed; }
+.coa-row-icon--arm {
+  background: var(--rom-danger, #c0392b) !important;
+  color: #fff !important;
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(192,57,43,0); }
+}
 
 .coa-add {
   display: flex; align-items: center; gap: 6px;

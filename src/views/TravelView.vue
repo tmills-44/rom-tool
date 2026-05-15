@@ -61,7 +61,7 @@
                 <input
                   type="text"
                   :value="trip.tripName ?? trip.travelerName ?? ''"
-                  placeholder="Trip name (e.g. System Install — MacDill AFB)"
+                  placeholder="Site location"
                   class="trip-name-input"
                   @input="rom.updateTrip(entity.id, trip.id, { tripName: $event.target.value })"
                 />
@@ -113,20 +113,25 @@
                   />
                 </div>
 
-                <!-- 3a. City (CONUS) -->
+                <!-- 3a. City (CONUS) — uses live GSA cache OR pre-loaded rates file OR free text -->
                 <div v-if="(trip.region || 'conus') === 'conus'" class="trip-field trip-field--city">
                   <label>
                     City
                     <span v-if="citiesLoading[trip.state]" class="spin-inline">⟳</span>
                   </label>
-                  <SearchSelect v-if="stateCities[trip.state]"
+                  <SearchSelect v-if="citiesForState(trip.state).length"
                     :model-value="trip.destination"
-                    :options="stateCities[trip.state].map(c => ({ value: c.city, label: c.city }))"
+                    :options="citiesForState(trip.state).map(c => ({ value: c.city, label: c.city }))"
                     placeholder="Search city…"
                     @update:model-value="onCitySelect(entity.id, trip, $event)"
                   />
-                  <div v-else-if="citiesLoading[trip.state]" class="city-placeholder">Loading…</div>
-                  <div v-else class="city-placeholder">{{ trip.state ? 'Loading…' : 'Select a state first' }}</div>
+                  <input v-else-if="trip.state" type="text" class="loc-text"
+                    :value="trip.destination"
+                    placeholder="Type city name…"
+                    @input="rom.updateTrip(entity.id, trip.id, { destination: $event.target.value })"
+                    @blur="onManualCityBlur(entity.id, trip)"
+                  />
+                  <div v-else class="city-placeholder">Select a state first</div>
                 </div>
 
                 <!-- 3b. Location (OCONUS) -->
@@ -280,7 +285,7 @@
                       <td class="t-col-name">
                         <input type="text"
                           :value="tr.name"
-                          placeholder="e.g. Aaron Mills"
+                          placeholder="Traveler"
                           @input="rom.updateTraveler(entity.id, trip.id, tr.id, { name: $event.target.value })" />
                       </td>
                       <td class="t-col-cat">
@@ -288,11 +293,11 @@
                           :value="tr.laborCat || ''"
                           class="cat-select"
                           @change="rom.updateTraveler(entity.id, trip.id, tr.id, { laborCat: $event.target.value })"
-                          :title="tr.laborCat ? `Travel labor: ${fmt(rom.travelLaborCost(tr))}` : 'Pick a pay category — travel hours × rate get added to the row total'"
+                          :title="rom.showRates && tr.laborCat ? `Travel labor: ${fmt(rom.travelLaborCost(tr))}` : 'Pick a pay category for this traveler'"
                         >
                           <option value="">— Pay cat —</option>
                           <option v-for="cat in rom.LABOR_CATS" :key="cat.id" :value="cat.id">
-                            {{ cat.label }} (${{ cat.defaultRate }}/hr)
+                            {{ rom.showRates ? `${cat.label} ($${cat.defaultRate}/hr)` : cat.label }}
                           </option>
                         </select>
                       </td>
@@ -619,9 +624,41 @@ function onCountryChange(entityId, trip, country) {
   gsaError[trip.id] = ''
 }
 
+// Unified city source — combines live GSA cache and pre-loaded rates file
+function citiesForState(stateCode) {
+  if (!stateCode) return []
+  // 1) Live GSA cache (preferred — carries gsaMonthlyRates for peak-month math)
+  const live = stateCities[stateCode]
+  if (Array.isArray(live) && live.length) return live
+  // 2) Pre-loaded CONUS rates file (rom.gsaRateMap)
+  const map = rom.gsaRateMap
+  if (!map) return []
+  const matches = []
+  for (const [key, val] of Object.entries(map)) {
+    if (!key.endsWith(`|${stateCode}`)) continue
+    const cityRaw = key.slice(0, key.lastIndexOf('|'))
+    const city    = cityRaw.replace(/\b\w/g, c => c.toUpperCase())
+    matches.push({
+      city,
+      lodging: val.lodging || 0,
+      mie:     val.mie     || 0,
+      gsaMonthlyRates: val.months || null,
+    })
+  }
+  return matches.sort((a, b) => a.city.localeCompare(b.city))
+}
+
+// When the user types a city manually (free text) and tabs out, try a live lookup
+function onManualCityBlur(entityId, trip) {
+  if (trip.destination?.trim() && trip.state?.length === 2) {
+    lookupGSA(entityId, trip)
+  }
+}
+
 function onCitySelect(entityId, trip, cityName) {
-  // Find the enriched city entry in cache
+  // Find the enriched city entry — check live cache first, then the pre-loaded rates file
   const cached = stateCities[trip.state]?.find(c => c.city === cityName)
+    ?? citiesForState(trip.state).find(c => c.city === cityName)
   if (!cached) {
     rom.updateTrip(entityId, trip.id, { destination: cityName })
     return
@@ -816,12 +853,21 @@ onMounted(() => {
 .trip-head-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 .trip-head-left .ti { color: var(--rom-accent); font-size: 14px; flex-shrink: 0; }
 .trip-name-input {
-  flex: 1; border: none; background: transparent;
+  flex: 1; min-width: 0;
   font-size: 13px; font-weight: 600; color: var(--rom-text);
-  padding: 0; min-width: 0;
+  padding: 5px 10px;
+  background: var(--rom-surface);
+  border: 1px solid var(--rom-border);
+  border-radius: 5px;
+  font-family: inherit;
 }
 .trip-name-input::placeholder { color: var(--rom-text-faint); font-weight: 400; }
-.trip-name-input:focus { outline: none; border-bottom: 1px solid var(--rom-accent); }
+.trip-name-input:hover { border-color: var(--rom-accent); }
+.trip-name-input:focus {
+  outline: 2px solid var(--rom-accent);
+  outline-offset: -1px;
+  border-color: var(--rom-accent);
+}
 .trip-head-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .trip-total { font-size: 14px; font-weight: 700; color: var(--rom-accent); }
 .del-btn {

@@ -1,174 +1,166 @@
 <template>
   <div class="summary-view">
 
-    <!-- Grand total hero -->
+    <!-- ── Hero strip — quote grand total across all INCLUDED scopes ── -->
     <div class="hero-strip">
       <div class="hero-left">
-        <div class="hero-label">Grand Total (Loaded)</div>
-        <div class="hero-value">{{ fmt(rom.totalLoadedCost) }}</div>
+        <div class="hero-label">Quote Grand Total (loaded)</div>
+        <div class="hero-value">{{ fmt(rom.totalLoadedForQuote) }}</div>
+        <div class="hero-sub">
+          {{ includedScopes.length }} of {{ rom.coas.length }} scope{{ rom.coas.length === 1 ? '' : 's' }} included
+          <span v-if="excludedScopes.length" class="hero-excluded">
+            · {{ excludedScopes.length }} excluded
+          </span>
+        </div>
       </div>
       <div class="hero-stats">
         <div class="hero-stat">
-          <div class="hero-stat-label">Engineering hrs</div>
-          <div class="hero-stat-value">{{ Math.round(rom.engineeringHours) }}</div>
+          <div class="hero-stat-label">Labor</div>
+          <div class="hero-stat-value">{{ fmt(rom.engineeringTotalForQuote) }}</div>
         </div>
         <div class="hero-stat">
-          <div class="hero-stat-label">Labor subtotal</div>
-          <div class="hero-stat-value">{{ fmt(rom.engineeringTotal) }}</div>
+          <div class="hero-stat-label">Travel</div>
+          <div class="hero-stat-value">{{ fmt(rom.travelTotalForQuote) }}</div>
         </div>
         <div class="hero-stat">
-          <div class="hero-stat-label">Overhead + SCR</div>
-          <div class="hero-stat-value">{{ fmt(rom.totalOverhead) }}</div>
+          <div class="hero-stat-label">Material</div>
+          <div class="hero-stat-value">{{ fmt(rom.materialTotalForQuote) }}</div>
         </div>
         <div class="hero-stat">
-          <div class="hero-stat-label">Travel + Material</div>
-          <div class="hero-stat-value">{{ fmt(rom.travelTotal + rom.materialTotal) }}</div>
+          <div class="hero-stat-label">Active scope</div>
+          <div class="hero-stat-value">{{ fmt(rom.totalLoadedCost) }}</div>
         </div>
       </div>
     </div>
 
-    <div class="sum-body">
-
-      <!-- Cost breakdown table -->
-      <div class="sum-card">
-        <div class="sum-card-head">Full Cost Breakdown</div>
-        <table class="break-table">
-          <tbody>
-            <tr class="break-section-row"><td colspan="2">Engineering Labor</td></tr>
-            <tr v-for="role in rom.ROLES" :key="role.id" class="break-detail-row">
-              <td><i class="ti" :class="role.icon"></i> {{ role.label }}</td>
-              <td class="amt">{{ fmt(rom.roleCost(role.id, null)) }}</td>
-            </tr>
-            <tr class="break-sub-row">
-              <td>Engineering Subtotal</td>
-              <td class="amt">{{ fmt(rom.engineeringTotal) }}</td>
-            </tr>
-
-            <tr class="break-section-row"><td colspan="2">Other Costs</td></tr>
-            <tr class="break-detail-row">
-              <td>Travel</td>
-              <td class="amt">{{ fmt(rom.travelTotal) }}</td>
-            </tr>
-            <tr class="break-detail-row">
-              <td>Material &amp; Shipping</td>
-              <td class="amt">{{ fmt(rom.materialTotal) }}</td>
-            </tr>
-            <tr class="break-sub-row">
-              <td>Unloaded Total</td>
-              <td class="amt">{{ fmt(rom.unloadedProjectTotal) }}</td>
-            </tr>
-
-            <tr class="break-section-row"><td colspan="2">Overhead</td></tr>
-            <tr class="break-detail-row">
-              <td>{{ rom.overhead.scpLabel }}</td>
-              <td class="amt">{{ fmt(rom.scpCost) }}</td>
-            </tr>
-            <tr class="break-detail-row" v-if="rom.overhead.globalPct > 0">
-              <td>{{ rom.overhead.globalLabel }}</td>
-              <td class="amt">{{ fmt(rom.globalCost) }}</td>
-            </tr>
-            <tr class="break-detail-row">
-              <td>{{ rom.overhead.govLaborLabel }}</td>
-              <td class="amt">{{ fmt(rom.govLaborCost) }}</td>
-            </tr>
-            <tr class="break-detail-row">
-              <td>Management Reserve</td>
-              <td class="amt">{{ fmt(rom.managementReserveCost) }}</td>
-            </tr>
-            <tr class="break-detail-row">
-              <td>SCR ({{ pctLabel(rom.overhead.scrPct) }}%)</td>
-              <td class="amt">{{ fmt(rom.scrCost) }}</td>
-            </tr>
-            <tr class="break-sub-row">
-              <td>Total Overhead</td>
-              <td class="amt">{{ fmt(rom.totalOverhead) }}</td>
-            </tr>
-
-            <tr class="break-grand-row">
-              <td>Grand Total (Loaded)</td>
-              <td class="amt">{{ fmt(rom.totalLoadedCost) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Engineering breakdown by entity -->
-      <div class="sum-card" v-if="rom.visibleEntities.length > 0">
-        <div class="sum-card-head">Engineering by Entity &amp; Role</div>
-        <table class="break-table">
-          <thead>
-            <tr>
-              <th>Role</th>
-              <th v-for="entity in rom.visibleEntities" :key="entity.id" class="amt">{{ entity.label }}</th>
-              <th class="amt">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="role in rom.ROLES" :key="role.id" class="break-detail-row">
-              <td><i class="ti" :class="role.icon"></i> {{ role.label }}</td>
-              <td v-for="entity in rom.visibleEntities" :key="entity.id" class="amt">
-                {{ fmt(rom.roleCost(role.id, entity.id)) }}
-              </td>
-              <td class="amt font-bold">{{ fmt(rom.roleCost(role.id, null)) }}</td>
-            </tr>
-            <tr class="break-sub-row">
-              <td>Total</td>
-              <td v-for="entity in rom.visibleEntities" :key="entity.id" class="amt">
-                {{ fmt(rom.entityCost(entity.id)) }}
-              </td>
-              <td class="amt">{{ fmt(rom.engineeringTotal) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Engineering breakdown by phase -->
-      <div class="sum-card">
-        <div class="sum-card-head">Engineering by Phase</div>
-        <table class="break-table">
-          <thead>
-            <tr>
-              <th>Phase</th>
-              <th v-for="role in rom.ROLES" :key="role.id" class="amt">{{ roleShort(role.id) }}</th>
-              <th class="amt">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="phase in rom.LIFECYCLE_PHASES" :key="phase.id" class="break-detail-row">
-              <td>{{ phase.label }}</td>
-              <td v-for="role in rom.ROLES" :key="role.id" class="amt">
-                {{ fmt(rom.phaseCost(role.id, phase.id, null)) }}
-              </td>
-              <td class="amt font-bold">
-                {{ fmt(rom.ROLES.reduce((s, r) => s + rom.phaseCost(r.id, phase.id, null), 0)) }}
-              </td>
-            </tr>
-            <tr class="break-sub-row">
-              <td>Total</td>
-              <td v-for="role in rom.ROLES" :key="role.id" class="amt">{{ fmt(rom.roleCost(role.id, null)) }}</td>
-              <td class="amt">{{ fmt(rom.engineeringTotal) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
+    <!-- ── Empty state hint ─────────────────────────────────────────── -->
+    <div v-if="!includedScopes.length" class="empty-banner">
+      No scopes ticked for the quote. Open the Scopes dropdown and tick the ones you want.
     </div>
+
+    <!-- ── Side-by-side: every included scope as its own column ──────── -->
+    <div v-if="includedScopes.length" class="sum-card sum-card--scroll">
+      <div class="sum-card-head">Full breakdown — side-by-side</div>
+      <table class="break-table break-table--cols">
+        <thead>
+          <tr>
+            <th class="col-label">Line item</th>
+            <th v-for="c in includedScopes" :key="c.id" class="amt col-scope">
+              <div>{{ c.name.split(' — ')[0] || c.name }}</div>
+              <div class="th-sub" v-if="c.name.includes(' — ')">{{ c.name.split(' — ').slice(1).join(' — ') }}</div>
+            </th>
+            <th class="amt col-total">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <!-- Labor section -->
+          <tr class="break-section-row"><td :colspan="cols">Labor</td></tr>
+          <tr v-for="role in rom.ROLES" :key="`r-${role.id}`" class="break-detail-row">
+            <td class="col-label-cell"><i class="ti" :class="role.icon"></i> {{ role.label }}</td>
+            <td v-for="c in includedScopes" :key="c.id" class="amt">
+              {{ fmt(coaLaborByRole(c.id, role.id)) }}
+            </td>
+            <td class="amt col-total">{{ fmt(rolledLabor(role.id)) }}</td>
+          </tr>
+          <tr class="break-sub-row">
+            <td>Labor subtotal</td>
+            <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.laborTotalFor(c.id)) }}</td>
+            <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.laborTotalFor(c.id))) }}</td>
+          </tr>
+
+          <!-- Travel section -->
+          <tr class="break-section-row"><td :colspan="cols">Travel</td></tr>
+          <tr class="break-detail-row">
+            <td class="col-label-cell"><i class="ti ti-plane" aria-hidden="true"></i> Trips + per diem</td>
+            <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.travelTotalFor(c.id)) }}</td>
+            <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.travelTotalFor(c.id))) }}</td>
+          </tr>
+
+          <!-- Material section -->
+          <tr class="break-section-row"><td :colspan="cols">Material</td></tr>
+          <tr class="break-detail-row">
+            <td class="col-label-cell"><i class="ti ti-package" aria-hidden="true"></i> Equipment (unloaded)</td>
+            <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.materialUnloadedFor(c.id)) }}</td>
+            <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.materialUnloadedFor(c.id))) }}</td>
+          </tr>
+          <tr class="break-detail-row">
+            <td class="col-label-cell">Shipping ({{ (rom.material.shippingPct * 100).toFixed(1) }}%)</td>
+            <td v-for="c in includedScopes" :key="c.id" class="amt">
+              {{ fmt(rom.materialUnloadedFor(c.id) * rom.material.shippingPct) }}
+            </td>
+            <td class="amt col-total">
+              {{ fmt(sum(includedScopes, c => rom.materialUnloadedFor(c.id) * rom.material.shippingPct)) }}
+            </td>
+          </tr>
+          <tr class="break-sub-row">
+            <td>Material subtotal</td>
+            <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.materialTotalFor(c.id)) }}</td>
+            <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.materialTotalFor(c.id))) }}</td>
+          </tr>
+
+          <!-- Unloaded sub -->
+          <tr class="break-sub-row break-sub-row--strong">
+            <td>Unloaded subtotal</td>
+            <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.coaTotals(c.id).unloaded) }}</td>
+            <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.coaTotals(c.id).unloaded)) }}</td>
+          </tr>
+
+          <!-- Overhead section -->
+          <tr class="break-section-row"><td :colspan="cols">Overhead</td></tr>
+          <tr class="break-detail-row">
+            <td class="col-label-cell">Project overhead (SCP + Global + Gov + Mgmt rsv)</td>
+            <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.coaTotals(c.id).ohTotal) }}</td>
+            <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.coaTotals(c.id).ohTotal)) }}</td>
+          </tr>
+          <tr class="break-detail-row">
+            <td class="col-label-cell">SCR loading</td>
+            <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.coaTotals(c.id).scr) }}</td>
+            <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.coaTotals(c.id).scr)) }}</td>
+          </tr>
+
+          <!-- Grand row -->
+          <tr class="break-grand-row">
+            <td>Loaded total</td>
+            <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.coaTotals(c.id).totalLoaded) }}</td>
+            <td class="amt col-total">{{ fmt(rom.totalLoadedForQuote) }}</td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRomStore } from '../stores/rom'
+
 const rom = useRomStore()
 
+const includedScopes = computed(() => rom.coas.filter(c => c.includeInQuote))
+const excludedScopes = computed(() => rom.coas.filter(c => !c.includeInQuote))
+const cols           = computed(() => includedScopes.value.length + 2)
+
+// Labor cost for one scope filtered to a specific role
+function coaLaborByRole(coaId, roleId) {
+  return rom.lineItems
+    .filter(l => l.coaId === coaId && l.role === roleId)
+    .reduce((s, l) => s + rom.lineCost(l), 0)
+}
+function rolledLabor(roleId) {
+  return includedScopes.value.reduce((s, c) => s + coaLaborByRole(c.id, roleId), 0)
+}
+function sum(arr, fn) { return arr.reduce((s, x) => s + fn(x), 0) }
+
 function fmt(n) { return n ? '$' + Math.round(n).toLocaleString() : '—' }
-function pctLabel(v) { return ((v || 0) * 100).toFixed(0) }
-function roleShort(id) { return { engineering: 'Eng', pm: 'PM', technician: 'Tech' }[id] ?? id }
 </script>
 
 <style scoped>
 .summary-view { padding: 0 0 48px; }
 
-/* Hero strip */
+/* Hero */
 .hero-strip {
   display: flex; align-items: center; justify-content: space-between;
   padding: 20px 24px;
@@ -177,78 +169,87 @@ function roleShort(id) { return { engineering: 'Eng', pm: 'PM', technician: 'Tec
   gap: 24px;
 }
 .hero-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.6); margin-bottom: 4px; }
-.hero-value { font-size: 32px; font-weight: 700; color: #7dd3fc; }
-.hero-stats { display: flex; gap: 32px; flex-shrink: 0; }
-.hero-stat { text-align: right; }
-.hero-stat-label { font-size: 10px; color: rgba(255,255,255,.5); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
-.hero-stat-value { font-size: 15px; font-weight: 600; color: rgba(255,255,255,.9); }
+.hero-value { font-size: 32px; font-weight: 700; color: #7dd3fc; line-height: 1.1; }
+.hero-sub { font-size: 12px; color: rgba(255,255,255,.7); margin-top: 4px; }
+.hero-excluded { color: rgba(255,255,255,.5); font-style: italic; }
+.hero-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.hero-stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: rgba(255,255,255,.55); margin-bottom: 2px; }
+.hero-stat-value { font-size: 16px; font-weight: 600; color: #fff; }
 
-/* Body */
-.sum-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+/* Empty state */
+.empty-banner {
+  margin: 16px 24px;
+  padding: 12px 16px;
+  background: #fff8e1;
+  border: 1px solid #f5c97a;
+  border-radius: 6px;
+  font-size: 13px; color: #92400e;
+}
 
 /* Cards */
 .sum-card {
   background: var(--rom-surface);
   border: 1px solid var(--rom-border);
-  border-radius: var(--rom-radius-lg);
+  border-radius: 8px;
+  margin: 16px 24px;
   overflow: hidden;
 }
 .sum-card-head {
-  padding: 9px 16px;
-  background: var(--rom-header-bg);
-  color: #fff;
-  font-size: 12px; font-weight: 600; letter-spacing: .04em;
-}
-
-/* Tables */
-.break-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.break-table th {
-  padding: 8px 14px;
-  text-align: left;
-  font-size: 11px; font-weight: 600;
+  padding: 10px 16px;
+  font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
   color: var(--rom-text-muted);
   background: var(--rom-surface-alt);
   border-bottom: 1px solid var(--rom-border);
+  display: flex; align-items: center; justify-content: space-between;
 }
-.break-table th.amt { text-align: right; }
+.sum-card-head--scope { color: var(--rom-accent-dark); text-transform: none; font-size: 14px; }
+.head-total { font-size: 16px; font-weight: 700; color: var(--rom-accent-dark); }
+.sum-card--scroll { overflow-x: auto; }
+
+.break-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.break-table--cols th, .break-table--cols td { min-width: 100px; }
+.break-table th, .break-table td { padding: 8px 14px; border-bottom: 1px solid var(--rom-border); }
+.break-table th {
+  text-align: left; background: var(--rom-surface-alt);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  color: var(--rom-text-muted);
+  white-space: nowrap;
+}
+.break-table .col-label { min-width: 260px; }
+.break-table .col-scope { text-align: right; min-width: 120px; }
+.break-table .col-scope .th-sub { font-size: 10px; font-weight: 500; color: var(--rom-text-faint); text-transform: none; letter-spacing: 0; margin-top: 2px; }
+.break-table .col-total { background: var(--rom-accent-bg); color: var(--rom-accent-dark); text-align: right; min-width: 120px; }
+.break-table .col-label-cell { padding-left: 28px; color: var(--rom-text-muted); }
+.amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .break-section-row td {
-  padding: 7px 14px 4px;
+  padding: 6px 14px;
+  background: var(--rom-surface-alt);
   font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .06em;
-  color: var(--rom-text-faint);
-  background: var(--rom-bg);
-  border-top: 1px solid var(--rom-border);
-}
-.break-detail-row td {
-  padding: 7px 14px;
+  color: var(--rom-accent-dark);
   border-bottom: 1px solid var(--rom-border);
-  color: var(--rom-text-muted);
 }
-.break-detail-row td .ti { font-size: 12px; margin-right: 4px; opacity: .6; }
-.break-detail-row:last-child td { border-bottom: none; }
+
+.break-detail-row td { color: var(--rom-text); }
+.break-detail-row td.amt { color: var(--rom-text); }
 .break-detail-row:hover td { background: var(--rom-surface-alt); }
 
 .break-sub-row td {
-  padding: 9px 14px;
-  font-weight: 600; font-size: 13px;
-  color: var(--rom-text);
-  background: var(--rom-surface-alt);
-  border-top: 2px solid var(--rom-border);
-  border-bottom: none;
+  font-weight: 700;
+  background: #fafafb;
+  border-top: 1px solid var(--rom-border);
 }
-.break-grand-row td {
-  padding: 12px 14px;
-  font-weight: 700; font-size: 15px;
-  color: var(--rom-accent-dark);
-  background: var(--rom-accent-bg);
-  border-top: 2px solid var(--rom-accent);
-}
+.break-sub-row--strong td { background: #f0f4fb; }
 
-.amt { text-align: right; }
-.font-bold { font-weight: 600; color: var(--rom-text); }
+.break-grand-row td {
+  background: var(--rom-header-bg);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+}
+.break-grand-row td.col-total { background: var(--rom-accent-dark); color: #7dd3fc; font-size: 16px; }
+
 </style>

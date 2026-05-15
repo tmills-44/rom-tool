@@ -5,7 +5,7 @@
     <div class="summary-strip">
       <div class="summary-card">
         <div class="sc-label">Line Items</div>
-        <div class="sc-value">{{ rom.material.items.length }}</div>
+        <div class="sc-value">{{ rom.activeMaterialItems.length }}</div>
       </div>
       <div class="summary-card">
         <div class="sc-label">Hardware Subtotal</div>
@@ -40,10 +40,10 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-if="rom.material.items.length === 0">
+            <tr v-if="rom.activeMaterialItems.length === 0">
               <td colspan="5" class="empty-row">No items yet — click <strong>+ Add Item</strong> to begin.</td>
             </tr>
-            <tr v-for="item in rom.material.items" :key="item.id" class="bom-row">
+            <tr v-for="item in rom.activeMaterialItems" :key="item.id" class="bom-row">
               <td class="col-desc">
                 <input
                   class="cell-input desc-input"
@@ -80,7 +80,7 @@
               </td>
             </tr>
           </tbody>
-          <tfoot v-if="rom.material.items.length > 0">
+          <tfoot v-if="rom.activeMaterialItems.length > 0">
             <tr class="subtotal-row">
               <td colspan="3">Hardware Subtotal</td>
               <td>{{ fmt(hardwareSubtotal) }}</td>
@@ -126,7 +126,7 @@ import { useRomStore } from '../stores/rom'
 const rom = useRomStore()
 
 const hardwareSubtotal = computed(() =>
-  rom.material.items.reduce((s, i) => s + (i.qty || 0) * (i.unitCost || 0), 0)
+  rom.activeMaterialItems.reduce((s, i) => s + (i.qty || 0) * (i.unitCost || 0), 0)
 )
 
 const shippingAmount = computed(() =>
