@@ -87,7 +87,6 @@
           type="text"
           :value="rom.project.sponsor"
           @input="rom.project.sponsor = $event.target.value"
-          placeholder="e.g. Navy SPAWAR"
         />
       </div>
       <div class="proj-field">
@@ -96,16 +95,14 @@
           type="text"
           :value="rom.project.roomName"
           @input="rom.project.roomName = $event.target.value"
-          placeholder="e.g. Radio Room A"
         />
       </div>
       <div class="proj-field">
-        <label>Project Engineer</label>
+        <label>Project Lead</label>
         <input
           type="text"
           :value="rom.project.projectEngineer"
           @input="rom.project.projectEngineer = $event.target.value"
-          placeholder="Your name"
         />
       </div>
       <div class="proj-field proj-field--date">
