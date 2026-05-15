@@ -29,10 +29,6 @@ npm-debug.log*
 # Temp/lock Office files
 ~$*
 
-# Per diem rate files (user-supplied, not committed)
-public/rates/conus.xlsx
-public/rates/oconus.xlsx
-public/rates/oconus.xls
 
 # Accidental nested src copy
 src/src/
