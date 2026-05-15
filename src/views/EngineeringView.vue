@@ -523,8 +523,9 @@ function roleIcon(role) {
 }
 
 // ── Task change — handle "Custom…" sentinel ──────────────────────────
-// Picking a real task also auto-fills its baseline Days from TASK_DEFAULTS
-// (only when the user hasn't already typed their own Days value).
+// Picking a task sets taskId and makes sure Hrs/Day carries the phase's
+// default (the small number next to the "Hrs/Day" header). Days is left
+// at 0 — the user fills it in manually, or loads it via a template.
 function onTaskChange(line, value) {
   if (value === '__custom__') {
     customTaskMode[line.id] = true
@@ -532,12 +533,9 @@ function onTaskChange(line, value) {
     return
   }
   const patch = { taskId: value }
-  const defaultDays = TASK_DEFAULTS[value]
-  // Apply default Days when:
-  //  - the task has a baseline in TASK_DEFAULTS, AND
-  //  - the row's current Days is empty/zero (don't clobber user input)
-  if (defaultDays != null && !(line.days > 0)) {
-    patch.days = defaultDays
+  // Make sure Hrs/Day reflects the phase default if the row hasn't got one yet
+  if (!(line.hoursPerDay > 0)) {
+    patch.hoursPerDay = getDefaultHrs(line.entity, line.phaseId)
   }
   rom.updateLine(line.id, patch)
 }
