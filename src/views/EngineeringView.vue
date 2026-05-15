@@ -650,14 +650,12 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 }
 .phase-section--has-lines > .phase-head {
   background: var(--rom-accent-bg);
-  border-left: 6px solid var(--rom-accent, #1a5fb4);
 }
 
 .phase-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 18px; cursor: pointer; user-select: none;
   transition: background .12s;
-  border-left: 6px solid transparent;
 }
 .phase-head:hover { background: var(--rom-surface-alt); }
 .phase-section--has-lines > .phase-head:hover { background: #dce8fb; }
@@ -762,18 +760,18 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .col-role  { width: 52px; }
 .col-cat   { width: 120px; }
 .col-task  { min-width: 200px; }
-.col-days  { width: 90px; }
-.col-hpd   { width: 110px; }
+.col-days  { width: 120px; }
+.col-hpd   { width: 140px; }
 .col-hpd-head {
   display: inline-flex; align-items: center; gap: 6px;
 }
 .col-default-input {
-  width: 38px;
-  height: 20px;
+  width: 58px;
+  height: 22px;
   font-size: 11px;
   font-weight: 600;
-  text-align: center;
-  padding: 0 2px;
+  text-align: left;
+  padding: 0 4px;
   border: 1px solid var(--rom-border);
   border-radius: 3px;
   background: var(--rom-surface);
@@ -784,7 +782,7 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   outline-offset: -1px;
   border-color: transparent;
 }
-.col-hrs   { width: 100px; }
+.col-hrs   { width: 130px; }
 .col-rate  { width: 100px; }
 .col-total { width: 110px; font-weight: 700; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
 .col-del   { width: 36px; }
@@ -863,7 +861,7 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .custom-task-back:hover { border-color: var(--rom-accent); color: var(--rom-accent); }
 
 .cell-num {
-  width: 100%; padding: 4px 6px; font-size: 12px; text-align: right;
+  width: 100%; padding: 4px 22px 4px 6px; font-size: 12px; text-align: right;
   border: 1px solid transparent; border-radius: 4px;
   background: transparent; color: var(--rom-text);
 }

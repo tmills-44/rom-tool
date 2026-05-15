@@ -18,6 +18,10 @@
       </div>
 
       <div class="topbar-right">
+        <div class="rates-chip rates-chip--load" :title="`Page loaded ${pageLoadedFull}`">
+          <i class="ti ti-clock"></i>
+          Loaded: {{ pageLoadedAt }}
+        </div>
         <div class="rates-chip" :title="ratesChipDetail">
           <i class="ti ti-database"></i>
           Rates: {{ ratesLoadedAt }}
@@ -213,6 +217,10 @@ const ratesStatus   = reactive({ conus: '', oconus: '', errors: [] })
 const ratesLoadedAt   = ref('')   // e.g. "May 15 · 2:34 PM"
 const ratesChipDetail = ref('')   // tooltip detail
 
+// Page load timestamp — stamped once on mount so the user can verify they're on a fresh build
+const pageLoadedAt   = ref('')   // e.g. "2:34 PM"
+const pageLoadedFull = ref('')   // e.g. "May 15, 2026 · 2:34:07 PM"
+
 function fmtTime(d) {
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric' })
     + ' · ' + d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -220,6 +228,11 @@ function fmtTime(d) {
 
 onMounted(async () => {
   if (!rom.project.templateId) showPicker.value = true
+
+  // Stamp the page-load time so the user can confirm a fresh refresh
+  const now = new Date()
+  pageLoadedAt.value   = now.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
+  pageLoadedFull.value = now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
 
   // Always stamp the load time immediately
   ratesLoadedAt.value   = fmtTime(new Date())
@@ -379,6 +392,12 @@ body {
   cursor: default;
 }
 .rates-chip .ti { font-size: 12px; }
+.rates-chip--load {
+  background: rgba(125,211,252,.18);
+  border-color: rgba(125,211,252,.4);
+  color: #b6e2fc;
+  font-weight: 600;
+}
 
 .app-logo { font-size: 22px; }
 .app-title { display: flex; flex-direction: column; line-height: 1.2; }
