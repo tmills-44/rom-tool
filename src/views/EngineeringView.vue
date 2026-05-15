@@ -95,6 +95,15 @@
                 >
                   {{ rf.label }}
                 </button>
+                <span
+                  v-if="getActiveRole(entity.id, phase.id) !== 'all' && linesForPhase(entity.id, phase.id).length > visibleLines(entity.id, phase.id).length"
+                  class="hidden-rows-hint-inline"
+                  @click="setActiveRole(entity.id, phase.id, 'all')"
+                  :title="`Click to switch to All and reveal the ${linesForPhase(entity.id, phase.id).length - visibleLines(entity.id, phase.id).length} hidden row(s)`"
+                >
+                  {{ linesForPhase(entity.id, phase.id).length - visibleLines(entity.id, phase.id).length }}
+                  row(s) hidden — switch to <strong>All</strong>
+                </span>
               </div>
 
               <!-- Lines table -->
@@ -334,14 +343,6 @@
                 </div>
               </div>
 
-              <!-- Hidden rows hint (below add button) -->
-              <div
-                v-if="getActiveRole(entity.id, phase.id) !== 'all' && linesForPhase(entity.id, phase.id).length > visibleLines(entity.id, phase.id).length"
-                class="hidden-rows-hint"
-              >
-                {{ linesForPhase(entity.id, phase.id).length - visibleLines(entity.id, phase.id).length }}
-                row(s) hidden by filter — switch to <strong>All</strong> to see them
-              </div>
 
             </div>
           </div>
@@ -611,6 +612,20 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   border-bottom: 1px solid var(--rom-border);
   background: var(--rom-surface);
 }
+.hidden-rows-hint-inline {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 11px; font-style: italic;
+  color: var(--rom-text-muted, #6f6f6a);
+  background: #fff8e1;
+  border: 1px solid #f5c97a;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hidden-rows-hint-inline strong { color: #92400e; font-style: normal; }
+.hidden-rows-hint-inline:hover { background: #ffeeb4; border-color: #d97706; color: var(--rom-text, #1a1a1a); }
+
 .role-filter-label {
   font-size: 10px; font-weight: 600; text-transform: uppercase;
   letter-spacing: .05em; color: var(--rom-text-faint); margin-right: 2px;
