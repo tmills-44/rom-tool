@@ -271,6 +271,31 @@
       @close="showPicker = false"
     />
 
+    <!-- ── Missing project-info warning before export ──────────── -->
+    <div v-if="showMissingWarning" class="modal-backdrop" @click.self="cancelMissingWarning">
+      <div class="confirm-modal missing-modal">
+        <h3>
+          <i class="ti ti-alert-triangle" aria-hidden="true" style="color: #d97706; vertical-align: -2px; margin-right: 4px;"></i>
+          {{ pendingMissing.length }} project field{{ pendingMissing.length === 1 ? '' : 's' }} missing
+        </h3>
+        <p class="missing-sub">Your printed quote will leave these blank:</p>
+        <ul class="missing-list">
+          <li v-for="f in pendingMissing" :key="f.key">
+            <i class="ti ti-circle-dashed" aria-hidden="true"></i> {{ f.label }}
+          </li>
+        </ul>
+        <p class="missing-q">Fill them in first, or export anyway?</p>
+        <div class="confirm-actions">
+          <button class="btn btn-secondary" @click="exportAnywayFromWarning" type="button">
+            Download anyway
+          </button>
+          <button class="btn btn-save" @click="updateInfoFromWarning" type="button">
+            <i class="ti ti-edit" aria-hidden="true"></i> Update project info
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Reset confirm modal ─────────────────────────────────── -->
     <div v-if="showReset" class="modal-backdrop" @click.self="showReset = false">
       <div class="confirm-modal">
@@ -449,21 +474,19 @@ function fmtCompact(n) {
   return '$' + Math.round(n)
 }
 
-async function exportExcel() {
-  if (!confirmExportIfMissing()) return
-  try {
-    await generateExcel(rom)
-  } catch (e) {
-    alert('Excel export error: ' + e.message)
-  }
+function exportExcel() {
+  runExportWithCheck(async () => {
+    try { await generateExcel(rom) }
+    catch (e) { alert('Excel export error: ' + e.message) }
+  })
 }
 const exportMenuOpen = ref(false)
 // Used in the Export menu to show which scopes will land in the combined PDF
 // and to hide the "combined" option entirely when only one scope is included.
 const includedScopesForExport = computed(() => rom.coas.filter(c => c.includeInQuote))
 
-// Required project-info fields for a printed quote — if any are blank we ask
-// the user to confirm before exporting.
+// Required project-info fields for a printed quote — if any are blank we pop
+// a custom modal asking the user whether to fill them in or export anyway.
 const REQUIRED_PROJECT_FIELDS = [
   { key: 'sponsor',         label: 'Sponsor' },
   { key: 'projectEngineer', label: 'Cronos Project Lead' },
@@ -477,33 +500,53 @@ const REQUIRED_PROJECT_FIELDS = [
 function missingProjectFields() {
   return REQUIRED_PROJECT_FIELDS.filter(f => !String(rom.project?.[f.key] ?? '').trim())
 }
-// Returns true if export should proceed, false if the user bailed.
-function confirmExportIfMissing() {
+
+// Missing-info modal state
+const showMissingWarning = ref(false)
+const pendingMissing = ref([])
+let pendingExportFn = null
+
+// Wrap each export with this. Runs the export immediately if nothing's missing,
+// otherwise pops a modal that lets the user fill in info or proceed anyway.
+function runExportWithCheck(fn) {
   const missing = missingProjectFields()
-  if (missing.length === 0) return true
-  const list = missing.map(f => `  • ${f.label}`).join('\n')
-  return window.confirm(
-    `Your project info is missing ${missing.length} field${missing.length === 1 ? '' : 's'}:\n\n${list}\n\nExport anyway?`
-  )
+  if (missing.length === 0) { fn(); return }
+  pendingMissing.value = missing
+  pendingExportFn      = fn
+  showMissingWarning.value = true
+}
+function exportAnywayFromWarning() {
+  showMissingWarning.value = false
+  const fn = pendingExportFn
+  pendingExportFn = null
+  pendingMissing.value = []
+  if (fn) fn()
+}
+function updateInfoFromWarning() {
+  showMissingWarning.value = false
+  pendingExportFn = null
+  pendingMissing.value = []
+  projInfoOpen.value = true   // open the Project Info drawer so they can fill in
+}
+function cancelMissingWarning() {
+  showMissingWarning.value = false
+  pendingExportFn = null
+  pendingMissing.value = []
 }
 const saveMenuOpen   = ref(false)
 const loadFileInput  = ref(null)
 
-async function exportPDF(mode = 'separate') {
-  if (!confirmExportIfMissing()) return
-  try {
-    await generatePDF(rom, { mode })
-  } catch (e) {
-    alert('PDF export error: ' + e.message)
-  }
+function exportPDF(mode = 'separate') {
+  runExportWithCheck(async () => {
+    try { await generatePDF(rom, { mode }) }
+    catch (e) { alert('PDF export error: ' + e.message) }
+  })
 }
-async function exportWord() {
-  if (!confirmExportIfMissing()) return
-  try {
-    await generateWord(rom)
-  } catch (e) {
-    alert('Word export error: ' + e.message)
-  }
+function exportWord() {
+  runExportWithCheck(async () => {
+    try { await generateWord(rom) }
+    catch (e) { alert('Word export error: ' + e.message) }
+  })
 }
 
 // ── Quote backup file: download + load ─────────────────────────────────

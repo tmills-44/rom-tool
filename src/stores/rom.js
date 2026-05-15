@@ -29,19 +29,22 @@ export const LIFECYCLE_PHASES = [
 // defaultRate = $/hr auto-filled when a new row is created; editable per row
 
 export const LABOR_CATS = [
-  { id: 'eng1',  label: 'ENG I',    role: 'engineering', defaultRate: 85  },
-  { id: 'eng2',  label: 'ENG II',   role: 'engineering', defaultRate: 110 },
-  { id: 'eng3',  label: 'ENG III',  role: 'engineering', defaultRate: 135 },
-  { id: 'prog1', label: 'PROG I',   role: 'programming', defaultRate: 75  },
-  { id: 'prog2', label: 'PROG II',  role: 'programming', defaultRate: 100 },
-  { id: 'prog3', label: 'PROG III', role: 'programming', defaultRate: 125 },
-  { id: 'pm1',   label: 'PM',       role: 'pm',         defaultRate: 95  },
-  { id: 'pm2',   label: 'PM SPT',   role: 'pm',         defaultRate: 125 },
-  { id: 'proc',  label: 'PROC',     role: 'pm',         defaultRate: 80  },
-  { id: 'wh',    label: 'WH I',     role: 'pm',         defaultRate: 55  },
-  { id: 'tech1', label: 'TECH I',   role: 'technician', defaultRate: 65  },
-  { id: 'tech2', label: 'TECH II',  role: 'technician', defaultRate: 75  },
-  { id: 'tech3', label: 'TECH III', role: 'technician', defaultRate: 90  },
+  { id: 'eng1',    label: 'ENG I',                 role: 'engineering', defaultRate: 116 },
+  { id: 'eng2',    label: 'ENG II',                role: 'engineering', defaultRate: 125 },
+  { id: 'eng3',    label: 'ENG III',               role: 'engineering', defaultRate: 134 },
+  { id: 'prog1',   label: 'PROG I',                role: 'programming', defaultRate: 116 },
+  { id: 'prog2',   label: 'PROG II',               role: 'programming', defaultRate: 125 },
+  { id: 'prog3',   label: 'PROG III',              role: 'programming', defaultRate: 134 },
+  { id: 'pm1',     label: 'PM',                    role: 'pm',          defaultRate: 102 },
+  { id: 'pm2',     label: 'PM SPT',                role: 'pm',          defaultRate: 78  },
+  { id: 'proc',    label: 'PROC',                  role: 'pm',          defaultRate: 62  },
+  { id: 'wh',      label: 'WH I',                  role: 'pm',          defaultRate: 76  },
+  { id: 'procsp3', label: 'Proc Specialist III',   role: 'pm',          defaultRate: 70  },
+  { id: 'procsp2', label: 'Proc Specialist II',    role: 'pm',          defaultRate: 67  },
+  { id: 'procsp1', label: 'Proc Specialist I',     role: 'pm',          defaultRate: 63  },
+  { id: 'tech1',   label: 'TECH I',                role: 'technician',  defaultRate: 71  },
+  { id: 'tech2',   label: 'TECH II',               role: 'technician',  defaultRate: 78  },
+  { id: 'tech3',   label: 'TECH III',              role: 'technician',  defaultRate: 94  },
 ]
 
 // ─── Task default day counts ────────────────────────────────────────
@@ -538,6 +541,25 @@ export const useRomStore = defineStore('rom', () => {
   LABOR_CATS.forEach(defaultCat => {
     if (!laborCats.some(c => c.id === defaultCat.id)) laborCats.push({ ...defaultCat })
   })
+  // One-time rates migration — when we ship a new rate schedule, bump
+  // RATES_VERSION below to force existing users' saved laborCats to update.
+  // After the migration runs, the version flag is stored so it won't run again.
+  const RATES_VERSION_KEY = 'rom-rates-version'
+  const RATES_VERSION = 2
+  try {
+    const ver = parseInt(localStorage.getItem(RATES_VERSION_KEY) || '0', 10)
+    if (ver < RATES_VERSION) {
+      LABOR_CATS.forEach(d => {
+        const cat = laborCats.find(c => c.id === d.id)
+        if (cat) {
+          cat.defaultRate = d.defaultRate
+          cat.label       = d.label
+          cat.role        = d.role
+        }
+      })
+      localStorage.setItem(RATES_VERSION_KEY, String(RATES_VERSION))
+    }
+  } catch {}
   // ── Migration: sync each line's role to its labor category's role.
   // Fixes stale lines saved before PROG I/II/III moved from 'engineering' to 'programming'.
   // Idempotent — no-op when data is already correct.
