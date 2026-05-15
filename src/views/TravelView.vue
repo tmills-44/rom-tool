@@ -94,52 +94,50 @@
                 <!-- 2a. State (CONUS) -->
                 <div v-if="(trip.region || 'conus') === 'conus'" class="trip-field trip-field--state">
                   <label>State</label>
-                  <select :value="trip.state" class="loc-select"
-                    @change="onStateChange(entity.id, trip, $event.target.value)">
-                    <option value="">— State —</option>
-                    <option v-for="s in US_STATES" :key="s.code" :value="s.code">{{ s.code }} — {{ s.name }}</option>
-                  </select>
+                  <SearchSelect
+                    :model-value="trip.state"
+                    :options="US_STATES.map(s => ({ value: s.code, label: s.code + ' — ' + s.name }))"
+                    placeholder="Search state…"
+                    @update:model-value="onStateChange(entity.id, trip, $event)"
+                  />
                 </div>
 
                 <!-- 2b. Country (OCONUS) -->
                 <div v-else class="trip-field trip-field--state">
                   <label>Country</label>
-                  <select :value="trip.country || ''" class="loc-select"
-                    @change="onCountryChange(entity.id, trip, $event.target.value)">
-                    <option value="">— Country —</option>
-                    <option v-for="c in COUNTRIES" :key="c" :value="c">{{ c }}</option>
-                  </select>
+                  <SearchSelect
+                    :model-value="trip.country || ''"
+                    :options="COUNTRIES"
+                    placeholder="Search country…"
+                    @update:model-value="onCountryChange(entity.id, trip, $event)"
+                  />
                 </div>
 
-                <!-- 3a. City dropdown (CONUS) -->
+                <!-- 3a. City (CONUS) -->
                 <div v-if="(trip.region || 'conus') === 'conus'" class="trip-field trip-field--city">
                   <label>
                     City
                     <span v-if="citiesLoading[trip.state]" class="spin-inline">⟳</span>
                   </label>
-                  <select v-if="stateCities[trip.state]"
-                    :value="trip.destination" class="loc-select city-select"
-                    @change="onCitySelect(entity.id, trip, $event.target.value)">
-                    <option value="">— Select city —</option>
-                    <option v-for="c in stateCities[trip.state]" :key="c.city" :value="c.city">{{ c.city }}</option>
-                  </select>
+                  <SearchSelect v-if="stateCities[trip.state]"
+                    :model-value="trip.destination"
+                    :options="stateCities[trip.state].map(c => ({ value: c.city, label: c.city }))"
+                    placeholder="Search city…"
+                    @update:model-value="onCitySelect(entity.id, trip, $event)"
+                  />
                   <div v-else-if="citiesLoading[trip.state]" class="city-placeholder">Loading…</div>
                   <div v-else class="city-placeholder">{{ trip.state ? 'Loading…' : 'Select a state first' }}</div>
                 </div>
 
-                <!-- 3b. Location dropdown/text (OCONUS) -->
+                <!-- 3b. Location (OCONUS) -->
                 <div v-else class="trip-field trip-field--city">
                   <label>Location / City</label>
-                  <!-- Dropdown when we have loaded file data for this country -->
-                  <select v-if="trip.country && oconusLocations(trip.country).length"
-                    :value="trip.destination" class="loc-select city-select"
-                    @change="onOconusLocationSelect(entity.id, trip, $event.target.value)">
-                    <option value="">— Select location —</option>
-                    <option v-for="loc in oconusLocations(trip.country)" :key="loc.location" :value="loc.location">
-                      {{ loc.location }}
-                    </option>
-                  </select>
-                  <!-- Fallback text input when no file data -->
+                  <SearchSelect v-if="trip.country && oconusLocations(trip.country).length"
+                    :model-value="trip.destination"
+                    :options="oconusLocations(trip.country).map(l => ({ value: l.location, label: l.location }))"
+                    placeholder="Search location…"
+                    @update:model-value="onOconusLocationSelect(entity.id, trip, $event)"
+                  />
                   <input v-else type="text" class="loc-text"
                     :value="trip.destination"
                     placeholder="e.g. Tokyo"
@@ -330,6 +328,7 @@
 <script setup>
 import { computed, reactive, onMounted } from 'vue'
 import { useRomStore } from '../stores/rom'
+import SearchSelect from '../components/SearchSelect.vue'
 
 const rom = useRomStore()
 
