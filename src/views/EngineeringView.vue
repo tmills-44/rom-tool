@@ -235,11 +235,26 @@
                 row(s) hidden by filter — switch to <strong>All</strong> to see them
               </div>
 
-              <!-- Add row button -->
+              <!-- Add row -->
               <div class="phase-add-row">
-                <button class="add-line-btn" @click="addLine(entity.id, phase.id)">
-                  <i class="ti ti-plus" aria-hidden="true"></i>
-                  Add {{ addLineLabel(entity.id, phase.id) }} row
+                <template v-if="showingPicker(entity.id, phase.id)">
+                  <div class="role-picker">
+                    <span class="role-picker-label">Add row for:</span>
+                    <button
+                      v-for="rf in ROLE_FILTERS.filter(r => r.id !== 'all')"
+                      :key="rf.id"
+                      class="role-pick-btn"
+                      :class="`role-pick-btn--${rf.id}`"
+                      @click="pickRole(entity.id, phase.id, rf.id)"
+                    >
+                      <i class="ti" :class="roleIcon(rf.id)"></i>
+                      {{ rf.label }}
+                    </button>
+                    <button class="role-pick-cancel" @click="hidePicker(entity.id, phase.id)">Cancel</button>
+                  </div>
+                </template>
+                <button v-else class="add-line-btn" @click="showPicker(entity.id, phase.id)">
+                  <i class="ti ti-plus" aria-hidden="true"></i> Add row
                 </button>
               </div>
 
@@ -254,7 +269,7 @@
 </template>
 
 <script setup>
-import { reactive, computed } from 'vue'
+import { reactive } from 'vue'
 import { useRomStore } from '../stores/rom'
 
 const rom = useRomStore()
@@ -271,8 +286,9 @@ const ROLE_SHORT = { engineering: 'ENG', pm: 'PM', technician: 'TECH' }
 function roleShort(role) { return ROLE_SHORT[role] ?? role.toUpperCase() }
 
 // ── Phase open/close state ───────────────────────────────────────────
-const phaseOpenState = reactive({})   // key: "entityId::phaseId"
+const phaseOpenState  = reactive({})  // key: "entityId::phaseId"
 const activeRoleState = reactive({})  // key: "entityId::phaseId"
+const pickerState     = reactive({})  // key: "entityId::phaseId"
 
 function phaseKey(eid, pid)  { return `${eid}::${pid}` }
 function isPhaseOpen(eid, pid) { return !!phaseOpenState[phaseKey(eid, pid)] }
@@ -315,19 +331,21 @@ function tasksForLine(line, phaseId) {
   return rom.wbs[line.role]?.[phaseId] ?? []
 }
 
-// ── Add a new line ───────────────────────────────────────────────────
-function addLine(eid, pid) {
-  const activeRole = getActiveRole(eid, pid)
-  const role = activeRole === 'all' ? 'engineering' : activeRole
+// ── Role picker ──────────────────────────────────────────────────────
+function showingPicker(eid, pid) { return !!pickerState[phaseKey(eid, pid)] }
+function showPicker(eid, pid)    { pickerState[phaseKey(eid, pid)] = true }
+function hidePicker(eid, pid)    { pickerState[phaseKey(eid, pid)] = false }
+
+function pickRole(eid, pid, role) {
   rom.addLine(role, pid, '', { entity: eid })
-  // Auto-open the phase when a line is added
   phaseOpenState[phaseKey(eid, pid)] = true
+  pickerState[phaseKey(eid, pid)] = false
+  // Also sync the filter chip to match what was just added
+  setActiveRole(eid, pid, role)
 }
 
-function addLineLabel(eid, pid) {
-  const r = getActiveRole(eid, pid)
-  if (r === 'all') return ''
-  return ROLE_FILTERS.find(f => f.id === r)?.label ?? ''
+function roleIcon(role) {
+  return { engineering: 'ti-cpu', pm: 'ti-clipboard-list', technician: 'ti-tool' }[role] ?? ''
 }
 
 // ── Labor cat helpers ────────────────────────────────────────────────
@@ -540,4 +558,34 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   background: transparent; color: var(--rom-text-muted); cursor: pointer;
 }
 .add-line-btn:hover { border-color: var(--rom-accent); color: var(--rom-accent); background: var(--rom-accent-bg); }
+
+/* Role picker (shown when Add row is clicked) */
+.role-picker {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--rom-surface);
+  border: 1px solid var(--rom-border);
+  border-radius: var(--rom-radius);
+  width: fit-content;
+}
+.role-picker-label {
+  font-size: 11px; font-weight: 600; color: var(--rom-text-muted);
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+}
+.role-pick-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  border: 2px solid; cursor: pointer; transition: all .12s;
+}
+.role-pick-btn--engineering { border-color: #1a5fb4; color: #1a5fb4; background: #f0f5ff; }
+.role-pick-btn--engineering:hover { background: #1a5fb4; color: #fff; }
+.role-pick-btn--pm           { border-color: #2e7d32; color: #2e7d32; background: #f0faf0; }
+.role-pick-btn--pm:hover     { background: #2e7d32; color: #fff; }
+.role-pick-btn--technician   { border-color: #854f0b; color: #854f0b; background: #fff8f0; }
+.role-pick-btn--technician:hover { background: #854f0b; color: #fff; }
+.role-pick-cancel {
+  padding: 4px 10px; font-size: 11px; color: var(--rom-text-faint);
+  background: none; border: 1px solid var(--rom-border); border-radius: 4px; cursor: pointer;
+}
+.role-pick-cancel:hover { color: var(--rom-danger); border-color: var(--rom-danger); }
 </style>
