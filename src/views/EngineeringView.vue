@@ -239,13 +239,13 @@
                         </select>
                       </td>
 
-                      <!-- Days (stored as precise float, displayed to 1 decimal) -->
+                      <!-- Days (stored as precise float, displayed to 1 decimal, capped at 365) -->
                       <td class="col-days">
                         <input
-                          type="number" min="0" step="0.1"
+                          type="number" min="0" max="365" step="0.1"
                           :value="parseFloat((line.days || 0).toFixed(1))"
                           class="cell-num"
-                          @change="rom.updateLine(line.id, { days: +$event.target.value })"
+                          @change="rom.updateLine(line.id, { days: clampDays(+$event.target.value) })"
                         />
                       </td>
 
@@ -569,7 +569,15 @@ function onTotalHrsChange(line, totalHrs) {
   const hpd = line.hoursPerDay || 8
   // Store raw Days — no rounding — so the reverse calc stays consistent
   const newDays = hpd > 0 ? snapped / hpd : 0
-  rom.updateLine(line.id, { days: newDays })
+  rom.updateLine(line.id, { days: clampDays(newDays) })
+}
+
+// Cap any single line's Days at 365 (one full year).
+function clampDays(v) {
+  const n = +v || 0
+  if (n < 0)   return 0
+  if (n > 365) return 365
+  return n
 }
 
 function dropAtEnd(eid, pid) {

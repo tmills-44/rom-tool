@@ -904,6 +904,11 @@ export const useRomStore = defineStore('rom', () => {
     if (!line) return
     if (patch.laborCat !== undefined && patch.rate === undefined && patch.laborCat !== line.laborCat)
       patch = { ...patch, rate: laborCatRate(patch.laborCat) }
+    // Hard cap: no single line may exceed 365 days.
+    if (patch.days !== undefined) {
+      const d = +patch.days || 0
+      patch = { ...patch, days: d < 0 ? 0 : (d > 365 ? 365 : d) }
+    }
     // Days no longer auto-fill on taskId change — user fills manually,
     // or loads via one of the baseline templates.
     Object.assign(line, patch)
