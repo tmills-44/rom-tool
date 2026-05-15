@@ -35,10 +35,11 @@ export const LABOR_CATS = [
   { id: 'prog1', label: 'PROG I',   role: 'programming', defaultRate: 75  },
   { id: 'prog2', label: 'PROG II',  role: 'programming', defaultRate: 100 },
   { id: 'prog3', label: 'PROG III', role: 'programming', defaultRate: 125 },
-  { id: 'pm1',   label: 'PM',       role: 'pm',         defaultRate: 95  },
-  { id: 'pm2',   label: 'PM SPT',   role: 'pm',         defaultRate: 125 },
-  { id: 'proc',  label: 'PROC',     role: 'pm',         defaultRate: 80  },
-  { id: 'wh',    label: 'WH I',     role: 'pm',         defaultRate: 55  },
+  { id: 'pm1',   label: 'PM',                          role: 'pm',         defaultRate: 95  },
+  { id: 'pm2',   label: 'PM SPT',                      role: 'pm',         defaultRate: 125 },
+  { id: 'pmspt', label: 'Project Management Support',  role: 'pm',         defaultRate: 110 },
+  { id: 'proc',  label: 'PROC',                        role: 'pm',         defaultRate: 80  },
+  { id: 'wh',    label: 'WH I',                        role: 'pm',         defaultRate: 55  },
   { id: 'tech1', label: 'TECH I',   role: 'technician', defaultRate: 65  },
   { id: 'tech2', label: 'TECH II',  role: 'technician', defaultRate: 75  },
   { id: 'tech3', label: 'TECH III', role: 'technician', defaultRate: 90  },
@@ -489,9 +490,17 @@ export const useRomStore = defineStore('rom', () => {
     sponsor: '', roomName: '',
     date: new Date().toISOString().split('T')[0],
     projectEngineer: '',
+    // Fields used by the 1-page Cost Summary PDF
+    govLead: '', building: '', cityBase: '',
+    pmSupportLead: '',
     anticipatedFYFunds: 5_000_000,
     templateId: null, templateName: null,
   })
+  // Backfill any missing newer fields when loading older saved state
+  if (!('govLead'  in project))      project.govLead       = ''
+  if (!('building' in project))      project.building      = ''
+  if (!('cityBase' in project))      project.cityBase      = ''
+  if (!('pmSupportLead' in project)) project.pmSupportLead = ''
 
   // ── Courses of Action ──────────────────────────────────────────────
   // Each COA is a self-contained scenario the user can flip between.
@@ -511,6 +520,11 @@ export const useRomStore = defineStore('rom', () => {
   const lineItems = reactive(saved?.lineItems ?? [])
   // Editable labor categories (rates, labels). Defaults seeded from LABOR_CATS, persisted across sessions.
   const laborCats = reactive(saved?.laborCats ?? deepClone(LABOR_CATS))
+  // Backfill: ensure every default labor cat exists, so newly-added cats appear
+  // for users who already have saved labor data from a previous build.
+  LABOR_CATS.forEach(defaultCat => {
+    if (!laborCats.some(c => c.id === defaultCat.id)) laborCats.push({ ...defaultCat })
+  })
   // ── Migration: sync each line's role to its labor category's role.
   // Fixes stale lines saved before PROG I/II/III moved from 'engineering' to 'programming'.
   // Idempotent — no-op when data is already correct.

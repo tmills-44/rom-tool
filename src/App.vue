@@ -74,20 +74,45 @@
                 <div class="export-menu-sub">Workbook with a Summary tab + one tab per scope</div>
               </div>
             </button>
+            <button class="export-menu-item" @click="exportPDF('summary'); exportMenuOpen = false">
+              <i class="ti ti-clipboard-list" aria-hidden="true"></i>
+              <div>
+                <div class="export-menu-title">PDF — cost summary (1 page)</div>
+                <div class="export-menu-sub">One-page roundup per scope (legacy format)</div>
+              </div>
+            </button>
             <button class="export-menu-item" @click="exportPDF('separate'); exportMenuOpen = false">
               <i class="ti ti-files" aria-hidden="true"></i>
               <div>
                 <div class="export-menu-title">PDF — separate files</div>
-                <div class="export-menu-sub">One PDF per included scope</div>
+                <div class="export-menu-sub">One PDF per included scope (full detail)</div>
               </div>
             </button>
-            <button class="export-menu-item" @click="exportPDF('combined'); exportMenuOpen = false">
-              <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
-              <div>
-                <div class="export-menu-title">PDF — combined document</div>
-                <div class="export-menu-sub">All scopes in one PDF + rollup page</div>
+            <div v-if="includedScopesForExport.length > 1" class="combine-section">
+              <button class="export-menu-item" @click="exportPDF('combined'); exportMenuOpen = false">
+                <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
+                <div>
+                  <div class="export-menu-title">PDF — combined document</div>
+                  <div class="export-menu-sub">
+                    Includes: {{ includedScopesForExport.map(c => c.name).join(', ') }}
+                  </div>
+                </div>
+              </button>
+              <div class="combine-chips" @click.stop>
+                <button
+                  v-for="c in rom.coas"
+                  :key="c.id"
+                  type="button"
+                  class="combine-chip"
+                  :class="{ 'combine-chip--on': c.includeInQuote }"
+                  @click="rom.toggleCoaIncluded(c.id)"
+                  :title="c.includeInQuote ? `Untick to drop ${c.name} from this combined PDF` : `Tick to include ${c.name} in this combined PDF`"
+                >
+                  <i class="ti" :class="c.includeInQuote ? 'ti-check' : 'ti-x'" aria-hidden="true"></i>
+                  {{ c.name }}
+                </button>
               </div>
-            </button>
+            </div>
             <button class="export-menu-item" @click="exportWord(); exportMenuOpen = false">
               <i class="ti ti-file-description" aria-hidden="true"></i>
               <div>
@@ -141,35 +166,43 @@
       <div v-show="projInfoOpen" class="proj-drawer-body">
         <div class="proj-field">
           <label>Sponsor</label>
-          <input
-            type="text"
-            :value="rom.project.sponsor"
-            @input="rom.project.sponsor = $event.target.value"
-          />
+          <input type="text" :value="rom.project.sponsor"
+            @input="rom.project.sponsor = $event.target.value" />
+        </div>
+        <div class="proj-field">
+          <label>Building</label>
+          <input type="text" :value="rom.project.building"
+            @input="rom.project.building = $event.target.value" />
         </div>
         <div class="proj-field">
           <label>Room / Project Name</label>
-          <input
-            type="text"
-            :value="rom.project.roomName"
-            @input="rom.project.roomName = $event.target.value"
-          />
+          <input type="text" :value="rom.project.roomName"
+            @input="rom.project.roomName = $event.target.value" />
         </div>
         <div class="proj-field">
-          <label>Project Lead</label>
-          <input
-            type="text"
-            :value="rom.project.projectEngineer"
-            @input="rom.project.projectEngineer = $event.target.value"
-          />
+          <label>City / Base</label>
+          <input type="text" :value="rom.project.cityBase"
+            @input="rom.project.cityBase = $event.target.value" />
+        </div>
+        <div class="proj-field">
+          <label>Cronos Project Lead</label>
+          <input type="text" :value="rom.project.projectEngineer"
+            @input="rom.project.projectEngineer = $event.target.value" />
+        </div>
+        <div class="proj-field">
+          <label>Government Project Lead</label>
+          <input type="text" :value="rom.project.govLead"
+            @input="rom.project.govLead = $event.target.value" />
+        </div>
+        <div class="proj-field">
+          <label>PM Support Lead</label>
+          <input type="text" :value="rom.project.pmSupportLead"
+            @input="rom.project.pmSupportLead = $event.target.value" />
         </div>
         <div class="proj-field proj-field--date">
           <label>Date</label>
-          <input
-            type="date"
-            :value="rom.project.date"
-            @input="rom.project.date = $event.target.value"
-          />
+          <input type="date" :value="rom.project.date"
+            @input="rom.project.date = $event.target.value" />
         </div>
       </div>
     </div>
@@ -318,6 +351,9 @@ async function exportExcel() {
   }
 }
 const exportMenuOpen = ref(false)
+// Used in the Export menu to show which scopes will land in the combined PDF
+// and to hide the "combined" option entirely when only one scope is included.
+const includedScopesForExport = computed(() => rom.coas.filter(c => c.includeInQuote))
 const saveMenuOpen   = ref(false)
 const loadFileInput  = ref(null)
 
@@ -567,6 +603,32 @@ body {
 .export-menu-item i { font-size: 18px; color: var(--rom-accent, #1a5fb4); margin-top: 2px; flex-shrink: 0; }
 .export-menu-title { font-size: 13px; font-weight: 600; color: var(--rom-text, #1a2133); }
 .export-menu-sub   { font-size: 11px; color: var(--rom-text-muted, #4a5a78); margin-top: 1px; }
+
+/* Combined-PDF section: row + inline scope chips you can toggle without closing the menu */
+.combine-section { border-bottom: 1px solid var(--rom-border, #c4cede); }
+.combine-section .export-menu-item { border-bottom: none; }
+.combine-chips {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding: 0 14px 10px 42px;
+}
+.combine-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px;
+  font-size: 10px; font-weight: 600;
+  border: 1px solid var(--rom-border, #c4cede);
+  border-radius: 10px;
+  background: var(--rom-surface, #fff);
+  color: var(--rom-text-faint, #8a9ab8);
+  cursor: pointer;
+  font-family: inherit;
+}
+.combine-chip i { font-size: 11px; }
+.combine-chip:hover { border-color: var(--rom-accent, #1a5fb4); }
+.combine-chip--on {
+  background: var(--rom-accent-bg, #e8f0fe);
+  border-color: var(--rom-accent, #1a5fb4);
+  color: var(--rom-accent-dark, #1248a0);
+}
 
 /* Save split button */
 .save-split { position: relative; display: inline-flex; align-items: stretch; }
