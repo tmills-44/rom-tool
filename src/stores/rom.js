@@ -497,6 +497,14 @@ export const useRomStore = defineStore('rom', () => {
   const lineItems = reactive(saved?.lineItems ?? [])
   // Editable labor categories (rates, labels). Defaults seeded from LABOR_CATS, persisted across sessions.
   const laborCats = reactive(saved?.laborCats ?? deepClone(LABOR_CATS))
+  // ── Migration: sync each line's role to its labor category's role.
+  // Fixes stale lines saved before PROG I/II/III moved from 'engineering' to 'programming'.
+  // Idempotent — no-op when data is already correct.
+  lineItems.forEach(l => {
+    if (!l.laborCat) return
+    const cat = laborCats.find(c => c.id === l.laborCat)
+    if (cat && l.role !== cat.role) l.role = cat.role
+  })
   const travel    = reactive(saved?.travel    ?? emptyTravelData())
   const gsaRateMap  = reactive(saved?.gsaRateMap ?? {})   // "city|ST" → { lodging, mie, months }
 
