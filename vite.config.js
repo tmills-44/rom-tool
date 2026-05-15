@@ -12,7 +12,7 @@ export default defineConfig({
       manifest: {
         name: 'ROM Tool — Rough Order of Magnitude Estimator',
         short_name: 'ROM Tool',
-        description: 'Navy C4NAV Rough Order of Magnitude cost estimator — works offline.',
+        description: 'Rough Order of Magnitude cost estimator — works offline.',
         theme_color: '#1a3560',
         background_color: '#f4f6fb',
         display: 'standalone',
