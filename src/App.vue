@@ -1,154 +1,180 @@
 <template>
   <div class="app">
 
-    <!-- ── Top bar ─────────────────────────────────────────────── -->
-    <header class="topbar">
-      <div class="topbar-left">
+    <!-- ── Left sidebar (brand + tabs + quote total) ──────────────── -->
+    <aside class="sidebar" role="navigation" aria-label="Sections">
+      <div class="sidebar-brand">
         <div class="app-logo-chip">
           <img src="/logo.png" alt="Cronos" class="app-logo-img" />
         </div>
-        <div class="app-title">
-          <div class="app-name">Cost Estimate Tool</div>
-          <div class="app-sub">Scope-based labor + travel + material estimator</div>
-        </div>
-        <div v-if="rom.project.sponsor || rom.project.roomName" class="quote-id">
-          <span v-if="rom.project.sponsor">{{ rom.project.sponsor }}</span>
-          <span v-if="rom.project.sponsor && rom.project.roomName"> · </span>
-          <span v-if="rom.project.roomName">{{ rom.project.roomName }}</span>
-        </div>
+        <div class="sidebar-brand-text">Cost Estimate Tool</div>
       </div>
 
-      <div class="topbar-right">
+      <nav class="sidebar-nav" role="tablist">
+        <button
+          v-for="tab in rom.TABS"
+          :key="tab.id"
+          class="sidebar-tab"
+          :class="{ active: rom.selectedTabId === tab.id }"
+          role="tab"
+          :aria-selected="rom.selectedTabId === tab.id"
+          @click="rom.selectedTabId = tab.id"
+        >
+          <i class="ti sidebar-tab-icon" :class="tab.icon" aria-hidden="true"></i>
+          <span class="sidebar-tab-label">{{ tab.label }}</span>
+          <span v-if="tab.id === 'engineering' && rom.engineeringTotal > 0" class="sidebar-tab-badge">
+            {{ fmtCompact(rom.engineeringTotal) }}
+          </span>
+          <span v-if="tab.id === 'travel' && rom.travelTotal > 0" class="sidebar-tab-badge">
+            {{ fmtCompact(rom.travelTotal) }}
+          </span>
+          <span v-if="tab.id === 'material' && rom.materialTotal > 0" class="sidebar-tab-badge">
+            {{ fmtCompact(rom.materialTotal) }}
+          </span>
+        </button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <div class="sidebar-total">
+        <div class="sidebar-total-label">Quote Total</div>
+        <div class="sidebar-total-value">{{ fmt(rom.totalLoadedCost) }}</div>
+      </div>
+    </aside>
+
+    <!-- ── Right column: light topbar + main + status ─────────────── -->
+    <div class="main-col">
+
+      <!-- Light topbar: scope chip · project info pills · actions -->
+      <header class="topbar topbar--light">
         <CoaSelector />
-        <div class="quote-total">
-          <span class="quote-total-label">QUOTE TOTAL</span>
-          <span class="quote-total-value">{{ fmt(rom.totalLoadedCost) }}</span>
+
+        <div class="info-pills">
+          <span v-for="(item, i) in projectSynopsis" :key="i"
+            class="info-pill"
+            :class="{ 'info-pill--scope': item.label === 'Scope' }">
+            <span class="info-pill-key">{{ item.label }}</span>
+            <span class="info-pill-value">{{ item.value }}</span>
+          </span>
+          <span v-if="!projectSynopsis.length" class="info-pill-empty">
+            No project info yet — click Edit to fill in
+          </span>
+          <button class="info-edit" @click="projInfoOpen = !projInfoOpen"
+            :title="projInfoOpen ? 'Hide project info editor' : 'Edit project info'">
+            <i class="ti" :class="projInfoOpen ? 'ti-x' : 'ti-edit'" aria-hidden="true"></i>
+            {{ projInfoOpen ? 'Close' : 'Edit' }}
+          </button>
         </div>
-        <button class="btn btn-icon" :disabled="!rom.canUndo" @click="rom.undo" title="Undo (last add/duplicate/remove/reorder)">
-          <i class="ti ti-arrow-back-up" aria-hidden="true"></i>
-        </button>
-        <button class="btn btn-icon" :disabled="!rom.canRedo" @click="rom.redo" title="Redo">
-          <i class="ti ti-arrow-forward-up" aria-hidden="true"></i>
-        </button>
-        <button class="btn btn-snapshot" @click="showPicker = true" title="Rooms (templates + saved quotes)">
-          <i class="ti ti-layout-grid" aria-hidden="true"></i> Rooms
-          <span v-if="rom.snapshots.length > 0" class="snap-count">{{ rom.snapshots.length }}</span>
-        </button>
-        <div class="save-split" v-click-outside="() => saveMenuOpen = false">
-          <button class="btn btn-save btn-save--main" @click="downloadQuoteFile" title="Download this quote as a .rom.json file">
-            <i class="ti ti-device-floppy" aria-hidden="true"></i> Save
+
+        <div class="topbar-actions">
+          <button class="btn btn-icon" :disabled="!rom.canUndo" @click="rom.undo" title="Undo">
+            <i class="ti ti-arrow-back-up" aria-hidden="true"></i>
           </button>
-          <button class="btn btn-save btn-save--caret" @click="saveMenuOpen = !saveMenuOpen" title="Save / load options" :aria-expanded="saveMenuOpen">
-            <i class="ti ti-chevron-down" aria-hidden="true"></i>
+          <button class="btn btn-icon" :disabled="!rom.canRedo" @click="rom.redo" title="Redo">
+            <i class="ti ti-arrow-forward-up" aria-hidden="true"></i>
           </button>
-          <div v-if="saveMenuOpen" class="save-menu">
-            <button class="save-menu-item" @click="downloadQuoteFile(); saveMenuOpen = false">
-              <i class="ti ti-download" aria-hidden="true"></i>
-              <div>
-                <div class="save-menu-title">Download backup</div>
-                <div class="save-menu-sub">Save this quote to a .rom.json file on your computer</div>
-              </div>
-            </button>
-            <button class="save-menu-item" @click="pickQuoteFile(); saveMenuOpen = false">
-              <i class="ti ti-upload" aria-hidden="true"></i>
-              <div>
-                <div class="save-menu-title">Load from backup</div>
-                <div class="save-menu-sub">Replace the current quote with one from a .rom.json file</div>
-              </div>
-            </button>
-          </div>
-          <input ref="loadFileInput" type="file" accept=".json,.rom.json,application/json"
-            style="display:none" @change="onQuoteFilePicked" />
-        </div>
-        <div class="export-split" v-click-outside="() => exportMenuOpen = false">
-          <button class="btn btn-export btn-export--main" @click="exportMenuOpen = !exportMenuOpen" title="Export quote">
-            <i class="ti ti-download" aria-hidden="true"></i> Export
-            <i class="ti ti-chevron-down" aria-hidden="true" style="font-size:13px;margin-left:2px;"></i>
+          <button class="btn btn-snapshot" @click="showPicker = true" title="Rooms (templates + saved quotes)">
+            <i class="ti ti-layout-grid" aria-hidden="true"></i> Rooms
+            <span v-if="rom.snapshots.length > 0" class="snap-count">{{ rom.snapshots.length }}</span>
           </button>
-          <div v-if="exportMenuOpen" class="export-menu">
-            <button class="export-menu-item" @click="exportExcel(); exportMenuOpen = false">
-              <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
-              <div>
-                <div class="export-menu-title">Excel</div>
-                <div class="export-menu-sub">Workbook with a Summary tab + one tab per scope</div>
-              </div>
+          <div class="save-split" v-click-outside="() => saveMenuOpen = false">
+            <button class="btn btn-save btn-save--main" @click="downloadQuoteFile" title="Download this quote as a .rom.json file">
+              <i class="ti ti-device-floppy" aria-hidden="true"></i> Save
             </button>
-            <button class="export-menu-item" @click="exportPDF('summary'); exportMenuOpen = false">
-              <i class="ti ti-clipboard-list" aria-hidden="true"></i>
-              <div>
-                <div class="export-menu-title">PDF — cost summary (1 page)</div>
-                <div class="export-menu-sub">One-page roundup per scope (legacy format)</div>
-              </div>
+            <button class="btn btn-save btn-save--caret" @click="saveMenuOpen = !saveMenuOpen" title="Save / load options" :aria-expanded="saveMenuOpen">
+              <i class="ti ti-chevron-down" aria-hidden="true"></i>
             </button>
-            <button class="export-menu-item" @click="exportPDF('separate'); exportMenuOpen = false">
-              <i class="ti ti-files" aria-hidden="true"></i>
-              <div>
-                <div class="export-menu-title">PDF — separate files</div>
-                <div class="export-menu-sub">One PDF per included scope (full detail)</div>
-              </div>
-            </button>
-            <div v-if="includedScopesForExport.length > 1" class="combine-section">
-              <button class="export-menu-item" @click="exportPDF('combined'); exportMenuOpen = false">
-                <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
+            <div v-if="saveMenuOpen" class="save-menu">
+              <button class="save-menu-item" @click="downloadQuoteFile(); saveMenuOpen = false">
+                <i class="ti ti-download" aria-hidden="true"></i>
                 <div>
-                  <div class="export-menu-title">PDF — combined document</div>
-                  <div class="export-menu-sub">
-                    Includes: {{ includedScopesForExport.map(c => c.name).join(', ') }}
-                  </div>
+                  <div class="save-menu-title">Download backup</div>
+                  <div class="save-menu-sub">Save this quote to a .rom.json file on your computer</div>
                 </div>
               </button>
-              <div class="combine-chips" @click.stop>
-                <button
-                  v-for="c in rom.coas"
-                  :key="c.id"
-                  type="button"
-                  class="combine-chip"
-                  :class="{ 'combine-chip--on': c.includeInQuote }"
-                  @click="rom.toggleCoaIncluded(c.id)"
-                  :title="c.includeInQuote ? `Untick to drop ${c.name} from this combined PDF` : `Tick to include ${c.name} in this combined PDF`"
-                >
-                  <i class="ti" :class="c.includeInQuote ? 'ti-check' : 'ti-x'" aria-hidden="true"></i>
-                  {{ c.name }}
-                </button>
-              </div>
+              <button class="save-menu-item" @click="pickQuoteFile(); saveMenuOpen = false">
+                <i class="ti ti-upload" aria-hidden="true"></i>
+                <div>
+                  <div class="save-menu-title">Load from backup</div>
+                  <div class="save-menu-sub">Replace the current quote with one from a .rom.json file</div>
+                </div>
+              </button>
             </div>
-            <button class="export-menu-item" @click="exportWord(); exportMenuOpen = false">
-              <i class="ti ti-file-description" aria-hidden="true"></i>
-              <div>
-                <div class="export-menu-title">Word</div>
-                <div class="export-menu-sub">Editable .doc you can open in Word</div>
-              </div>
-            </button>
+            <input ref="loadFileInput" type="file" accept=".json,.rom.json,application/json"
+              style="display:none" @change="onQuoteFilePicked" />
           </div>
+          <div class="export-split" v-click-outside="() => exportMenuOpen = false">
+            <button class="btn btn-export btn-export--main" @click="exportMenuOpen = !exportMenuOpen" title="Export quote">
+              <i class="ti ti-download" aria-hidden="true"></i> Export
+              <i class="ti ti-chevron-down" aria-hidden="true" style="font-size:13px;margin-left:2px;"></i>
+            </button>
+            <div v-if="exportMenuOpen" class="export-menu">
+              <button class="export-menu-item" @click="exportExcel(); exportMenuOpen = false">
+                <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+                <div>
+                  <div class="export-menu-title">Excel</div>
+                  <div class="export-menu-sub">Workbook with a Summary tab + one tab per scope</div>
+                </div>
+              </button>
+              <button class="export-menu-item" @click="exportPDF('summary'); exportMenuOpen = false">
+                <i class="ti ti-clipboard-list" aria-hidden="true"></i>
+                <div>
+                  <div class="export-menu-title">PDF — cost summary (1 page)</div>
+                  <div class="export-menu-sub">One-page roundup per scope (legacy format)</div>
+                </div>
+              </button>
+              <button class="export-menu-item" @click="exportPDF('separate'); exportMenuOpen = false">
+                <i class="ti ti-files" aria-hidden="true"></i>
+                <div>
+                  <div class="export-menu-title">PDF — separate files</div>
+                  <div class="export-menu-sub">One PDF per included scope (full detail)</div>
+                </div>
+              </button>
+              <div v-if="includedScopesForExport.length > 1" class="combine-section">
+                <button class="export-menu-item" @click="exportPDF('combined'); exportMenuOpen = false">
+                  <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
+                  <div>
+                    <div class="export-menu-title">PDF — combined document</div>
+                    <div class="export-menu-sub">
+                      Includes: {{ includedScopesForExport.map(c => c.name).join(', ') }}
+                    </div>
+                  </div>
+                </button>
+                <div class="combine-chips" @click.stop>
+                  <button
+                    v-for="c in rom.coas"
+                    :key="c.id"
+                    type="button"
+                    class="combine-chip"
+                    :class="{ 'combine-chip--on': c.includeInQuote }"
+                    @click="rom.toggleCoaIncluded(c.id)"
+                    :title="c.includeInQuote ? `Untick to drop ${c.name} from this combined PDF` : `Tick to include ${c.name} in this combined PDF`"
+                  >
+                    <i class="ti" :class="c.includeInQuote ? 'ti-check' : 'ti-x'" aria-hidden="true"></i>
+                    {{ c.name }}
+                  </button>
+                </div>
+              </div>
+              <button class="export-menu-item" @click="exportWord(); exportMenuOpen = false">
+                <i class="ti ti-file-description" aria-hidden="true"></i>
+                <div>
+                  <div class="export-menu-title">Word</div>
+                  <div class="export-menu-sub">Editable .doc you can open in Word</div>
+                </div>
+              </button>
+            </div>
+          </div>
+          <button class="btn btn-secondary" @click="showPicker = true" title="New quote">
+            <i class="ti ti-file-plus" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn-danger" @click="confirmReset" title="Reset all data">
+            <i class="ti ti-trash" aria-hidden="true"></i>
+          </button>
         </div>
-        <button class="btn btn-secondary" @click="showPicker = true" title="New quote">
-          <i class="ti ti-file-plus" aria-hidden="true"></i> New
-        </button>
-        <button class="btn btn-danger" @click="confirmReset" title="Reset all data">
-          <i class="ti ti-trash" aria-hidden="true"></i>
-        </button>
-      </div>
-    </header>
+      </header>
 
-    <!-- ── Project Info drawer (sits between topbar and tabbar) ───── -->
-    <div class="proj-drawer" :class="{ 'proj-drawer--open': projInfoOpen }">
-      <button class="proj-drawer-tab" type="button" @click="projInfoOpen = !projInfoOpen" :aria-expanded="projInfoOpen">
-        <span class="proj-drawer-tab-label">Project Info</span>
-        <span v-if="projectSynopsis.length" class="proj-drawer-synopsis">
-          <span v-for="(item, i) in projectSynopsis" :key="i"
-            class="proj-drawer-syn-item"
-            :class="{ 'proj-drawer-syn-item--scope': item.label === 'Scope' }">
-            <span class="proj-drawer-syn-key">{{ item.label }}:</span> {{ item.value }}
-          </span>
-        </span>
-        <span v-else class="proj-drawer-synopsis proj-drawer-synopsis--empty">
-          No sponsor info yet — click to fill in
-        </span>
-        <i class="ti" :class="projInfoOpen ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true"></i>
-      </button>
-
-      <div v-show="projInfoOpen" class="proj-drawer-body">
-        <!-- Row 1 — Sponsor (narrow) · Room/Project · City/Base (wide) · Building (compact) -->
+      <!-- Project Info editor — slides down from the light topbar when Edit is clicked -->
+      <div v-show="projInfoOpen" class="proj-drawer-body proj-drawer-body--inline">
         <div class="proj-field">
           <label>Sponsor</label>
           <input type="text" :value="rom.project.sponsor"
@@ -169,7 +195,6 @@
           <input type="text" :value="rom.project.building"
             @input="rom.project.building = $event.target.value" />
         </div>
-        <!-- Row 2 — Cronos Lead (narrow) · Gov Lead · PM Support Lead · Date -->
         <div class="proj-field">
           <label>Cronos Project Lead</label>
           <input type="text" :value="rom.project.projectEngineer"
@@ -191,32 +216,6 @@
             @input="rom.project.date = $event.target.value" />
         </div>
       </div>
-    </div>
-
-    <!-- ── Tab bar (Labor / Travel / Material / Overhead / …) ────── -->
-    <nav class="tabbar" role="tablist" aria-label="Sections">
-      <button
-        v-for="tab in rom.TABS"
-        :key="tab.id"
-        class="tab-btn"
-        :class="{ active: rom.selectedTabId === tab.id }"
-        role="tab"
-        :aria-selected="rom.selectedTabId === tab.id"
-        @click="rom.selectedTabId = tab.id"
-      >
-        <i class="ti" :class="tab.icon" aria-hidden="true"></i>
-        {{ tab.label }}
-        <span v-if="tab.id === 'engineering' && rom.engineeringTotal > 0" class="tab-badge">
-          {{ fmtCompact(rom.engineeringTotal) }}
-        </span>
-        <span v-if="tab.id === 'travel' && rom.travelTotal > 0" class="tab-badge">
-          {{ fmtCompact(rom.travelTotal) }}
-        </span>
-        <span v-if="tab.id === 'material' && rom.materialTotal > 0" class="tab-badge">
-          {{ fmtCompact(rom.materialTotal) }}
-        </span>
-      </button>
-    </nav>
 
     <!-- ── Validation banner ─────────────────────────────────────── -->
     <!-- Hidden for now. To re-enable, change v-if to "validationWarnings.length". -->
@@ -244,6 +243,8 @@
       <span class="stat stat-loaded">Loaded total <strong>{{ fmt(rom.totalLoadedCost) }}</strong></span>
       <span class="stat stat-saved"><i class="ti ti-device-floppy" aria-hidden="true"></i> Auto-saved</span>
     </footer>
+
+    </div><!-- /.main-col -->
 
     <!-- ── Template picker modal ───────────────────────────────── -->
     <TemplatePicker
@@ -543,30 +544,133 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ═══ App shell — 4-row grid ════════════════════════════════════════
-   topbar | tabbar | main (scrollable) | statusbar
+/* ═══ App shell — sidebar | main-col ═══════════════════════════════
+   sidebar (navy) holds brand + tabs + quote total
+   main-col holds light topbar + project info drawer + main + status
 ══════════════════════════════════════════════════════════════════════ */
 .app {
   display: grid;
-  grid-template-rows: auto auto auto 1fr auto;
+  grid-template-columns: 200px 1fr;
   height: 100vh;
   overflow: hidden;
 }
 
-/* ─── Topbar ─────────────────────────────────────────────────────── */
-.topbar {
+/* ─── Sidebar ──────────────────────────────────────────────────── */
+.sidebar {
   background: var(--rom-header-bg);
   color: var(--rom-header-text);
+  display: flex; flex-direction: column;
+  padding: 14px 0;
+  overflow-y: auto;
+}
+.sidebar-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  margin-bottom: 10px;
+}
+.sidebar-brand-text {
+  font-size: 13px; font-weight: 500; color: #fff;
+  line-height: 1.15;
+}
+.sidebar-nav { display: flex; flex-direction: column; padding: 4px 6px; gap: 2px; }
+.sidebar-tab {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  background: transparent; border: none; border-left: 3px solid transparent;
+  color: rgba(255,255,255,0.65);
+  font-size: 13px; font-weight: 500; text-align: left;
+  cursor: pointer; font-family: inherit;
+  border-radius: 0 4px 4px 0;
+  transition: background .12s, color .12s;
+}
+.sidebar-tab-icon { font-size: 16px; flex-shrink: 0; }
+.sidebar-tab-label { flex: 1; }
+.sidebar-tab:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.sidebar-tab.active {
+  color: #fff;
+  background: rgba(125,211,252,0.12);
+  border-left-color: #7dd3fc;
+  font-weight: 700;
+}
+.sidebar-tab-badge {
+  font-size: 10px; padding: 1px 7px;
+  background: #2e7d32; color: #fff;
+  border-radius: 10px; font-weight: 600;
+}
+.sidebar-spacer { flex: 1; min-height: 16px; }
+.sidebar-total {
+  padding: 12px 14px;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  line-height: 1.1;
+}
+.sidebar-total-label {
+  font-size: 9px; color: rgba(255,255,255,0.55);
+  letter-spacing: .08em; text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.sidebar-total-value {
+  font-size: 20px; font-weight: 700; color: #7dd3fc;
+}
+
+/* ─── Main column wrapper ──────────────────────────────────────── */
+.main-col {
+  display: flex; flex-direction: column;
+  min-width: 0;            /* allow content inside to shrink/scroll */
+  overflow: hidden;
+}
+.proj-drawer-body--inline { flex-shrink: 0; }
+
+/* ─── Light topbar (above main content) ────────────────────────── */
+.topbar {
   padding: 9px 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   flex-shrink: 0;
   z-index: 10;
 }
-.topbar-left  { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.topbar--light {
+  background: var(--rom-surface);
+  border-bottom: 1px solid var(--rom-border);
+  color: var(--rom-text);
+}
+.topbar-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
+
+/* Project info pills row in the light topbar */
+.info-pills {
+  display: flex; align-items: center; gap: 14px; flex-wrap: nowrap;
+  flex: 1; min-width: 0;
+  overflow-x: auto;
+  padding: 2px 4px;
+}
+.info-pills::-webkit-scrollbar { display: none; }
+.info-pill {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.info-pill-key {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--rom-text-muted);
+}
+.info-pill-value { color: var(--rom-text); }
+.info-pill--scope .info-pill-key { color: var(--rom-accent); }
+.info-pill--scope .info-pill-value { color: var(--rom-accent-dark); font-weight: 700; }
+.info-pill-empty {
+  font-size: 12px; color: var(--rom-text-muted); font-style: italic;
+}
+.info-edit {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 4px;
+  background: transparent; border: 1px solid var(--rom-border);
+  color: var(--rom-accent-dark); font-size: 11px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  flex-shrink: 0;
+}
+.info-edit:hover { background: var(--rom-accent-bg); border-color: var(--rom-accent); }
+.info-edit i { font-size: 12px; }
 .rates-chip {
   display: flex; align-items: center; gap: 5px;
   padding: 3px 9px; border-radius: 12px;
@@ -616,32 +720,41 @@ body {
 .quote-total-label { font-size: 9px; color: rgba(255,255,255,.6); letter-spacing: .08em; text-transform: uppercase; }
 .quote-total-value { font-size: 16px; font-weight: 600; color: #7dd3fc; }
 
-/* ─── Buttons (shared) ───────────────────────────────────────────── */
+/* ─── Buttons (shared) — now on a LIGHT topbar ─────────────────── */
 .btn {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 6px 12px; font-size: 12px; font-weight: 500;
-  border-radius: var(--rom-radius); border: 1px solid rgba(255,255,255,.25);
-  background: rgba(255,255,255,.1); color: #fff; cursor: pointer;
-  transition: background .15s;
+  border-radius: var(--rom-radius);
+  border: 1px solid var(--rom-border);
+  background: var(--rom-surface); color: var(--rom-text);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  font-family: inherit;
 }
-.btn:hover          { background: rgba(255,255,255,.2); }
-.btn.btn-secondary  { background: rgba(255,255,255,.06); }
-.btn.btn-danger     { background: rgba(163,45,45,.5); border-color: #a32d2d; }
-.btn.btn-danger:hover { background: rgba(163,45,45,.75); }
-.btn.btn-snapshot   { background: rgba(255,255,255,.12); border-color: rgba(125,211,252,.4); }
-.btn.btn-snapshot:hover { background: rgba(125,211,252,.15); }
-.btn.btn-pdf        { background: rgba(180,30,30,.35); border-color: rgba(220,80,80,.5); }
-.btn.btn-pdf:hover  { background: rgba(180,30,30,.55); }
+.btn:hover          { background: var(--rom-surface-alt); border-color: var(--rom-accent); }
+.btn.btn-secondary  { background: var(--rom-surface); }
+.btn.btn-danger     { background: #fff0f0; border-color: var(--rom-danger); color: var(--rom-danger); }
+.btn.btn-danger:hover { background: var(--rom-danger); color: #fff; }
+.btn.btn-snapshot   {
+  background: var(--rom-accent-bg);
+  border-color: var(--rom-accent);
+  color: var(--rom-accent-dark);
+}
+.btn.btn-snapshot:hover { background: #d6e3fa; }
+.btn.btn-pdf        { background: #fff0f0; border-color: var(--rom-danger); color: var(--rom-danger); }
+.btn.btn-pdf:hover  { background: var(--rom-danger); color: #fff; }
+.btn:disabled       { opacity: .4; cursor: not-allowed; }
+.btn:disabled:hover { background: var(--rom-surface); border-color: var(--rom-border); }
 
 /* Unified Export dropdown — Excel · PDF · Word */
 .export-split { position: relative; display: inline-flex; }
 .btn-export {
   display: inline-flex; align-items: center; gap: 5px;
-  background: rgba(255,255,255,.18);
-  border-color: rgba(255,255,255,.35);
+  background: var(--rom-header-bg);
+  border-color: var(--rom-header-bg);
   color: #fff;
 }
-.btn-export:hover { background: rgba(255,255,255,.28); }
+.btn-export:hover { background: var(--rom-accent-dark); border-color: var(--rom-accent-dark); }
 .export-menu {
   position: absolute; top: calc(100% + 4px); right: 0; z-index: 60;
   width: 300px;
@@ -693,8 +806,8 @@ body {
 
 /* Save split button */
 .save-split { position: relative; display: inline-flex; align-items: stretch; }
-.btn.btn-save        { background: rgba(125,211,252,.12); border-color: rgba(125,211,252,.4); }
-.btn.btn-save:hover  { background: rgba(125,211,252,.22); }
+.btn.btn-save        { background: var(--rom-accent); border-color: var(--rom-accent); color: #fff; }
+.btn.btn-save:hover  { background: var(--rom-accent-dark); border-color: var(--rom-accent-dark); }
 .btn-save--main      { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .btn-save--caret     {
   padding: 6px 8px;
@@ -726,39 +839,10 @@ body {
 .save-menu-sub   { font-size: 11px; color: var(--rom-text-muted, #4a5a78); margin-top: 1px; }
 .btn.btn-icon       { padding: 6px 8px; }
 .btn.btn-icon i     { font-size: 16px; }
-.btn:disabled       { opacity: .35; cursor: not-allowed; background: rgba(255,255,255,.05); }
-.btn:disabled:hover { background: rgba(255,255,255,.05); }
 .snap-count {
   font-size: 10px; padding: 1px 6px;
-  background: #7dd3fc; color: #1a3560;
+  background: var(--rom-accent); color: #fff;
   border-radius: 8px; font-weight: 700; margin-left: 2px;
-}
-
-/* ─── Tab bar ────────────────────────────────────────────────────── */
-.tabbar {
-  display: flex;
-  background: var(--rom-header-bg);
-  border-bottom: 3px solid var(--rom-accent);
-  padding: 0 12px;
-  gap: 2px;
-  flex-shrink: 0;
-}
-.tab-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 10px 18px 8px; font-size: 13px; font-weight: 500;
-  border: none; border-bottom: 3px solid transparent;
-  margin-bottom: -3px;
-  background: transparent; color: rgba(255,255,255,.65); cursor: pointer;
-  transition: color .15s, background .15s;
-  white-space: nowrap; border-radius: 4px 4px 0 0;
-}
-.tab-btn .ti { font-size: 14px; }
-.tab-btn:hover           { color: #fff; background: rgba(255,255,255,.08); }
-.tab-btn.active          { color: var(--rom-accent); background: var(--rom-surface); border-bottom-color: var(--rom-accent); font-weight: 700; }
-.tab-badge {
-  font-size: 10px; padding: 1px 7px;
-  background: #2e7d32; color: #fff;
-  border-radius: 10px; font-weight: 600;
 }
 
 /* ─── Project Info drawer ────────────────────────────────────────── */
@@ -866,9 +950,13 @@ body {
 
 /* ─── Main content ───────────────────────────────────────────────── */
 .main {
+  flex: 1;                /* fill the available height in main-col's flex column */
+  min-height: 0;          /* allow inner scrolling */
   overflow-y: auto;
   background: var(--rom-bg);
 }
+.statusbar { flex-shrink: 0; }
+.topbar    { flex-shrink: 0; }
 
 /* ─── Status bar ─────────────────────────────────────────────────── */
 .statusbar {
