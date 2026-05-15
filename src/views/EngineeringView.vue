@@ -250,7 +250,7 @@
                           type="number" min="0" max="365" step="0.1"
                           :value="parseFloat((line.days || 0).toFixed(1))"
                           class="cell-num"
-                          @change="rom.updateLine(line.id, { days: clampDays(+$event.target.value) })"
+                          @change="onDaysChange(line, $event)"
                         />
                       </td>
 
@@ -270,7 +270,7 @@
                           type="number" min="0" step="0.5"
                           :value="Math.round(((line.days || 0) * (line.hoursPerDay || 0)) * 2) / 2"
                           class="cell-num cell-num--hrs"
-                          @change="onTotalHrsChange(line, +$event.target.value)"
+                          @change="onTotalHrsChange(line, $event)"
                         />
                       </td>
 
@@ -568,13 +568,17 @@ function onLaborCatChange(lineId, catId) {
 }
 
 // ── Total Hours bidirectional ────────────────────────────────────────
-// Editing Total Hrs → back-calculates Days (Hrs/Day stays fixed)
-function onTotalHrsChange(line, totalHrs) {
-  const snapped = Math.round(totalHrs * 2) / 2   // snap Total Hrs to nearest 0.5
-  const hpd = line.hoursPerDay || 8
-  // Store raw Days — no rounding — so the reverse calc stays consistent
-  const newDays = hpd > 0 ? snapped / hpd : 0
-  rom.updateLine(line.id, { days: clampDays(newDays) })
+// Editing Total Hrs → back-calculates Days (Hrs/Day stays fixed).
+// If the resulting Days would exceed 365, both Days and Total Hrs snap
+// down to their capped maximums.
+function onTotalHrsChange(line, e) {
+  const rawHrs  = +e.target.value || 0
+  const snapped = Math.round(rawHrs * 2) / 2   // snap Total Hrs to nearest 0.5
+  const hpd     = line.hoursPerDay || 8
+  const newDays = hpd > 0 ? clampDays(snapped / hpd) : 0
+  rom.updateLine(line.id, { days: newDays })
+  // Reflect the clamped value in the input so the user sees the snap-back
+  e.target.value = Math.round((newDays * hpd) * 2) / 2
 }
 
 // Cap any single line's Days at 365 (one full year).
@@ -583,6 +587,15 @@ function clampDays(v) {
   if (n < 0)   return 0
   if (n > 365) return 365
   return n
+}
+
+// Days input handler — clamps the typed value AND snaps the DOM input
+// back to the clamped value so the user immediately sees 365 if they
+// typed something larger.
+function onDaysChange(line, e) {
+  const clamped = clampDays(+e.target.value)
+  rom.updateLine(line.id, { days: clamped })
+  e.target.value = parseFloat(clamped.toFixed(1))
 }
 
 function dropAtEnd(eid, pid) {
