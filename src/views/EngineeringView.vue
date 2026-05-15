@@ -596,32 +596,33 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 /* Phase sections — each phase is its own clearly bordered block */
 .phases-wrap {
   display: flex; flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  background: var(--rom-bg, #f4f6fb);
+  gap: 18px;
+  padding: 16px;
+  background: #e9edf5;
+  border-top: 1px solid var(--rom-border);
 }
 
 .phase-section {
-  border: 1px solid var(--rom-border);
-  border-radius: var(--rom-radius, 6px);
+  border: 2px solid #c9cfdb;
+  border-radius: 8px;
   background: var(--rom-surface);
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 }
 .phase-section--has-lines {
-  border-color: #b6cff0;
-  box-shadow: 0 1px 3px rgba(26,95,180,0.08);
+  border-color: #1a5fb4;
+  box-shadow: 0 3px 10px rgba(26,95,180,0.14);
 }
 .phase-section--has-lines > .phase-head {
   background: var(--rom-accent-bg);
-  border-left: 4px solid var(--rom-accent, #1a5fb4);
+  border-left: 6px solid var(--rom-accent, #1a5fb4);
 }
 
 .phase-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; cursor: pointer; user-select: none;
+  padding: 14px 18px; cursor: pointer; user-select: none;
   transition: background .12s;
-  border-left: 4px solid transparent;
+  border-left: 6px solid transparent;
 }
 .phase-head:hover { background: var(--rom-surface-alt); }
 .phase-section--has-lines > .phase-head:hover { background: #dce8fb; }
