@@ -122,7 +122,20 @@
                       <th class="col-cat">Labor Category</th>
                       <th class="col-task">Task</th>
                       <th class="col-days">Days</th>
-                      <th class="col-hpd">Hrs/Day</th>
+                      <th class="col-hpd">
+                        <div class="col-hpd-head">
+                          <span>Hrs/Day</span>
+                          <input
+                            type="number"
+                            min="0.5"
+                            step="0.5"
+                            class="col-default-input"
+                            :value="getDefaultHrs(entity.id, phase.id)"
+                            @change="setDefaultHrs(entity.id, phase.id, +$event.target.value)"
+                            title="Default Hrs/Day for new rows added in this phase"
+                          />
+                        </div>
+                      </th>
                       <th class="col-hrs">Total Hrs</th>
                       <th v-if="rom.showRates" class="col-rate">Rate ($/hr)</th>
                       <th class="col-total">Total</th>
@@ -366,8 +379,9 @@ import { useRomStore } from '../stores/rom'
 
 const rom = useRomStore()
 
-const PHASE_STATE_KEY  = 'rom-phase-open-state'
-const ROLE_STATE_KEY   = 'rom-phase-role-state'
+const PHASE_STATE_KEY    = 'rom-phase-open-state'
+const ROLE_STATE_KEY     = 'rom-phase-role-state'
+const DEFAULT_HRS_KEY    = 'rom-phase-default-hrs'
 
 // ── Role filter options ──────────────────────────────────────────────
 const ROLE_FILTERS = [
@@ -382,11 +396,21 @@ const ROLE_SHORT = { engineering: 'ENG', pm: 'PM', programming: 'PROG', technici
 function roleShort(role) { return ROLE_SHORT[role] ?? role.toUpperCase() }
 
 // ── Phase open/close state ───────────────────────────────────────────
-const phaseOpenState  = reactive(loadSaved(PHASE_STATE_KEY))
-const activeRoleState = reactive(loadSaved(ROLE_STATE_KEY))
-const pickerState     = reactive({})
-const customTaskMode  = reactive({})
-const dragState       = reactive({ dragId: null, overId: null })
+const phaseOpenState   = reactive(loadSaved(PHASE_STATE_KEY))
+const activeRoleState  = reactive(loadSaved(ROLE_STATE_KEY))
+const defaultHrsState  = reactive(loadSaved(DEFAULT_HRS_KEY))
+const pickerState      = reactive({})
+const customTaskMode   = reactive({})
+const dragState        = reactive({ dragId: null, overId: null })
+
+function getDefaultHrs(eid, pid) {
+  const v = defaultHrsState[phaseKey(eid, pid)]
+  return (v && v > 0) ? v : 8
+}
+function setDefaultHrs(eid, pid, val) {
+  if (val > 0) defaultHrsState[phaseKey(eid, pid)] = val
+  else delete defaultHrsState[phaseKey(eid, pid)]
+}
 
 function loadSaved(key) {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
@@ -477,6 +501,13 @@ function hidePicker(eid, pid)    { pickerState[phaseKey(eid, pid)] = false }
 
 function pickRole(eid, pid, role) {
   rom.addLine(role, pid, '', { entity: eid })
+  // Apply the phase's default Hrs/Day to the newly added line
+  const defaultHrs = getDefaultHrs(eid, pid)
+  const phaseLines = rom.lineItems.filter(l => l.entity === eid && l.phaseId === pid)
+  const newLine = phaseLines[phaseLines.length - 1]
+  if (newLine && newLine.hoursPerDay !== defaultHrs) {
+    rom.updateLine(newLine.id, { hoursPerDay: defaultHrs })
+  }
   phaseOpenState[phaseKey(eid, pid)] = true
   pickerState[phaseKey(eid, pid)] = false
 }
@@ -502,8 +533,9 @@ function onTaskChange(line, value) {
 
 // On mount, put any lines with non-WBS taskIds into custom mode
 onMounted(() => {
-  watch(phaseOpenState,  v => localStorage.setItem(PHASE_STATE_KEY,  JSON.stringify(v)), { deep: true })
-  watch(activeRoleState, v => localStorage.setItem(ROLE_STATE_KEY,   JSON.stringify(v)), { deep: true })
+  watch(phaseOpenState,   v => localStorage.setItem(PHASE_STATE_KEY,   JSON.stringify(v)), { deep: true })
+  watch(activeRoleState,  v => localStorage.setItem(ROLE_STATE_KEY,    JSON.stringify(v)), { deep: true })
+  watch(defaultHrsState,  v => localStorage.setItem(DEFAULT_HRS_KEY,   JSON.stringify(v)), { deep: true })
 
   const allWbsIds = new Set(
     Object.values(rom.wbs).flatMap(phases => Object.values(phases).flat().map(t => t.id))
@@ -731,7 +763,27 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .col-cat   { width: 120px; }
 .col-task  { min-width: 200px; }
 .col-days  { width: 90px; }
-.col-hpd   { width: 90px; }
+.col-hpd   { width: 110px; }
+.col-hpd-head {
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.col-default-input {
+  width: 38px;
+  height: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  padding: 0 2px;
+  border: 1px solid var(--rom-border);
+  border-radius: 3px;
+  background: var(--rom-surface);
+  color: var(--rom-accent-dark, #1248a0);
+}
+.col-default-input:focus {
+  outline: 2px solid var(--rom-accent);
+  outline-offset: -1px;
+  border-color: transparent;
+}
 .col-hrs   { width: 100px; }
 .col-rate  { width: 100px; }
 .col-total { width: 110px; font-weight: 700; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
