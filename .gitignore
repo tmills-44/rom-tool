@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temp/lock Office files
+~$*
+
+# Per diem rate files (user-supplied, not committed)
+public/rates/conus.xlsx
+public/rates/oconus.xlsx
+public/rates/oconus.xls
+
+# Accidental nested src copy
+src/src/
+
+# Orphaned scaffold files
+src/assets/vite.svg
+src/assets/vue.svg
+src/components/HelloWorld.vue
+src/components/SidebarTree.vue
+src/views/LaborView.vue
+src/views/OverheadView.vue
+src/views/StubView.vue
