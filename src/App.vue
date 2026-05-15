@@ -18,7 +18,7 @@
       </div>
 
       <div class="topbar-right">
-        <div v-if="ratesLoadedAt" class="rates-chip" :title="ratesChipDetail">
+        <div class="rates-chip" :title="ratesChipDetail">
           <i class="ti ti-database"></i>
           Rates: {{ ratesLoadedAt }}
         </div>
@@ -149,8 +149,17 @@ const ratesStatus   = reactive({ conus: '', oconus: '', errors: [] })
 const ratesLoadedAt   = ref('')   // e.g. "May 15 · 2:34 PM"
 const ratesChipDetail = ref('')   // tooltip detail
 
+function fmtTime(d) {
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric' })
+    + ' · ' + d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
 onMounted(async () => {
   if (!rom.project.templateId) showPicker.value = true
+
+  // Always stamp the load time immediately
+  ratesLoadedAt.value   = fmtTime(new Date())
+  ratesChipDetail.value = 'Rates loading…'
 
   // Load rate files from public/rates/ — silently skips if files not yet uploaded
   try {
@@ -165,12 +174,8 @@ onMounted(async () => {
       rom.loadOCONUSRates(oconus)
       ratesStatus.oconus = `${oconus.countries.length} countries / ${Object.keys(oconus.map).length} OCONUS locations`
     }
-    if (ratesStatus.conus || ratesStatus.oconus) {
-      const now = new Date()
-      ratesLoadedAt.value = now.toLocaleString('en-US', { month: 'short', day: 'numeric' })
-        + ' · ' + now.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-      ratesChipDetail.value = [ratesStatus.conus, ratesStatus.oconus].filter(Boolean).join(' · ')
-    }
+    const detail = [ratesStatus.conus, ratesStatus.oconus].filter(Boolean).join(' · ')
+    ratesChipDetail.value = detail || 'No rate files found'
   } catch {
     // Files not present yet — normal on first run
   }
