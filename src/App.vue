@@ -1,9 +1,16 @@
 <template>
-  <div class="app">
+  <div class="app" :class="{ 'app--sidebar-collapsed': sidebarCollapsed }">
 
     <!-- ── Left sidebar (brand + tabs + quote total) ──────────────── -->
     <aside class="sidebar" role="navigation" aria-label="Sections">
       <div class="sidebar-brand">
+        <button class="sidebar-toggle"
+          type="button"
+          @click="sidebarCollapsed = !sidebarCollapsed"
+          :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+          <i class="ti ti-menu-2" aria-hidden="true"></i>
+        </button>
         <div class="app-logo-chip">
           <img src="/logo.png" alt="Cronos" class="app-logo-img" />
         </div>
@@ -18,17 +25,24 @@
           :class="{ active: rom.selectedTabId === tab.id }"
           role="tab"
           :aria-selected="rom.selectedTabId === tab.id"
+          :title="tab.label"
           @click="rom.selectedTabId = tab.id"
         >
           <i class="ti sidebar-tab-icon" :class="tab.icon" aria-hidden="true"></i>
           <span class="sidebar-tab-label">{{ tab.label }}</span>
-          <span v-if="tab.id === 'engineering' && rom.engineeringTotal > 0" class="sidebar-tab-badge">
+          <span v-if="tab.id === 'engineering' && tabStatus('engineering') !== 'empty'"
+            class="sidebar-tab-badge"
+            :class="`sidebar-tab-badge--${tabStatus('engineering')}`">
             {{ fmtCompact(rom.engineeringTotal) }}
           </span>
-          <span v-if="tab.id === 'travel' && rom.travelTotal > 0" class="sidebar-tab-badge">
+          <span v-if="tab.id === 'travel' && tabStatus('travel') !== 'empty'"
+            class="sidebar-tab-badge"
+            :class="`sidebar-tab-badge--${tabStatus('travel')}`">
             {{ fmtCompact(rom.travelTotal) }}
           </span>
-          <span v-if="tab.id === 'material' && rom.materialTotal > 0" class="sidebar-tab-badge">
+          <span v-if="tab.id === 'material' && tabStatus('material') !== 'empty'"
+            class="sidebar-tab-badge"
+            :class="`sidebar-tab-badge--${tabStatus('material')}`">
             {{ fmtCompact(rom.materialTotal) }}
           </span>
         </button>
@@ -269,7 +283,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { useRomStore } from './stores/rom'
 import { generatePDF }   from './utils/pdfExport'
 import { generateExcel } from './utils/excelExport'
@@ -335,6 +349,49 @@ onMounted(async () => {
 
 // Project info drawer — closed by default, click the tab to expand
 const projInfoOpen = ref(false)
+
+// Sidebar collapse state — persisted across reloads so the user's preference sticks
+const SIDEBAR_KEY = 'rom-sidebar-collapsed'
+const sidebarCollapsed = ref(localStorage.getItem(SIDEBAR_KEY) === '1')
+watch(sidebarCollapsed, v => {
+  try { localStorage.setItem(SIDEBAR_KEY, v ? '1' : '0') } catch {}
+})
+
+// Per-tab completion status — drives the sidebar tab badge color.
+// Returns 'empty' (no badge), 'partial' (orange — something needs filling in), or 'complete' (green)
+const laborTabStatus = computed(() => {
+  const lines = rom.lineItems.filter(l => l.coaId === rom.activeCoaId && !!l.laborCat)
+  if (lines.length === 0) return 'empty'
+  const allComplete = lines.every(l =>
+    l.taskId && (l.days || 0) > 0 && (l.hoursPerDay || 0) > 0 && (l.rate || 0) > 0
+  )
+  return allComplete ? 'complete' : 'partial'
+})
+const travelTabStatus = computed(() => {
+  const trips = rom.ENTITIES.flatMap(e => rom.travel[e.id] ?? [])
+    .filter(t => (t.coaId ?? rom.coas[0]?.id) === rom.activeCoaId)
+  const travelers = trips.flatMap(t => t.travelers ?? [])
+  if (travelers.length === 0) return 'empty'
+  const allComplete = travelers.every(tr =>
+    !!tr.name && (tr.days || 0) > 0 && (tr.hotel || tr.car || tr.airfare || tr.misc)
+  )
+  return allComplete ? 'complete' : 'partial'
+})
+const materialTabStatus = computed(() => {
+  const items = rom.activeMaterialItems
+  if (items.length === 0) return 'empty'
+  const allComplete = items.every(i =>
+    !!i.description && (i.qty || 0) > 0 && (i.unitCost || 0) > 0
+  )
+  return allComplete ? 'complete' : 'partial'
+})
+// Helper used by the template to map tab id → its status
+function tabStatus(tabId) {
+  if (tabId === 'engineering') return laborTabStatus.value
+  if (tabId === 'travel')      return travelTabStatus.value
+  if (tabId === 'material')    return materialTabStatus.value
+  return 'empty'
+}
 
 // One-line synopsis of project info shown in the collapsed drawer tab so the
 // user can glance at the key fields without opening the drawer. Active scope
@@ -551,6 +608,7 @@ body {
 .app {
   display: grid;
   grid-template-columns: 200px 1fr;
+  grid-template-rows: 1fr;   /* single full-height row so sidebar + main-col stretch */
   height: 100vh;
   overflow: hidden;
 }
@@ -564,15 +622,25 @@ body {
   overflow-y: auto;
 }
 .sidebar-brand {
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 14px 12px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 10px 12px;
   border-bottom: 1px solid rgba(255,255,255,0.12);
   margin-bottom: 10px;
 }
 .sidebar-brand-text {
   font-size: 13px; font-weight: 500; color: #fff;
   line-height: 1.15;
+  flex: 1; min-width: 0;
 }
+.sidebar-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px;
+  background: transparent; border: none; border-radius: 4px;
+  color: rgba(255,255,255,0.75); cursor: pointer;
+  flex-shrink: 0;
+}
+.sidebar-toggle:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.sidebar-toggle i { font-size: 18px; }
 .sidebar-nav { display: flex; flex-direction: column; padding: 4px 6px; gap: 2px; }
 .sidebar-tab {
   display: flex; align-items: center; gap: 10px;
@@ -595,9 +663,11 @@ body {
 }
 .sidebar-tab-badge {
   font-size: 10px; padding: 1px 7px;
-  background: #2e7d32; color: #fff;
+  background: #2e7d32; color: #fff;     /* default green = complete */
   border-radius: 10px; font-weight: 600;
 }
+.sidebar-tab-badge--complete { background: #2e7d32; color: #fff; }
+.sidebar-tab-badge--partial  { background: #d97706; color: #fff; }
 .sidebar-spacer { flex: 1; min-height: 16px; }
 .sidebar-total {
   padding: 12px 14px;
@@ -611,6 +681,45 @@ body {
 }
 .sidebar-total-value {
   font-size: 20px; font-weight: 700; color: #7dd3fc;
+}
+
+/* ─── Collapsed sidebar state ─────────────────────────────────────
+   Triggered by the hamburger toggle in the brand area. Sidebar shrinks
+   to a 64px rail showing only icons + the C logo + the loaded total. */
+.app--sidebar-collapsed { grid-template-columns: 64px 1fr; }
+.app--sidebar-collapsed .sidebar-brand {
+  flex-direction: column; gap: 6px; padding: 0 0 10px;
+}
+.app--sidebar-collapsed .sidebar-brand-text { display: none; }
+.app--sidebar-collapsed .sidebar-toggle { margin-bottom: 2px; }
+
+.app--sidebar-collapsed .sidebar-nav { padding: 4px 6px; }
+.app--sidebar-collapsed .sidebar-tab {
+  justify-content: center;
+  padding: 10px 0;
+  border-left-width: 3px;
+  border-radius: 0 4px 4px 0;
+  position: relative;
+}
+.app--sidebar-collapsed .sidebar-tab-label { display: none; }
+.app--sidebar-collapsed .sidebar-tab-icon { font-size: 18px; }
+.app--sidebar-collapsed .sidebar-tab-badge {
+  position: absolute; top: 4px; right: 4px;
+  padding: 0; width: 7px; height: 7px;
+  font-size: 0; line-height: 0; color: transparent;
+  border-radius: 50%;
+}
+.app--sidebar-collapsed .sidebar-tab-badge--complete { background: #2e7d32; }
+.app--sidebar-collapsed .sidebar-tab-badge--partial  { background: #d97706; }
+
+.app--sidebar-collapsed .sidebar-total {
+  padding: 10px 4px;
+  text-align: center;
+}
+.app--sidebar-collapsed .sidebar-total-label { display: none; }
+.app--sidebar-collapsed .sidebar-total-value {
+  font-size: 11px; font-weight: 700;
+  word-break: break-all; line-height: 1.1;
 }
 
 /* ─── Main column wrapper ──────────────────────────────────────── */
