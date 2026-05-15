@@ -515,6 +515,34 @@ export const useRomStore = defineStore('rom', () => {
 
   // Cronos is always on; gov and sub are opt-in
   const enabledEntities = ref(saved?.enabledEntities ?? ['cronos'])
+
+  // Global UI pref — whether the Rate column shows on the deliverables page
+  const showRates = ref(saved?.showRates ?? true)
+
+  // ── Undo / redo stacks for lineItems ─────────────────────────────────
+  const undoStack = ref([])
+  const redoStack = ref([])
+  const MAX_HISTORY = 50
+
+  function snapshotLines() {
+    undoStack.value.push(JSON.stringify(lineItems))
+    if (undoStack.value.length > MAX_HISTORY) undoStack.value.shift()
+    redoStack.value = []
+  }
+  function undo() {
+    if (!undoStack.value.length) return
+    redoStack.value.push(JSON.stringify(lineItems))
+    const prev = JSON.parse(undoStack.value.pop())
+    lineItems.splice(0, lineItems.length, ...prev)
+  }
+  function redo() {
+    if (!redoStack.value.length) return
+    undoStack.value.push(JSON.stringify(lineItems))
+    const next = JSON.parse(redoStack.value.pop())
+    lineItems.splice(0, lineItems.length, ...next)
+  }
+  const canUndo = computed(() => undoStack.value.length > 0)
+  const canRedo = computed(() => redoStack.value.length > 0)
   const visibleEntities = computed(() => ENTITIES.filter(e => enabledEntities.value.includes(e.id)))
 
   const selectedTabId = ref(saved?.selectedTabId ?? 'engineering')
@@ -559,6 +587,15 @@ export const useRomStore = defineStore('rom', () => {
     if (j < 0 || j >= laborCats.length) return
     ;[laborCats[i], laborCats[j]] = [laborCats[j], laborCats[i]]
   }
+  function reorderLaborCat(dragId, dropId, after = false) {
+    if (!dragId || !dropId || dragId === dropId) return
+    const dragIdx = laborCats.findIndex(c => c.id === dragId)
+    if (dragIdx < 0) return
+    const [dragged] = laborCats.splice(dragIdx, 1)
+    const dropIdx = laborCats.findIndex(c => c.id === dropId)
+    if (dropIdx < 0) { laborCats.push(dragged); return }
+    laborCats.splice(after ? dropIdx + 1 : dropIdx, 0, dragged)
+  }
 
   // ── WBS task CRUD (for the Admin tab) ────────────────────────────
   function addTask(role, phaseId, task) {
@@ -586,6 +623,17 @@ export const useRomStore = defineStore('rom', () => {
     const j = direction === 'up' ? i - 1 : i + 1
     if (j < 0 || j >= arr.length) return
     ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  function reorderTask(role, phaseId, dragId, dropId, after = false) {
+    if (!dragId || !dropId || dragId === dropId) return
+    const arr = wbs[role]?.[phaseId]
+    if (!arr) return
+    const dragIdx = arr.findIndex(t => t.id === dragId)
+    if (dragIdx < 0) return
+    const [dragged] = arr.splice(dragIdx, 1)
+    const dropIdx = arr.findIndex(t => t.id === dropId)
+    if (dropIdx < 0) { arr.push(dragged); return }
+    arr.splice(after ? dropIdx + 1 : dropIdx, 0, dragged)
   }
   function resetWbs() {
     Object.keys(wbs).forEach(k => delete wbs[k])
@@ -782,6 +830,7 @@ export const useRomStore = defineStore('rom', () => {
   }
 
   function addLine(role, phaseId, taskId, opts = {}) {
+    snapshotLines()
     const entity   = opts.entity   ?? 'cronos'
     const laborCat = opts.laborCat ?? ''
     // Everything starts at zero unless explicitly passed (e.g. by a baseline template).
@@ -793,6 +842,20 @@ export const useRomStore = defineStore('rom', () => {
       rate:        opts.rate        ?? (laborCat ? laborCatRate(laborCat) : 0),
       sortOrder:   opts.sortOrder   ?? nextSortOrder(entity, phaseId),
     })
+  }
+
+  function duplicateLine(lineId) {
+    const src = lineItems.find(l => l.id === lineId)
+    if (!src) return
+    snapshotLines()
+    const clone = { ...src, id: uuid(), sortOrder: (src.sortOrder ?? 0) + 0.5 }
+    const idx = lineItems.findIndex(l => l.id === lineId)
+    lineItems.splice(idx + 1, 0, clone)
+    // Re-normalize sortOrder so the inserted 0.5 doesn't accumulate forever
+    const samePhase = lineItems
+      .filter(l => l.entity === src.entity && l.phaseId === src.phaseId)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    samePhase.forEach((l, i) => { l.sortOrder = i })
   }
 
   function swapLineOrder(idA, idB) {
@@ -808,6 +871,7 @@ export const useRomStore = defineStore('rom', () => {
     const drag = lineItems.find(l => l.id === dragId)
     const drop = lineItems.find(l => l.id === dropId)
     if (!drag || !drop || dragId === dropId) return
+    snapshotLines()
     const phaseLines = lineItems
       .filter(l => l.entity === drag.entity && l.phaseId === drag.phaseId)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -819,7 +883,9 @@ export const useRomStore = defineStore('rom', () => {
 
   function removeLine(lineId) {
     const i = lineItems.findIndex(l => l.id === lineId)
-    if (i >= 0) lineItems.splice(i, 1)
+    if (i < 0) return
+    snapshotLines()
+    lineItems.splice(i, 1)
   }
 
   function updateLine(lineId, patch) {
@@ -935,7 +1001,7 @@ export const useRomStore = defineStore('rom', () => {
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  watch([project, wbs, lineItems, travel, material, overhead, enabledEntities, selectedTabId, gsaRateMap, laborCats], () => {
+  watch([project, wbs, lineItems, travel, material, overhead, enabledEntities, selectedTabId, gsaRateMap, laborCats, showRates], () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         project: { ...project }, wbs: deepClone(wbs), lineItems: deepClone(lineItems),
@@ -943,6 +1009,7 @@ export const useRomStore = defineStore('rom', () => {
         overhead: { ...overhead }, enabledEntities: enabledEntities.value, selectedTabId: selectedTabId.value,
         gsaRateMap: { ...gsaRateMap },
         laborCats: deepClone(laborCats),
+        showRates: showRates.value,
       }))
     } catch {}
   }, { deep: true })
@@ -957,11 +1024,12 @@ export const useRomStore = defineStore('rom', () => {
     materialUnloaded, shippingCost, materialTotal, unloadedProjectTotal,
     scpCost, globalCost, govLaborCost, managementReserveCost,
     projectOverheadTotal, projectWithOverhead, scrCost, totalOverhead, totalLoadedCost,
-    laborCatRate, catsForRole, updateLaborCatRate, updateLaborCatLabel, updateLaborCatRole, moveLaborCat, addLaborCat, removeLaborCat, resetLaborCats,
-    addTask, removeTask, updateTask, moveTask, resetWbs,
+    laborCatRate, catsForRole, updateLaborCatRate, updateLaborCatLabel, updateLaborCatRole, moveLaborCat, reorderLaborCat, addLaborCat, removeLaborCat, resetLaborCats,
+    addTask, removeTask, updateTask, moveTask, reorderTask, resetWbs,
     lineHours, lineCost, tasksFor, linesForPhase, linesForRole,
     phaseHours, phaseCost, roleHours, roleCost, entityHours, entityCost, travelLineCost,
-    addLine, removeLine, updateLine, swapLineOrder, reorderLine, enableEntity, disableEntity, applyTemplate, resetAll,
+    addLine, duplicateLine, removeLine, updateLine, swapLineOrder, reorderLine, enableEntity, disableEntity, applyTemplate, resetAll,
+    showRates, undo, redo, canUndo, canRedo,
     addMaterialItem, updateMaterialItem, removeMaterialItem,
     addTrip, updateTrip, removeTrip, tripCost,
     gsaRateMap, importGSARates, lookupGSARate, clearGSARates,

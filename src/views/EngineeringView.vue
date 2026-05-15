@@ -109,8 +109,9 @@
                       <th class="col-days">Days</th>
                       <th class="col-hpd">Hrs/Day</th>
                       <th class="col-hrs">Total Hrs</th>
-                      <th class="col-rate">Rate ($/hr)</th>
+                      <th v-if="rom.showRates" class="col-rate">Rate ($/hr)</th>
                       <th class="col-total">Total</th>
+                      <th class="col-dup"></th>
                       <th class="col-del"></th>
                     </tr>
                   </thead>
@@ -219,8 +220,8 @@
                         />
                       </td>
 
-                      <!-- Rate -->
-                      <td class="col-rate">
+                      <!-- Rate (hidden when admin's "Show rates" is off) -->
+                      <td v-if="rom.showRates" class="col-rate">
                         <input
                           type="number" min="0" step="5"
                           :value="line.rate"
@@ -232,6 +233,13 @@
                       <!-- Total Cost -->
                       <td class="col-total">
                         {{ fmt((line.days || 0) * (line.hoursPerDay || 0) * (line.rate || 0)) }}
+                      </td>
+
+                      <!-- Duplicate -->
+                      <td class="col-dup">
+                        <button class="dup-btn" @click="rom.duplicateLine(line.id)" title="Duplicate this row below">
+                          <i class="ti ti-copy" aria-hidden="true"></i>
+                        </button>
                       </td>
 
                       <!-- Delete -->
@@ -250,7 +258,7 @@
                       @dragleave="dragState.overId = null"
                       @drop.prevent="dropAtEnd(entity.id, phase.id)"
                     >
-                      <td colspan="10" class="drop-zone-cell">Drop here to move to end</td>
+                      <td :colspan="rom.showRates ? 11 : 10" class="drop-zone-cell">Drop here to move to end</td>
                     </tr>
                   </tbody>
                 </table>
@@ -699,6 +707,15 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .phase-footer-total { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .phase-total-label { font-size: 11px; font-weight: 700; color: var(--rom-text-muted); text-transform: uppercase; letter-spacing: .04em; }
 .phase-total-value { font-size: 15px; font-weight: 800; color: var(--rom-accent-dark); white-space: nowrap; }
+
+/* Duplicate row button */
+.col-dup { width: 30px; }
+.dup-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border: none; border-radius: 4px;
+  background: transparent; color: var(--rom-text-faint); cursor: pointer; font-size: 12px;
+}
+.dup-btn:hover { background: rgba(26,95,180,0.08); color: var(--rom-accent, #1a5fb4); }
 
 /* Delete button */
 .del-btn {

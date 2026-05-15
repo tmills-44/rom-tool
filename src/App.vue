@@ -26,6 +26,12 @@
           <span class="quote-total-label">QUOTE TOTAL</span>
           <span class="quote-total-value">{{ fmt(rom.totalLoadedCost) }}</span>
         </div>
+        <button class="btn btn-icon" :disabled="!rom.canUndo" @click="rom.undo" title="Undo (last add/duplicate/remove/reorder)">
+          <i class="ti ti-arrow-back-up" aria-hidden="true"></i>
+        </button>
+        <button class="btn btn-icon" :disabled="!rom.canRedo" @click="rom.redo" title="Redo">
+          <i class="ti ti-arrow-forward-up" aria-hidden="true"></i>
+        </button>
         <button class="btn btn-snapshot" @click="showSnapshots = true" title="Snapshots">
           <i class="ti ti-camera" aria-hidden="true"></i> Snapshots
           <span v-if="rom.snapshots.length > 0" class="snap-count">{{ rom.snapshots.length }}</span>
@@ -350,6 +356,10 @@ body {
 .btn.btn-snapshot:hover { background: rgba(125,211,252,.15); }
 .btn.btn-pdf        { background: rgba(180,30,30,.35); border-color: rgba(220,80,80,.5); }
 .btn.btn-pdf:hover  { background: rgba(180,30,30,.55); }
+.btn.btn-icon       { padding: 6px 8px; }
+.btn.btn-icon i     { font-size: 16px; }
+.btn:disabled       { opacity: .35; cursor: not-allowed; background: rgba(255,255,255,.05); }
+.btn:disabled:hover { background: rgba(255,255,255,.05); }
 .snap-count {
   font-size: 10px; padding: 1px 6px;
   background: #7dd3fc; color: #1a3560;

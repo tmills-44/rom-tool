@@ -47,6 +47,15 @@
       </header>
 
       <div class="admin-body">
+        <!-- ── Display preferences ─────────────────────────────────── -->
+        <section class="admin-prefs">
+          <label class="pref-toggle">
+            <input type="checkbox" :checked="rom.showRates" @change="rom.showRates = $event.target.checked" />
+            <span class="pref-label">Show Rate column on the Deliverables page</span>
+            <span class="pref-hint">When off, the per-hour $ rate is hidden from line rows. Costs and totals stay visible.</span>
+          </label>
+        </section>
+
         <!-- ── Rates editor ───────────────────────────────────────── -->
         <section class="admin-section">
           <div class="admin-section-head">
@@ -81,9 +90,24 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(cat, i) in sortedLaborCats" :key="cat.id">
+                <tr
+                  v-for="(cat, i) in sortedLaborCats"
+                  :key="cat.id"
+                  class="rate-row"
+                  :class="{
+                    'rate-row--dragging':  dragCat.dragId === cat.id,
+                    'rate-row--drag-over': dragCat.overId === cat.id && dragCat.dragId !== cat.id,
+                  }"
+                  draggable="true"
+                  @dragstart="onCatDragStart(cat.id)"
+                  @dragend="onCatDragEnd"
+                  @dragover.prevent="dragCat.overId = cat.id"
+                  @dragleave="dragCat.overId = null"
+                  @drop.prevent="onCatDrop(cat.id)"
+                >
                   <td class="col-move-cell">
                     <div class="cat-reorder">
+                      <span class="drag-handle" title="Drag to reorder">⠿</span>
                       <button
                         :disabled="i === 0 && sortKey === null"
                         @click="moveCatUp(cat.id)"
@@ -226,8 +250,19 @@
               v-for="(task, i) in currentTasks"
               :key="task.id"
               class="wbs-task-row"
+              :class="{
+                'wbs-task-row--dragging':  dragTask.dragId === task.id,
+                'wbs-task-row--drag-over': dragTask.overId === task.id && dragTask.dragId !== task.id,
+              }"
+              draggable="true"
+              @dragstart="dragTask.dragId = task.id"
+              @dragend="dragTask.dragId = null; dragTask.overId = null"
+              @dragover.prevent="dragTask.overId = task.id"
+              @dragleave="dragTask.overId = null"
+              @drop.prevent="onTaskDrop(task.id)"
             >
               <div class="wbs-reorder">
+                <span class="drag-handle" title="Drag to reorder">⠿</span>
                 <button :disabled="i === 0" @click="rom.moveTask(selectedRole, selectedPhase, task.id, 'up')" title="Move up">
                   <i class="ti ti-chevron-up"></i>
                 </button>
@@ -281,7 +316,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, reactive, computed, nextTick, watch } from 'vue'
 import { useRomStore } from '../stores/rom'
 
 const rom = useRomStore()
@@ -369,6 +404,31 @@ function moveCatUp(catId) {
 function moveCatDown(catId) {
   if (sortKey.value) { sortKey.value = null; sortDir.value = 'asc' }
   rom.moveLaborCat(catId, 'down')
+}
+
+// ── Drag-and-drop reorder: rates table ──────────────────────────────
+const dragCat = reactive({ dragId: null, overId: null })
+function onCatDragStart(catId) {
+  // Clear column sort so the visible order reflects the underlying array
+  if (sortKey.value) { sortKey.value = null; sortDir.value = 'asc' }
+  dragCat.dragId = catId
+}
+function onCatDragEnd() {
+  dragCat.dragId = null
+  dragCat.overId = null
+}
+function onCatDrop(dropId) {
+  rom.reorderLaborCat(dragCat.dragId, dropId)
+  dragCat.dragId = null
+  dragCat.overId = null
+}
+
+// ── Drag-and-drop reorder: WBS tasks ────────────────────────────────
+const dragTask = reactive({ dragId: null, overId: null })
+function onTaskDrop(dropId) {
+  rom.reorderTask(selectedRole.value, selectedPhase.value, dragTask.dragId, dropId)
+  dragTask.dragId = null
+  dragTask.overId = null
 }
 
 // New labor-category form state
@@ -490,6 +550,23 @@ function resetWbs() {
 
 .admin-body { padding: 20px; display: flex; flex-direction: column; gap: 24px; }
 
+.admin-prefs {
+  background: var(--rom-surface-alt, #f7f5ee);
+  border: 1px solid var(--rom-border, #d8d6cd);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+.pref-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px 10px;
+  cursor: pointer;
+}
+.pref-toggle input { grid-row: span 2; width: 18px; height: 18px; cursor: pointer; }
+.pref-label { font-size: 13px; font-weight: 500; }
+.pref-hint  { font-size: 11px; color: var(--rom-text-muted); }
+
 .admin-section {
   background: var(--rom-surface);
   border: 1px solid var(--rom-border); border-radius: 8px;
@@ -521,9 +598,9 @@ function resetWbs() {
 .sort-arrow { display: inline-block; min-width: 14px; color: var(--rom-accent, #1a5fb4); font-size: 10px; }
 
 /* Manual reorder column */
-.col-move-head { width: 56px; }
-.col-move-cell { width: 56px; padding: 4px 6px !important; }
-.cat-reorder { display: inline-flex; gap: 2px; }
+.col-move-head { width: 78px; }
+.col-move-cell { width: 78px; padding: 4px 6px !important; }
+.cat-reorder { display: inline-flex; gap: 2px; align-items: center; }
 .cat-reorder button {
   width: 22px; height: 22px;
   background: transparent; color: var(--rom-text-muted);
@@ -533,6 +610,29 @@ function resetWbs() {
 }
 .cat-reorder button:hover:not(:disabled) { color: var(--rom-text); border-color: var(--rom-text-muted); }
 .cat-reorder button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* Drag handle (six-dot grip) */
+.drag-handle {
+  cursor: grab;
+  color: var(--rom-text-faint, #b4b2a9);
+  font-size: 16px;
+  padding: 0 4px;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+}
+.drag-handle:hover { color: var(--rom-text-muted, #6f6f6a); }
+.drag-handle:active { cursor: grabbing; }
+
+/* Drag state on table rows */
+.rate-row { cursor: default; }
+.rate-row--dragging { opacity: 0.4; }
+.rate-row--drag-over td { border-top: 2px solid var(--rom-accent, #1a5fb4) !important; }
+
+/* Drag state on WBS task rows */
+.wbs-task-row { transition: background .1s ease, transform .1s ease; }
+.wbs-task-row--dragging { opacity: 0.4; }
+.wbs-task-row--drag-over { box-shadow: inset 0 2px 0 0 var(--rom-accent, #1a5fb4); }
 .rates-table th.amt { text-align: right; }
 .rates-table td { padding: 6px 10px; border-bottom: 1px solid var(--rom-border); }
 .rates-table td.amt { text-align: right; }
