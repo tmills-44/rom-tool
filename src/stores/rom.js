@@ -45,7 +45,8 @@ export const LABOR_CATS = [
 ]
 
 // ─── Task default day counts ────────────────────────────────────────
-// Selecting a task from the dropdown auto-fills days from this table.
+// Used only by baseline templates (Baseline A/B/C/D) to preload Days.
+// Picking a task from the dropdown does NOT auto-fill these — Days stays 0.
 
 export const TASK_DEFAULTS = {
   'eng-ce-site-survey': 2, 'eng-ce-sow-conceptual': 3, 'eng-ce-rom-equip': 1, 'eng-ce-meetings': 3,
@@ -903,10 +904,8 @@ export const useRomStore = defineStore('rom', () => {
     if (!line) return
     if (patch.laborCat !== undefined && patch.rate === undefined && patch.laborCat !== line.laborCat)
       patch = { ...patch, rate: laborCatRate(patch.laborCat) }
-    if (patch.taskId !== undefined && patch.days === undefined && patch.taskId !== line.taskId) {
-      const d = TASK_DEFAULTS[patch.taskId]
-      if (d !== undefined) patch = { ...patch, days: d }
-    }
+    // Days no longer auto-fill on taskId change — user fills manually,
+    // or loads via one of the baseline templates.
     Object.assign(line, patch)
   }
 
