@@ -518,6 +518,8 @@ export const useRomStore = defineStore('rom', () => {
 
   // Global UI pref — whether the Rate column shows on the deliverables page
   const showRates = ref(saved?.showRates ?? true)
+  // Global UI pref — whether to show per-row tracking indicators (check / alert / empty)
+  const showRowStatus = ref(saved?.showRowStatus ?? true)
 
   // ── Undo / redo stacks for lineItems ─────────────────────────────────
   const undoStack = ref([])
@@ -1001,7 +1003,7 @@ export const useRomStore = defineStore('rom', () => {
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  watch([project, wbs, lineItems, travel, material, overhead, enabledEntities, selectedTabId, gsaRateMap, laborCats, showRates], () => {
+  watch([project, wbs, lineItems, travel, material, overhead, enabledEntities, selectedTabId, gsaRateMap, laborCats, showRates, showRowStatus], () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         project: { ...project }, wbs: deepClone(wbs), lineItems: deepClone(lineItems),
@@ -1010,6 +1012,7 @@ export const useRomStore = defineStore('rom', () => {
         gsaRateMap: { ...gsaRateMap },
         laborCats: deepClone(laborCats),
         showRates: showRates.value,
+        showRowStatus: showRowStatus.value,
       }))
     } catch {}
   }, { deep: true })
@@ -1029,7 +1032,7 @@ export const useRomStore = defineStore('rom', () => {
     lineHours, lineCost, tasksFor, linesForPhase, linesForRole,
     phaseHours, phaseCost, roleHours, roleCost, entityHours, entityCost, travelLineCost,
     addLine, duplicateLine, removeLine, updateLine, swapLineOrder, reorderLine, enableEntity, disableEntity, applyTemplate, resetAll,
-    showRates, undo, redo, canUndo, canRedo,
+    showRates, showRowStatus, undo, redo, canUndo, canRedo,
     addMaterialItem, updateMaterialItem, removeMaterialItem,
     addTrip, updateTrip, removeTrip, tripCost,
     gsaRateMap, importGSARates, lookupGSARate, clearGSARates,

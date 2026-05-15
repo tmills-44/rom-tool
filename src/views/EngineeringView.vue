@@ -133,21 +133,24 @@
                     >
                       <!-- Drag handle + status -->
                       <td class="col-move">
-                        <i
-                          class="ti row-status"
-                          :class="[
-                            `row-status--${lineStatus(line)}`,
-                            lineStatus(line) === 'complete' ? 'ti-circle-check-filled' :
-                            lineStatus(line) === 'partial'  ? 'ti-alert-circle-filled' :
-                                                              'ti-circle-dashed',
-                          ]"
-                          :title="
-                            lineStatus(line) === 'complete' ? 'Row complete' :
-                            lineStatus(line) === 'partial'  ? 'Row incomplete — fill all fields' :
-                                                              'Empty row'
-                          "
-                        ></i>
-                        <span class="drag-handle" title="Drag to reorder">⠿</span>
+                        <div class="move-cell-inner">
+                          <i
+                            v-if="rom.showRowStatus"
+                            class="ti row-status"
+                            :class="[
+                              `row-status--${lineStatus(line)}`,
+                              lineStatus(line) === 'complete' ? 'ti-circle-check-filled' :
+                              lineStatus(line) === 'partial'  ? 'ti-alert-circle-filled' :
+                                                                'ti-circle-dashed',
+                            ]"
+                            :title="
+                              lineStatus(line) === 'complete' ? 'Row complete' :
+                              lineStatus(line) === 'partial'  ? 'Row incomplete — fill all fields' :
+                                                                'Empty row'
+                            "
+                          ></i>
+                          <span class="drag-handle" title="Drag to reorder">⠿</span>
+                        </div>
                       </td>
 
                       <!-- Role badge -->
@@ -639,8 +642,12 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .line-row:hover td { background: var(--rom-surface-alt); }
 
 /* Column widths */
-.col-move  { width: 50px; white-space: nowrap; }
-.row-status { font-size: 14px; margin-right: 4px; vertical-align: -1px; }
+.col-move  { width: 48px; white-space: nowrap; padding: 0 4px !important; }
+.move-cell-inner {
+  display: flex; align-items: center; justify-content: flex-start;
+  gap: 4px; height: 100%;
+}
+.row-status { font-size: 14px; line-height: 1; display: inline-flex; align-items: center; }
 .row-status--complete { color: #2e7d32; }
 .row-status--partial  { color: #d97706; }
 .row-status--empty    { color: var(--rom-text-faint, #b4b2a9); }

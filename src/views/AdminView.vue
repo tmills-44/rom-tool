@@ -54,6 +54,11 @@
             <span class="pref-label">Show Rate column on the Deliverables page</span>
             <span class="pref-hint">When off, the per-hour $ rate is hidden from line rows. Costs and totals stay visible.</span>
           </label>
+          <label class="pref-toggle">
+            <input type="checkbox" :checked="rom.showRowStatus" @change="rom.showRowStatus = $event.target.checked" />
+            <span class="pref-label">Show row tracking indicators</span>
+            <span class="pref-hint">The green check / amber alert / empty circle next to each engineering row. Off = nothing shown, just the drag handle.</span>
+          </label>
         </section>
 
         <!-- ── Rates editor ───────────────────────────────────────── -->
@@ -555,6 +560,7 @@ function resetWbs() {
   border: 1px solid var(--rom-border, #d8d6cd);
   border-radius: 8px;
   padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 10px;
 }
 .pref-toggle {
   display: grid;
@@ -563,6 +569,7 @@ function resetWbs() {
   gap: 4px 10px;
   cursor: pointer;
 }
+.pref-toggle + .pref-toggle { padding-top: 10px; border-top: 1px dashed var(--rom-border, #d8d6cd); }
 .pref-toggle input { grid-row: span 2; width: 18px; height: 18px; cursor: pointer; }
 .pref-label { font-size: 13px; font-weight: 500; }
 .pref-hint  { font-size: 11px; color: var(--rom-text-muted); }
