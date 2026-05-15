@@ -376,6 +376,7 @@
 <script setup>
 import { reactive, watch, onMounted } from 'vue'
 import { useRomStore } from '../stores/rom'
+import { TASK_DEFAULTS } from '../stores/rom'
 
 const rom = useRomStore()
 
@@ -522,13 +523,23 @@ function roleIcon(role) {
 }
 
 // ── Task change — handle "Custom…" sentinel ──────────────────────────
+// Picking a real task also auto-fills its baseline Days from TASK_DEFAULTS
+// (only when the user hasn't already typed their own Days value).
 function onTaskChange(line, value) {
   if (value === '__custom__') {
     customTaskMode[line.id] = true
     rom.updateLine(line.id, { taskId: '' })
-  } else {
-    rom.updateLine(line.id, { taskId: value })
+    return
   }
+  const patch = { taskId: value }
+  const defaultDays = TASK_DEFAULTS[value]
+  // Apply default Days when:
+  //  - the task has a baseline in TASK_DEFAULTS, AND
+  //  - the row's current Days is empty/zero (don't clobber user input)
+  if (defaultDays != null && !(line.days > 0)) {
+    patch.days = defaultDays
+  }
+  rom.updateLine(line.id, patch)
 }
 
 // On mount, put any lines with non-WBS taskIds into custom mode
