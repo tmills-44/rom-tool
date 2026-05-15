@@ -3,7 +3,9 @@ import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/',
+  // For GitHub Pages: must match the repo name path so asset URLs resolve.
+  // If your repo is at github.com/USER/REPO-NAME, this should be '/REPO-NAME/'.
+  base: process.env.GITHUB_ACTIONS ? '/rom-tool/' : '/',
   plugins: [
     vue(),
     VitePWA({
