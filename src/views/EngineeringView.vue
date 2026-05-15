@@ -255,7 +255,35 @@
                   </tbody>
                   <tfoot>
                     <tr class="phase-total-row">
-                      <td colspan="7" class="phase-total-label">Phase Total</td>
+                      <!-- Add row inline -->
+                      <td colspan="6" class="phase-add-inline">
+                        <template v-if="getActiveRole(entity.id, phase.id) === 'all'">
+                          <template v-if="showingPicker(entity.id, phase.id)">
+                            <div class="role-picker role-picker--inline">
+                              <span class="role-picker-label">Add:</span>
+                              <button
+                                v-for="rf in ROLE_FILTERS.filter(r => r.id !== 'all')"
+                                :key="rf.id"
+                                class="role-pick-btn"
+                                :class="`role-pick-btn--${rf.id}`"
+                                @click="pickRole(entity.id, phase.id, rf.id)"
+                              >
+                                <i class="ti" :class="roleIcon(rf.id)"></i>
+                                {{ rf.label }}
+                              </button>
+                              <button class="role-pick-cancel" @click="hidePicker(entity.id, phase.id)">Cancel</button>
+                            </div>
+                          </template>
+                          <button v-else class="add-line-btn add-line-btn--inline" @click="showPicker(entity.id, phase.id)">
+                            <i class="ti ti-plus" aria-hidden="true"></i> Add row
+                          </button>
+                        </template>
+                        <button v-else class="add-line-btn add-line-btn--inline" @click="pickRole(entity.id, phase.id, getActiveRole(entity.id, phase.id))">
+                          <i class="ti ti-plus" aria-hidden="true"></i>
+                          Add {{ ROLE_FILTERS.find(r => r.id === getActiveRole(entity.id, phase.id))?.label }} row
+                        </button>
+                      </td>
+                      <td class="phase-total-label">Phase Total</td>
                       <td class="phase-total-value">{{ fmt(phaseCost(entity.id, phase.id)) }}</td>
                       <td></td>
                     </tr>
@@ -272,9 +300,8 @@
                 row(s) hidden by filter — switch to <strong>All</strong> to see them
               </div>
 
-              <!-- Add row -->
-              <div class="phase-add-row">
-                <!-- Filter is "All" → show picker -->
+              <!-- Add row (shown when phase has no lines — table not rendered) -->
+              <div v-if="!visibleLines(entity.id, phase.id).length" class="phase-add-row">
                 <template v-if="getActiveRole(entity.id, phase.id) === 'all'">
                   <template v-if="showingPicker(entity.id, phase.id)">
                     <div class="role-picker">
@@ -296,8 +323,6 @@
                     <i class="ti ti-plus" aria-hidden="true"></i> Add row
                   </button>
                 </template>
-
-                <!-- Filter is specific role → direct add -->
                 <button v-else class="add-line-btn" @click="pickRole(entity.id, phase.id, getActiveRole(entity.id, phase.id))">
                   <i class="ti ti-plus" aria-hidden="true"></i>
                   Add {{ ROLE_FILTERS.find(r => r.id === getActiveRole(entity.id, phase.id))?.label }} row
@@ -688,7 +713,7 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   border-left: 3px solid var(--rom-border);
 }
 
-/* Add row */
+/* Add row — no-lines state (standalone below filter bar) */
 .phase-add-row { padding: 10px 16px 12px; }
 .add-line-btn {
   display: inline-flex; align-items: center; gap: 6px;
@@ -697,6 +722,26 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   background: transparent; color: var(--rom-text-muted); cursor: pointer;
 }
 .add-line-btn:hover { border-color: var(--rom-accent); color: var(--rom-accent); background: var(--rom-accent-bg); }
+
+/* Inline add cell in tfoot */
+.phase-add-inline {
+  padding: 5px 8px;
+  background: var(--rom-surface-alt);
+  border-top: 2px solid var(--rom-border);
+}
+.add-line-btn--inline {
+  padding: 3px 10px; font-size: 11px;
+}
+.role-picker--inline {
+  padding: 4px 6px;
+  border: none; border-radius: 4px;
+  background: transparent;
+  width: auto;
+}
+.role-picker--inline .role-pick-btn {
+  padding: 3px 10px; font-size: 11px;
+}
+.role-picker--inline .role-picker-label { font-size: 10px; }
 
 /* Role picker (shown when Add row is clicked) */
 .role-picker {
