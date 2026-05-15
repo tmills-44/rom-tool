@@ -79,6 +79,45 @@
       </button>
     </nav>
 
+    <!-- ── Project Info bar ──────────────────────────────────────── -->
+    <div class="proj-info-bar">
+      <div class="proj-field">
+        <label>Customer / Sponsor</label>
+        <input
+          type="text"
+          :value="rom.project.sponsor"
+          @input="rom.project.sponsor = $event.target.value"
+          placeholder="e.g. Navy SPAWAR"
+        />
+      </div>
+      <div class="proj-field">
+        <label>Room / Project Name</label>
+        <input
+          type="text"
+          :value="rom.project.roomName"
+          @input="rom.project.roomName = $event.target.value"
+          placeholder="e.g. Radio Room A"
+        />
+      </div>
+      <div class="proj-field">
+        <label>Project Engineer</label>
+        <input
+          type="text"
+          :value="rom.project.projectEngineer"
+          @input="rom.project.projectEngineer = $event.target.value"
+          placeholder="Your name"
+        />
+      </div>
+      <div class="proj-field proj-field--date">
+        <label>Date</label>
+        <input
+          type="date"
+          :value="rom.project.date"
+          @input="rom.project.date = $event.target.value"
+        />
+      </div>
+    </div>
+
     <!-- ── Validation banner ─────────────────────────────────────── -->
     <div v-if="validationWarnings.length" class="val-banner">
       <i class="ti ti-alert-triangle" aria-hidden="true"></i>
@@ -394,6 +433,36 @@ body {
 }
 
 /* ─── Validation banner ──────────────────────────────────────────── */
+/* ─── Project Info bar ──────────────────────────────────────────── */
+.proj-info-bar {
+  display: grid;
+  grid-template-columns: 1.6fr 1.4fr 1fr 140px;
+  gap: 14px;
+  padding: 10px 18px;
+  background: var(--rom-surface, #fff);
+  border-bottom: 1px solid var(--rom-border, #d8d6cd);
+}
+.proj-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.proj-field label {
+  font-size: 10px; font-weight: 600;
+  color: var(--rom-text-muted, #6f6f6a);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.proj-field input {
+  height: 30px; font-size: 13px; padding: 0 10px;
+  border: 1px solid var(--rom-border, #d8d6cd); border-radius: 6px;
+  background: var(--rom-surface, #fff); color: var(--rom-text, #1a1a1a);
+  font-family: inherit; min-width: 0;
+}
+.proj-field input:focus {
+  outline: 2px solid var(--rom-accent, #1a5fb4); outline-offset: -1px;
+  border-color: var(--rom-accent, #1a5fb4);
+}
+.proj-field input::placeholder { color: var(--rom-text-faint, #b4b2a9); }
+@media (max-width: 760px) {
+  .proj-info-bar { grid-template-columns: 1fr 1fr; }
+}
+
 .val-banner {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   padding: 7px 18px;
