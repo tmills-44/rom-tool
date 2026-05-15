@@ -84,6 +84,7 @@
       <!-- Collapsed summary: always visible, click to toggle open -->
       <button class="proj-info-summary" type="button" @click="projInfoOpen = !projInfoOpen">
         <i class="ti proj-summary-icon" :class="projInfoOpen ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+        <span class="proj-summary-label">Project Info</span>
         <span class="proj-summary-text">
           <template v-if="projSummaryHasAny">
             <span v-if="rom.project.sponsor"          class="proj-pill"><b>Sponsor:</b> {{ rom.project.sponsor }}</span>
@@ -91,8 +92,9 @@
             <span v-if="rom.project.projectEngineer"  class="proj-pill"><b>Lead:</b> {{ rom.project.projectEngineer }}</span>
             <span v-if="rom.project.date"             class="proj-pill"><b>Date:</b> {{ rom.project.date }}</span>
           </template>
-          <span v-else class="proj-summary-empty">Click to set project info (Sponsor / Room / Lead / Date)</span>
+          <span v-else class="proj-summary-empty">Click to set Sponsor / Room / Lead / Date</span>
         </span>
+        <span class="proj-summary-action">{{ projInfoOpen ? 'Hide' : 'Edit' }}</span>
       </button>
 
       <!-- Expanded: the actual input fields -->
@@ -461,32 +463,57 @@ body {
 }
 .proj-info-summary {
   width: 100%;
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 18px;
-  background: transparent;
-  border: none; border-bottom: 0;
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 18px;
+  background: linear-gradient(to bottom, #f5f8fd, #eaf0fb);
+  border: none;
+  border-bottom: 1px solid var(--rom-border, #c4cede);
   cursor: pointer;
   font-family: inherit; text-align: left;
-  color: var(--rom-text, #1a1a1a);
+  color: var(--rom-text, #1a2133);
+  transition: background-color .12s;
 }
-.proj-info-summary:hover { background: var(--rom-surface-alt, #f7f5ee); }
-.proj-summary-icon { font-size: 14px; color: var(--rom-text-muted, #6f6f6a); transition: transform 120ms ease; flex-shrink: 0; }
-.proj-summary-text { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.proj-info-summary:hover { background: #dfe7f5; }
+.proj-summary-icon {
+  font-size: 18px;
+  color: var(--rom-accent, #1a5fb4);
+  transition: transform 120ms ease;
+  flex-shrink: 0;
+}
+.proj-summary-label {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--rom-accent-dark, #1248a0);
+  flex-shrink: 0;
+  padding-right: 10px;
+  border-right: 1px solid var(--rom-border, #c4cede);
+}
+.proj-summary-text { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 0; }
 .proj-pill {
   font-size: 12px;
-  color: var(--rom-text, #1a1a1a);
-  background: var(--rom-surface-alt, #f7f5ee);
-  border: 1px solid var(--rom-border, #d8d6cd);
+  color: var(--rom-text, #1a2133);
+  background: #fff;
+  border: 1px solid var(--rom-border, #c4cede);
   border-radius: 12px;
   padding: 2px 10px;
   white-space: nowrap;
 }
-.proj-pill b { font-weight: 600; color: var(--rom-text-muted, #6f6f6a); margin-right: 4px; }
+.proj-pill b { font-weight: 700; color: var(--rom-text-muted, #4a5a78); margin-right: 4px; }
 .proj-summary-empty {
   font-size: 12px; font-style: italic;
-  color: var(--rom-text-muted, #6f6f6a);
+  color: var(--rom-text-muted, #4a5a78);
 }
-.proj-info-wrap--open .proj-info-summary { border-bottom: 1px solid var(--rom-border, #d8d6cd); }
+.proj-summary-action {
+  flex-shrink: 0;
+  font-size: 11px; font-weight: 600;
+  padding: 3px 12px; border-radius: 12px;
+  background: var(--rom-accent, #1a5fb4); color: #fff;
+  letter-spacing: .03em;
+}
+.proj-info-summary:hover .proj-summary-action {
+  background: var(--rom-accent-dark, #1248a0);
+}
+.proj-info-wrap--open .proj-info-summary { border-bottom: 1px solid var(--rom-border, #c4cede); }
 
 .proj-info-bar {
   display: grid;
