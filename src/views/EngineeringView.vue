@@ -374,16 +374,19 @@
 
       </div>
 
-      <!-- Add Government / Subcontractor as a quiet inline action — sits below
-           the last entity card, smaller buttons, no header label -->
-      <div v-if="disabledEntityList.length" class="entity-add-inline">
+      <!-- Always-present add buttons below the entity stack. They stay visible
+           even after the entity is enabled, so the affordance never goes away.
+           The X / Remove control still lives on each entity card's header. -->
+      <div class="entity-add-inline">
         <button
-          v-for="ent in disabledEntityList"
+          v-for="ent in addableEntityList"
           :key="ent.id"
           class="entity-add-btn-sm"
-          :class="`entity-add-btn-sm--${ent.id}`"
+          :class="[`entity-add-btn-sm--${ent.id}`, { 'entity-add-btn-sm--added': rom.visibleEntities.some(v => v.id === ent.id) }]"
           @click="rom.enableEntity(ent.id)"
-          :title="`Add a ${ent.label} section for this scope`"
+          :title="rom.visibleEntities.some(v => v.id === ent.id)
+            ? `${ent.label} already added — remove it from its card to take it out`
+            : `Add a ${ent.label} section for this scope`"
         >
           <i class="ti ti-plus" aria-hidden="true"></i> Add {{ ent.label }}
         </button>
@@ -400,9 +403,12 @@ import { TASK_DEFAULTS } from '../stores/rom'
 
 const rom = useRomStore()
 
-// Entities that aren't currently shown — the toolbar lets users add them as a tab/section
-const disabledEntityList = computed(() =>
-  rom.ENTITIES.filter(e => !e.alwaysVisible && !rom.visibleEntities.some(v => v.id === e.id))
+// Every non-primary entity (Government, Subcontractor) — buttons are always
+// shown so the affordance never disappears. When the entity is already added,
+// the button just gets a subtle "added" look; the entity card's own X / Remove
+// button is still how you take it back out.
+const addableEntityList = computed(() =>
+  rom.ENTITIES.filter(e => !e.alwaysVisible)
 )
 
 const PHASE_STATE_KEY    = 'rom-phase-open-state'
@@ -649,26 +655,41 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .summary-card--accent .summary-label { color: var(--rom-accent-dark); opacity: .8; }
 .summary-card--accent .summary-value { color: var(--rom-accent-dark); }
 
-/* Inline "Add Government / Subcontractor" — sits below the last entity card,
-   compact and unobtrusive (no toolbar header) */
+/* Inline "Add Government / Subcontractor" — styled to match the standard
+   `+ Add row` / `+ Add traveler` primary action buttons across the app */
 .entity-add-inline {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  padding: 2px 0 0 4px;
-  margin-top: -4px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 4px 0 0;
 }
 .entity-add-btn-sm {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 2px 8px; border-radius: 10px;
-  font-size: 10px; font-weight: 600;
-  border: 1px dashed; background: transparent;
-  cursor: pointer; font-family: inherit;
-  letter-spacing: 0.02em;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px;                /* thinner than the standard +Add row buttons */
+  font-size: 11px; font-weight: 600; letter-spacing: .01em;
+  border: 1px solid var(--rom-accent, #1a5fb4);
+  border-radius: var(--rom-radius, 6px);
+  background: var(--rom-accent, #1a5fb4);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  transition: background-color .12s, box-shadow .12s, transform .04s, opacity .12s;
+  white-space: nowrap;
+  font-family: inherit;
 }
-.entity-add-btn-sm .ti { font-size: 11px; }
-.entity-add-btn-sm--gov { color: #185fa5; border-color: #185fa5; }
-.entity-add-btn-sm--gov:hover { background: #d6e8f8; }
-.entity-add-btn-sm--sub { color: #854f0b; border-color: #854f0b; }
-.entity-add-btn-sm--sub:hover { background: #faeeda; }
+.entity-add-btn-sm:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.10);
+  filter: brightness(0.92);
+}
+.entity-add-btn-sm:active { transform: translateY(1px); box-shadow: 0 1px 1px rgba(0,0,0,0.10); }
+.entity-add-btn-sm .ti { font-size: 12px; }
+
+/* Per-entity colors so each button reads as that entity at a glance */
+.entity-add-btn-sm--gov { background: #185fa5; border-color: #185fa5; }
+.entity-add-btn-sm--sub { background: #854f0b; border-color: #854f0b; }
+
+/* Once the entity is already added, gently signal it — the button stays
+   clickable but reads as "already on" */
+.entity-add-btn-sm--added { opacity: 0.55; }
+.entity-add-btn-sm--added:hover { opacity: 0.85; }
 
 /* Entity cards */
 .entities-wrap { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
