@@ -253,71 +253,42 @@
                       <td colspan="10" class="drop-zone-cell">Drop here to move to end</td>
                     </tr>
                   </tbody>
-                  <tfoot>
-                    <tr class="phase-total-row">
-                      <!-- Add row inline -->
-                      <td colspan="6" class="phase-add-inline">
-                        <template v-if="getActiveRole(entity.id, phase.id) === 'all'">
-                          <template v-if="showingPicker(entity.id, phase.id)">
-                            <div class="role-picker role-picker--inline">
-                              <span class="role-picker-label">Add:</span>
-                              <button
-                                v-for="rf in ROLE_FILTERS.filter(r => r.id !== 'all')"
-                                :key="rf.id"
-                                class="role-pick-btn"
-                                :class="`role-pick-btn--${rf.id}`"
-                                @click="pickRole(entity.id, phase.id, rf.id)"
-                              >
-                                <i class="ti" :class="roleIcon(rf.id)"></i>
-                                {{ rf.label }}
-                              </button>
-                              <button class="role-pick-cancel" @click="hidePicker(entity.id, phase.id)">Cancel</button>
-                            </div>
-                          </template>
-                          <button v-else class="add-line-btn add-line-btn--inline" @click="showPicker(entity.id, phase.id)">
-                            <i class="ti ti-plus" aria-hidden="true"></i> Add row
-                          </button>
-                        </template>
-                        <button v-else class="add-line-btn add-line-btn--inline" @click="pickRole(entity.id, phase.id, getActiveRole(entity.id, phase.id))">
-                          <i class="ti ti-plus" aria-hidden="true"></i>
-                          Add {{ ROLE_FILTERS.find(r => r.id === getActiveRole(entity.id, phase.id))?.label }} row
-                        </button>
-                      </td>
-                      <td class="phase-total-label">Phase Total</td>
-                      <td class="phase-total-value">{{ fmt(phaseCost(entity.id, phase.id)) }}</td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
 
-              <!-- Add row (shown when no visible lines — table not rendered) -->
-              <div v-if="!visibleLines(entity.id, phase.id).length" class="phase-add-row">
-                <template v-if="getActiveRole(entity.id, phase.id) === 'all'">
-                  <template v-if="showingPicker(entity.id, phase.id)">
-                    <div class="role-picker">
-                      <span class="role-picker-label">Add row for:</span>
-                      <button
-                        v-for="rf in ROLE_FILTERS.filter(r => r.id !== 'all')"
-                        :key="rf.id"
-                        class="role-pick-btn"
-                        :class="`role-pick-btn--${rf.id}`"
-                        @click="pickRole(entity.id, phase.id, rf.id)"
-                      >
-                        <i class="ti" :class="roleIcon(rf.id)"></i>
-                        {{ rf.label }}
-                      </button>
-                      <button class="role-pick-cancel" @click="hidePicker(entity.id, phase.id)">Cancel</button>
-                    </div>
+              <!-- Phase footer bar: Add button left · Phase Total right (always visible) -->
+              <div class="phase-footer-bar">
+                <div class="phase-footer-add">
+                  <template v-if="getActiveRole(entity.id, phase.id) === 'all'">
+                    <template v-if="showingPicker(entity.id, phase.id)">
+                      <div class="role-picker role-picker--inline">
+                        <span class="role-picker-label">Add:</span>
+                        <button
+                          v-for="rf in ROLE_FILTERS.filter(r => r.id !== 'all')"
+                          :key="rf.id"
+                          class="role-pick-btn"
+                          :class="`role-pick-btn--${rf.id}`"
+                          @click="pickRole(entity.id, phase.id, rf.id)"
+                        >
+                          <i class="ti" :class="roleIcon(rf.id)"></i>
+                          {{ rf.label }}
+                        </button>
+                        <button class="role-pick-cancel" @click="hidePicker(entity.id, phase.id)">Cancel</button>
+                      </div>
+                    </template>
+                    <button v-else class="add-line-btn" @click="showPicker(entity.id, phase.id)">
+                      <i class="ti ti-plus" aria-hidden="true"></i> Add row
+                    </button>
                   </template>
-                  <button v-else class="add-line-btn" @click="showPicker(entity.id, phase.id)">
-                    <i class="ti ti-plus" aria-hidden="true"></i> Add row
+                  <button v-else class="add-line-btn" @click="pickRole(entity.id, phase.id, getActiveRole(entity.id, phase.id))">
+                    <i class="ti ti-plus" aria-hidden="true"></i>
+                    Add {{ ROLE_FILTERS.find(r => r.id === getActiveRole(entity.id, phase.id))?.label }} row
                   </button>
-                </template>
-                <button v-else class="add-line-btn" @click="pickRole(entity.id, phase.id, getActiveRole(entity.id, phase.id))">
-                  <i class="ti ti-plus" aria-hidden="true"></i>
-                  Add {{ ROLE_FILTERS.find(r => r.id === getActiveRole(entity.id, phase.id))?.label }} row
-                </button>
+                </div>
+                <div class="phase-footer-total">
+                  <span class="phase-total-label">Phase Total</span>
+                  <span class="phase-total-value">{{ fmt(phaseCost(entity.id, phase.id)) }}</span>
+                </div>
               </div>
 
               <!-- Hidden rows hint (below add button) -->
@@ -693,10 +664,17 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   border-color: var(--rom-accent); background: var(--rom-surface); outline: none;
 }
 
-/* Phase total footer */
-.phase-total-row td { padding: 6px 8px; background: var(--rom-surface-alt); border-top: 2px solid var(--rom-border); }
-.phase-total-label { font-size: 11px; font-weight: 700; color: var(--rom-text-muted); text-align: right; text-transform: uppercase; letter-spacing: .04em; }
-.phase-total-value { font-size: 14px; font-weight: 800; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
+/* Phase footer bar */
+.phase-footer-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 16px;
+  background: var(--rom-surface-alt);
+  border-top: 2px solid var(--rom-border);
+}
+.phase-footer-add { display: flex; align-items: center; }
+.phase-footer-total { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.phase-total-label { font-size: 11px; font-weight: 700; color: var(--rom-text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.phase-total-value { font-size: 15px; font-weight: 800; color: var(--rom-accent-dark); white-space: nowrap; }
 
 /* Delete button */
 .del-btn {
@@ -715,34 +693,21 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   border-left: 3px solid var(--rom-border);
 }
 
-/* Add row — no-lines state (standalone below filter bar) */
-.phase-add-row { padding: 10px 16px 12px; }
+/* Add row button */
 .add-line-btn {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 12px; font-size: 12px;
+  padding: 4px 12px; font-size: 12px;
   border: 1px dashed var(--rom-border); border-radius: var(--rom-radius);
   background: transparent; color: var(--rom-text-muted); cursor: pointer;
 }
 .add-line-btn:hover { border-color: var(--rom-accent); color: var(--rom-accent); background: var(--rom-accent-bg); }
 
-/* Inline add cell in tfoot */
-.phase-add-inline {
-  padding: 5px 8px;
-  background: var(--rom-surface-alt);
-  border-top: 2px solid var(--rom-border);
-}
-.add-line-btn--inline {
-  padding: 3px 10px; font-size: 11px;
-}
+/* Inline role picker (inside footer bar) */
 .role-picker--inline {
-  padding: 4px 6px;
-  border: none; border-radius: 4px;
-  background: transparent;
-  width: auto;
+  padding: 2px 4px;
+  border: none; background: transparent; width: auto;
 }
-.role-picker--inline .role-pick-btn {
-  padding: 3px 10px; font-size: 11px;
-}
+.role-picker--inline .role-pick-btn { padding: 3px 10px; font-size: 11px; }
 .role-picker--inline .role-picker-label { font-size: 10px; }
 
 /* Role picker (shown when Add row is clicked) */
