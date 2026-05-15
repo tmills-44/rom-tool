@@ -424,6 +424,36 @@ function resetWbs() {
 .role-pill--programming { background: #f7f0ff; color: #6a1b9a; }
 .role-pill--technician  { background: #fff8f0; color: #854f0b; }
 
+/* Role dropdown — tint to match the chosen role */
+.cell-input--role { font-weight: 600; font-size: 11px; padding: 4px 8px; }
+.role-select--engineering { background: #f0f5ff; color: #1a5fb4; }
+.role-select--pm          { background: #f0faf0; color: #2e7d32; }
+.role-select--programming { background: #f7f0ff; color: #6a1b9a; }
+.role-select--technician  { background: #fff8f0; color: #854f0b; }
+
+/* Delete / add category buttons */
+.cat-delete, .cat-add {
+  width: 28px; height: 26px;
+  background: transparent;
+  border: 1px solid var(--rom-border); border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px;
+}
+.cat-delete { color: var(--rom-text-muted); }
+.cat-delete:hover { color: var(--rom-danger, #c44a4a); border-color: var(--rom-danger, #c44a4a); background: #fff0f0; }
+.cat-add {
+  color: #fff; background: var(--rom-accent, #1a5fb4); border-color: var(--rom-accent, #1a5fb4);
+}
+.cat-add:hover:not(:disabled) { background: var(--rom-accent-dark, #134a91); }
+.cat-add:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.add-cat-row td {
+  background: var(--rom-surface-alt);
+  border-top: 1px dashed var(--rom-border);
+}
+.add-cat-row td.mono { color: var(--rom-text-faint); font-style: italic; }
+
 .cell-input {
   width: 100%;
   padding: 5px 8px; font-size: 12px;
