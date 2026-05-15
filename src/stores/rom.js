@@ -731,7 +731,7 @@ export const useRomStore = defineStore('rom', () => {
     b.sortOrder = tmp
   }
 
-  function reorderLine(dragId, dropId) {
+  function reorderLine(dragId, dropId, after = false) {
     const drag = lineItems.find(l => l.id === dragId)
     const drop = lineItems.find(l => l.id === dropId)
     if (!drag || !drop || dragId === dropId) return
@@ -740,7 +740,7 @@ export const useRomStore = defineStore('rom', () => {
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     const without = phaseLines.filter(l => l.id !== dragId)
     const dropIdx = without.findIndex(l => l.id === dropId)
-    without.splice(dropIdx, 0, drag)
+    without.splice(after ? dropIdx + 1 : dropIdx, 0, drag)
     without.forEach((l, i) => { l.sortOrder = i })
   }
 

@@ -108,6 +108,7 @@
                       <th class="col-task">Task</th>
                       <th class="col-days">Days</th>
                       <th class="col-hpd">Hrs/Day</th>
+                      <th class="col-hrs">Total Hrs</th>
                       <th class="col-rate">Rate ($/hr)</th>
                       <th class="col-total">Total</th>
                       <th class="col-del"></th>
@@ -208,6 +209,16 @@
                         />
                       </td>
 
+                      <!-- Total Hrs (bidirectional: editing updates Days) -->
+                      <td class="col-hrs">
+                        <input
+                          type="number" min="0" step="0.5"
+                          :value="Math.round(((line.days || 0) * (line.hoursPerDay || 0)) * 10) / 10"
+                          class="cell-num cell-num--hrs"
+                          @change="onTotalHrsChange(line, +$event.target.value)"
+                        />
+                      </td>
+
                       <!-- Rate -->
                       <td class="col-rate">
                         <input
@@ -218,7 +229,7 @@
                         />
                       </td>
 
-                      <!-- Total -->
+                      <!-- Total Cost -->
                       <td class="col-total">
                         {{ fmt((line.days || 0) * (line.hoursPerDay || 0) * (line.rate || 0)) }}
                       </td>
@@ -230,10 +241,21 @@
                         </button>
                       </td>
                     </tr>
+                    <!-- Drop zone at the end of the list -->
+                    <tr
+                      v-if="dragState.dragId"
+                      class="drop-zone-end"
+                      :class="{ 'drop-zone-end--active': dragState.overId === `${entity.id}::${phase.id}::end` }"
+                      @dragover.prevent="dragState.overId = `${entity.id}::${phase.id}::end`"
+                      @dragleave="dragState.overId = null"
+                      @drop.prevent="dropAtEnd(entity.id, phase.id)"
+                    >
+                      <td colspan="10" class="drop-zone-cell">Drop here to move to end</td>
+                    </tr>
                   </tbody>
                   <tfoot>
                     <tr class="phase-total-row">
-                      <td colspan="6" class="phase-total-label">Phase Total</td>
+                      <td colspan="7" class="phase-total-label">Phase Total</td>
                       <td class="phase-total-value">{{ fmt(phaseCost(entity.id, phase.id)) }}</td>
                       <td></td>
                     </tr>
@@ -418,6 +440,24 @@ function onLaborCatChange(lineId, catId) {
   })
 }
 
+// ── Total Hours bidirectional ────────────────────────────────────────
+// Editing Total Hrs → back-calculates Days (Hrs/Day stays fixed)
+function onTotalHrsChange(line, totalHrs) {
+  const hpd = line.hoursPerDay || 8
+  const newDays = hpd > 0 ? Math.round((totalHrs / hpd) * 10) / 10 : 0
+  rom.updateLine(line.id, { days: newDays })
+}
+
+function dropAtEnd(eid, pid) {
+  const visible = visibleLines(eid, pid)
+  const lastLine = visible[visible.length - 1]
+  if (lastLine && dragState.dragId !== lastLine.id) {
+    rom.reorderLine(dragState.dragId, lastLine.id, true)
+  }
+  dragState.dragId = null
+  dragState.overId = null
+}
+
 function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 </script>
 
@@ -548,9 +588,24 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .col-task  { min-width: 200px; }
 .col-days  { width: 64px; }
 .col-hpd   { width: 72px; }
+.col-hrs   { width: 80px; }
 .col-rate  { width: 80px; }
 .col-total { width: 90px; font-weight: 700; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
 .col-del   { width: 36px; }
+
+/* Total Hrs cell — slightly highlighted to show it's computed but editable */
+.cell-num--hrs {
+  font-weight: 600;
+  color: var(--rom-accent-dark);
+  background: var(--rom-accent-bg) !important;
+  border-color: transparent !important;
+  border-radius: 4px;
+}
+.cell-num--hrs:hover, .cell-num--hrs:focus {
+  border-color: var(--rom-accent) !important;
+  background: var(--rom-surface) !important;
+  color: var(--rom-text);
+}
 
 /* Drag handle */
 .drag-handle {
@@ -672,4 +727,20 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   background: none; border: 1px solid var(--rom-border); border-radius: 4px; cursor: pointer;
 }
 .role-pick-cancel:hover { color: var(--rom-danger); border-color: var(--rom-danger); }
+
+/* Drop zone at end of list */
+.drop-zone-end td {
+  padding: 4px 8px;
+  border-top: 2px dashed var(--rom-border);
+  transition: background .1s, border-color .1s;
+}
+.drop-zone-end--active td {
+  background: var(--rom-accent-bg);
+  border-top-color: var(--rom-accent);
+}
+.drop-zone-cell {
+  font-size: 11px; color: var(--rom-text-faint); font-style: italic;
+  text-align: center; padding: 6px 8px !important;
+}
+.drop-zone-end--active .drop-zone-cell { color: var(--rom-accent); }
 </style>
