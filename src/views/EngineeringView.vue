@@ -125,43 +125,18 @@
                         </span>
                       </td>
 
-                      <!-- Labor Category -->
+                      <!-- Labor Category — always filtered to this row's role -->
                       <td class="col-cat">
                         <select
                           :value="line.laborCat"
                           class="cell-select"
                           @change="onLaborCatChange(line.id, $event.target.value)"
                         >
-                          <!-- Current value if it's outside the active filter -->
                           <option
-                            v-if="isOutsideFilter(entity.id, phase.id, line)"
-                            :value="line.laborCat"
-                            disabled
-                          >{{ catLabel(line.laborCat) }} ← current</option>
-
-                          <!-- All roles when filter is "All" -->
-                          <template v-if="getActiveRole(entity.id, phase.id) === 'all'">
-                            <optgroup
-                              v-for="role in rom.ROLES"
-                              :key="role.id"
-                              :label="role.label"
-                            >
-                              <option
-                                v-for="cat in rom.LABOR_CATS.filter(c => c.role === role.id)"
-                                :key="cat.id"
-                                :value="cat.id"
-                              >{{ cat.label }}</option>
-                            </optgroup>
-                          </template>
-
-                          <!-- Filtered to active role -->
-                          <template v-else>
-                            <option
-                              v-for="cat in rom.LABOR_CATS.filter(c => c.role === getActiveRole(entity.id, phase.id))"
-                              :key="cat.id"
-                              :value="cat.id"
-                            >{{ cat.label }}</option>
-                          </template>
+                            v-for="cat in rom.LABOR_CATS.filter(c => c.role === line.role)"
+                            :key="cat.id"
+                            :value="cat.id"
+                          >{{ cat.label }}</option>
                         </select>
                       </td>
 
@@ -382,20 +357,7 @@ function roleIcon(role) {
   return { engineering: 'ti-cpu', pm: 'ti-clipboard-list', technician: 'ti-tool' }[role] ?? ''
 }
 
-// ── Labor cat helpers ────────────────────────────────────────────────
-function catLabel(catId) {
-  return rom.LABOR_CATS.find(c => c.id === catId)?.label ?? catId
-}
-
-// Returns true if the row's laborCat is outside the active role filter
-function isOutsideFilter(eid, pid, line) {
-  const active = getActiveRole(eid, pid)
-  if (active === 'all') return false
-  const cat = rom.LABOR_CATS.find(c => c.id === line.laborCat)
-  return cat?.role !== active
-}
-
-// ── Update labor category (also syncs role) ──────────────────────────
+// ── Update labor category ────────────────────────────────────────────
 function onLaborCatChange(lineId, catId) {
   const cat = rom.LABOR_CATS.find(c => c.id === catId)
   rom.updateLine(lineId, {
