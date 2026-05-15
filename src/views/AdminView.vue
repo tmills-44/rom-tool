@@ -36,9 +36,14 @@
           <h2 class="admin-title">Administration</h2>
           <p class="admin-sub">Manage labor-category rates and the task list. Changes persist across sessions.</p>
         </div>
-        <button class="lock-btn" @click="unlocked = false" title="Lock this page">
-          <i class="ti ti-lock"></i> Lock
-        </button>
+        <div class="admin-header-actions">
+          <button class="lock-btn" @click="manualLock" title="Sign out — require password again">
+            <i class="ti ti-lock"></i> Lock
+          </button>
+          <button class="close-btn" @click="closeAdmin" title="Close Administration" aria-label="Close">
+            <i class="ti ti-x"></i>
+          </button>
+        </div>
       </header>
 
       <div class="admin-body">
@@ -59,6 +64,7 @@
             <table class="rates-table">
               <thead>
                 <tr>
+                  <th class="col-move-head"></th>
                   <th class="sortable" @click="toggleSort('id')">
                     Code <span class="sort-arrow">{{ sortArrow('id') }}</span>
                   </th>
@@ -75,7 +81,25 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="cat in sortedLaborCats" :key="cat.id">
+                <tr v-for="(cat, i) in sortedLaborCats" :key="cat.id">
+                  <td class="col-move-cell">
+                    <div class="cat-reorder">
+                      <button
+                        :disabled="i === 0 && sortKey === null"
+                        @click="moveCatUp(cat.id)"
+                        :title="sortKey ? 'Clear sort, then move up' : 'Move up'"
+                      >
+                        <i class="ti ti-chevron-up"></i>
+                      </button>
+                      <button
+                        :disabled="i === sortedLaborCats.length - 1 && sortKey === null"
+                        @click="moveCatDown(cat.id)"
+                        :title="sortKey ? 'Clear sort, then move down' : 'Move down'"
+                      >
+                        <i class="ti ti-chevron-down"></i>
+                      </button>
+                    </div>
+                  </td>
                   <td class="mono">{{ cat.id }}</td>
                   <td>
                     <input
@@ -121,6 +145,7 @@
                 </tr>
                 <!-- Add new category row -->
                 <tr class="add-cat-row">
+                  <td class="col-move-cell"></td>
                   <td class="mono">new</td>
                   <td>
                     <input
@@ -262,14 +287,24 @@ import { useRomStore } from '../stores/rom'
 const rom = useRomStore()
 
 const ADMIN_PASSWORD = '8888'
+const UNLOCK_KEY = 'rom-admin-unlocked'
 
-const unlocked  = ref(false)
+const unlocked  = ref(sessionStorage.getItem(UNLOCK_KEY) === '1')
 const pwInput   = ref('')
 const showError = ref(false)
+// Remember which tab the user came from so the X can return them there
+const previousTabId = ref('engineering')
+
+watch(() => rom.selectedTabId, (newTab, oldTab) => {
+  if (newTab === 'admin' && oldTab && oldTab !== 'admin') {
+    previousTabId.value = oldTab
+  }
+})
 
 function tryUnlock() {
   if (pwInput.value.trim() === ADMIN_PASSWORD) {
     unlocked.value = true
+    sessionStorage.setItem(UNLOCK_KEY, '1')
     pwInput.value = ''
     showError.value = false
   } else {
@@ -278,10 +313,16 @@ function tryUnlock() {
   }
 }
 
-// Auto-relock when navigating away from the admin tab
-watch(() => rom.selectedTabId, (tab) => {
-  if (tab !== 'admin') unlocked.value = false
-})
+function manualLock() {
+  unlocked.value = false
+  sessionStorage.removeItem(UNLOCK_KEY)
+}
+
+function closeAdmin() {
+  // Don't lock — just navigate back to where the user came from.
+  // Unlock state persists in sessionStorage so they don't have to retype next time.
+  rom.selectedTabId = previousTabId.value || 'engineering'
+}
 
 // Sort state for the rates table
 const sortKey = ref(null)      // 'id' | 'label' | 'role' | 'defaultRate' | null (unsorted, preserves original order)
@@ -318,6 +359,17 @@ const sortedLaborCats = computed(() => {
     return 0
   })
 })
+
+// Reorder helpers — clear any active column sort first so the up/down buttons
+// actually visibly reorder rows even when the table is currently sorted.
+function moveCatUp(catId) {
+  if (sortKey.value) { sortKey.value = null; sortDir.value = 'asc' }
+  rom.moveLaborCat(catId, 'up')
+}
+function moveCatDown(catId) {
+  if (sortKey.value) { sortKey.value = null; sortDir.value = 'asc' }
+  rom.moveLaborCat(catId, 'down')
+}
 
 // New labor-category form state
 const newCat = ref({ label: '', role: 'engineering', defaultRate: 0 })
@@ -417,6 +469,7 @@ function resetWbs() {
 }
 .admin-title { font-size: 20px; font-weight: 600; margin: 0 0 2px; }
 .admin-sub   { font-size: 12px; color: var(--rom-text-muted); margin: 0; }
+.admin-header-actions { display: inline-flex; align-items: center; gap: 8px; }
 .lock-btn {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 12px; padding: 6px 12px;
@@ -425,6 +478,15 @@ function resetWbs() {
   cursor: pointer;
 }
 .lock-btn:hover { color: var(--rom-text); border-color: var(--rom-text-muted); }
+.close-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  font-size: 18px;
+  background: transparent; color: var(--rom-text-muted);
+  border: 1px solid var(--rom-border); border-radius: var(--rom-radius, 6px);
+  cursor: pointer;
+}
+.close-btn:hover { color: #fff; background: var(--rom-danger, #c44a4a); border-color: var(--rom-danger, #c44a4a); }
 
 .admin-body { padding: 20px; display: flex; flex-direction: column; gap: 24px; }
 
@@ -457,6 +519,20 @@ function resetWbs() {
 .rates-table th.sortable { cursor: pointer; user-select: none; }
 .rates-table th.sortable:hover { color: var(--rom-text); }
 .sort-arrow { display: inline-block; min-width: 14px; color: var(--rom-accent, #1a5fb4); font-size: 10px; }
+
+/* Manual reorder column */
+.col-move-head { width: 56px; }
+.col-move-cell { width: 56px; padding: 4px 6px !important; }
+.cat-reorder { display: inline-flex; gap: 2px; }
+.cat-reorder button {
+  width: 22px; height: 22px;
+  background: transparent; color: var(--rom-text-muted);
+  border: 1px solid var(--rom-border); border-radius: 4px;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
+.cat-reorder button:hover:not(:disabled) { color: var(--rom-text); border-color: var(--rom-text-muted); }
+.cat-reorder button:disabled { opacity: 0.3; cursor: not-allowed; }
 .rates-table th.amt { text-align: right; }
 .rates-table td { padding: 6px 10px; border-bottom: 1px solid var(--rom-border); }
 .rates-table td.amt { text-align: right; }

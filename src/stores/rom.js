@@ -552,6 +552,13 @@ export const useRomStore = defineStore('rom', () => {
     const c = laborCats.find(c => c.id === catId)
     if (c) c.role = role
   }
+  function moveLaborCat(catId, direction) {
+    const i = laborCats.findIndex(c => c.id === catId)
+    if (i < 0) return
+    const j = direction === 'up' ? i - 1 : i + 1
+    if (j < 0 || j >= laborCats.length) return
+    ;[laborCats[i], laborCats[j]] = [laborCats[j], laborCats[i]]
+  }
 
   // ── WBS task CRUD (for the Admin tab) ────────────────────────────
   function addTask(role, phaseId, task) {
@@ -950,7 +957,7 @@ export const useRomStore = defineStore('rom', () => {
     materialUnloaded, shippingCost, materialTotal, unloadedProjectTotal,
     scpCost, globalCost, govLaborCost, managementReserveCost,
     projectOverheadTotal, projectWithOverhead, scrCost, totalOverhead, totalLoadedCost,
-    laborCatRate, catsForRole, updateLaborCatRate, updateLaborCatLabel, updateLaborCatRole, addLaborCat, removeLaborCat, resetLaborCats,
+    laborCatRate, catsForRole, updateLaborCatRate, updateLaborCatLabel, updateLaborCatRole, moveLaborCat, addLaborCat, removeLaborCat, resetLaborCats,
     addTask, removeTask, updateTask, moveTask, resetWbs,
     lineHours, lineCost, tasksFor, linesForPhase, linesForRole,
     phaseHours, phaseCost, roleHours, roleCost, entityHours, entityCost, travelLineCost,
