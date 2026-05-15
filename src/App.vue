@@ -4,7 +4,9 @@
     <!-- ── Top bar ─────────────────────────────────────────────── -->
     <header class="topbar">
       <div class="topbar-left">
-        <img src="/logo.png" alt="Cronos" class="app-logo-img" />
+        <div class="app-logo-chip">
+          <img src="/logo.png" alt="Cronos" class="app-logo-img" />
+        </div>
         <div class="app-title">
           <div class="app-name">ROM Tool</div>
           <div class="app-sub">Rough Order of Magnitude Estimator</div>
@@ -59,36 +61,42 @@
           <input ref="loadFileInput" type="file" accept=".json,.rom.json,application/json"
             style="display:none" @change="onQuoteFilePicked" />
         </div>
-        <button class="btn" @click="exportExcel" title="Export to Excel">
-          <i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Excel
-        </button>
-        <div class="pdf-split" v-click-outside="() => pdfMenuOpen = false">
-          <button class="btn btn-pdf btn-pdf--main" @click="exportPDF('separate')" title="Export each included scope as a separate PDF">
-            <i class="ti ti-file-type-pdf" aria-hidden="true"></i> PDF
+        <div class="export-split" v-click-outside="() => exportMenuOpen = false">
+          <button class="btn btn-export btn-export--main" @click="exportMenuOpen = !exportMenuOpen" title="Export quote">
+            <i class="ti ti-download" aria-hidden="true"></i> Export
+            <i class="ti ti-chevron-down" aria-hidden="true" style="font-size:13px;margin-left:2px;"></i>
           </button>
-          <button class="btn btn-pdf btn-pdf--caret" @click="pdfMenuOpen = !pdfMenuOpen" title="PDF export options" :aria-expanded="pdfMenuOpen">
-            <i class="ti ti-chevron-down" aria-hidden="true"></i>
-          </button>
-          <div v-if="pdfMenuOpen" class="pdf-menu">
-            <button class="pdf-menu-item" @click="exportPDF('separate'); pdfMenuOpen = false">
-              <i class="ti ti-files" aria-hidden="true"></i>
+          <div v-if="exportMenuOpen" class="export-menu">
+            <button class="export-menu-item" @click="exportExcel(); exportMenuOpen = false">
+              <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
               <div>
-                <div class="pdf-menu-title">Separate files</div>
-                <div class="pdf-menu-sub">One PDF per included scope</div>
+                <div class="export-menu-title">Excel</div>
+                <div class="export-menu-sub">Workbook with a Summary tab + one tab per scope</div>
               </div>
             </button>
-            <button class="pdf-menu-item" @click="exportPDF('combined'); pdfMenuOpen = false">
-              <i class="ti ti-file-stack" aria-hidden="true"></i>
+            <button class="export-menu-item" @click="exportPDF('separate'); exportMenuOpen = false">
+              <i class="ti ti-files" aria-hidden="true"></i>
               <div>
-                <div class="pdf-menu-title">Combined document</div>
-                <div class="pdf-menu-sub">All scopes in one PDF + rollup page</div>
+                <div class="export-menu-title">PDF — separate files</div>
+                <div class="export-menu-sub">One PDF per included scope</div>
+              </div>
+            </button>
+            <button class="export-menu-item" @click="exportPDF('combined'); exportMenuOpen = false">
+              <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
+              <div>
+                <div class="export-menu-title">PDF — combined document</div>
+                <div class="export-menu-sub">All scopes in one PDF + rollup page</div>
+              </div>
+            </button>
+            <button class="export-menu-item" @click="exportWord(); exportMenuOpen = false">
+              <i class="ti ti-file-description" aria-hidden="true"></i>
+              <div>
+                <div class="export-menu-title">Word</div>
+                <div class="export-menu-sub">Editable .doc you can open in Word</div>
               </div>
             </button>
           </div>
         </div>
-        <button class="btn" @click="exportPpt" title="Export to PowerPoint">
-          <i class="ti ti-presentation" aria-hidden="true"></i> PPT
-        </button>
         <button class="btn btn-secondary" @click="showPicker = true" title="New quote">
           <i class="ti ti-file-plus" aria-hidden="true"></i> New
         </button>
@@ -220,6 +228,7 @@ import { ref, computed, onMounted, reactive } from 'vue'
 import { useRomStore } from './stores/rom'
 import { generatePDF }   from './utils/pdfExport'
 import { generateExcel } from './utils/excelExport'
+import { generateWord }  from './utils/wordExport'
 import { loadAllRates }  from './utils/ratesLoader'
 import TemplatePicker from './components/TemplatePicker.vue'
 import CoaSelector from './components/CoaSelector.vue'
@@ -308,18 +317,22 @@ async function exportExcel() {
     alert('Excel export error: ' + e.message)
   }
 }
-async function exportPpt() {
-  alert('PowerPoint export — coming soon.')
-}
-const pdfMenuOpen  = ref(false)
-const saveMenuOpen = ref(false)
-const loadFileInput = ref(null)
+const exportMenuOpen = ref(false)
+const saveMenuOpen   = ref(false)
+const loadFileInput  = ref(null)
 
 async function exportPDF(mode = 'separate') {
   try {
     await generatePDF(rom, { mode })
   } catch (e) {
     alert('PDF export error: ' + e.message)
+  }
+}
+async function exportWord() {
+  try {
+    await generateWord(rom)
+  } catch (e) {
+    alert('Word export error: ' + e.message)
   }
 }
 
@@ -472,14 +485,18 @@ body {
   font-weight: 600;
 }
 
+/* Light chip behind the logo so the blue C reads cleanly against navy.
+   Gives it its own surface with a soft shadow for depth. */
+.app-logo-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #fff;
+  padding: 3px 8px;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25), 0 0 0 1px rgba(125,211,252,0.4);
+}
 .app-logo-img {
-  height: 36px; width: auto;
+  height: 32px; width: auto;
   display: block;
-  /* The PNG has a white background. mix-blend-mode: multiply makes white
-     pixels multiply by the navy topbar color (so they vanish into it),
-     while the colored "C" and CRONOS text stay legible. */
-  mix-blend-mode: multiply;
-  filter: brightness(1.15) contrast(1.15);
 }
 .app-title { display: flex; flex-direction: column; line-height: 1.2; }
 .app-name  { font-size: 14px; font-weight: 500; }
@@ -519,18 +536,18 @@ body {
 .btn.btn-pdf        { background: rgba(180,30,30,.35); border-color: rgba(220,80,80,.5); }
 .btn.btn-pdf:hover  { background: rgba(180,30,30,.55); }
 
-/* PDF split button */
-.pdf-split { position: relative; display: inline-flex; align-items: stretch; }
-.btn-pdf--main  { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.btn-pdf--caret {
-  padding: 6px 8px;
-  border-top-left-radius: 0; border-bottom-left-radius: 0;
-  border-left: 1px solid rgba(220,80,80,.7);
+/* Unified Export dropdown — Excel · PDF · Word */
+.export-split { position: relative; display: inline-flex; }
+.btn-export {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.18);
+  border-color: rgba(255,255,255,.35);
+  color: #fff;
 }
-.btn-pdf--caret i { font-size: 14px; }
-.pdf-menu {
+.btn-export:hover { background: rgba(255,255,255,.28); }
+.export-menu {
   position: absolute; top: calc(100% + 4px); right: 0; z-index: 60;
-  width: 260px;
+  width: 300px;
   background: var(--rom-surface, #fff);
   color: var(--rom-text, #1a2133);
   border: 1px solid var(--rom-border, #c4cede);
@@ -538,18 +555,18 @@ body {
   box-shadow: 0 8px 24px rgba(0,0,0,0.18);
   overflow: hidden;
 }
-.pdf-menu-item {
+.export-menu-item {
   display: flex; align-items: flex-start; gap: 10px;
   width: 100%; padding: 10px 14px;
   background: transparent; border: none; border-bottom: 1px solid var(--rom-border, #c4cede);
   font-family: inherit; text-align: left; cursor: pointer;
   color: inherit;
 }
-.pdf-menu-item:last-child { border-bottom: none; }
-.pdf-menu-item:hover { background: var(--rom-accent-bg, #e8f0fe); }
-.pdf-menu-item i { font-size: 18px; color: var(--rom-accent, #1a5fb4); margin-top: 2px; flex-shrink: 0; }
-.pdf-menu-title { font-size: 13px; font-weight: 600; color: var(--rom-text, #1a2133); }
-.pdf-menu-sub   { font-size: 11px; color: var(--rom-text-muted, #4a5a78); margin-top: 1px; }
+.export-menu-item:last-child { border-bottom: none; }
+.export-menu-item:hover { background: var(--rom-accent-bg, #e8f0fe); }
+.export-menu-item i { font-size: 18px; color: var(--rom-accent, #1a5fb4); margin-top: 2px; flex-shrink: 0; }
+.export-menu-title { font-size: 13px; font-weight: 600; color: var(--rom-text, #1a2133); }
+.export-menu-sub   { font-size: 11px; color: var(--rom-text-muted, #4a5a78); margin-top: 1px; }
 
 /* Save split button */
 .save-split { position: relative; display: inline-flex; align-items: stretch; }

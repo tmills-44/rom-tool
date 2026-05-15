@@ -156,11 +156,17 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
   // Engineering detail page
   doc.addPage()
   y = margin
-  if (logoData) doc.addImage(logoData, 'PNG', margin, y, 70, Math.round(70 * 210 / 290))
+  // Logo + title + rule sized so they all fit cleanly in the header band
+  const detailLogoW = 80
+  const detailLogoH = Math.round(detailLogoW * (210 / 290))
+  if (logoData) doc.addImage(logoData, 'PNG', margin, y, detailLogoW, detailLogoH)
   doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...NAVY)
-  doc.text(`${scope.name} — Engineering Detail`, W - margin, y + 18, { align: 'right' })
-  doc.setFillColor(...NAVY); doc.rect(margin, y + 30, inner, 1.5, 'F')
-  y += 46
+  // Title text vertically centered with the logo
+  doc.text(`${scope.name} — Engineering Detail`, W - margin, y + detailLogoH / 2 + 5, { align: 'right' })
+  // Navy rule sits below the logo, not through it
+  const headerBottomDetail = y + detailLogoH + 6
+  doc.setFillColor(...NAVY); doc.rect(margin, headerBottomDetail, inner, 1.5, 'F')
+  y = headerBottomDetail + 14
 
   if (rom.visibleEntities.length > 0) {
     y = table({
