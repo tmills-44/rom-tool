@@ -39,14 +39,13 @@ function loadImage(src) {
 // Labor categories grouped by job title for the 1-page Cost Summary.
 // Maps the labor-cat IDs in the store to the title rows in the summary table.
 const LABOR_TITLE_GROUPS = [
-  { title: 'Engineering',                 catIds: ['eng1', 'eng2', 'eng3']    },
-  { title: 'Programming',                 catIds: ['prog1', 'prog2', 'prog3'] },
-  { title: 'Project Management',          catIds: ['pm1']                     },
-  { title: 'Project Support',             catIds: ['pm2']                     },
-  { title: 'Project Management Support',  catIds: ['pmspt']                   },
-  { title: 'Procurement',                 catIds: ['proc']                    },
-  { title: 'Warehouse',                   catIds: ['wh']                      },
-  { title: 'Technician',                  catIds: ['tech1', 'tech2', 'tech3'] },
+  { title: 'Engineering',         catIds: ['eng1', 'eng2', 'eng3']    },
+  { title: 'Programming',         catIds: ['prog1', 'prog2', 'prog3'] },
+  { title: 'Project Management',  catIds: ['pm1']                     },
+  { title: 'Project Support',     catIds: ['pm2']                     },
+  { title: 'Procurement',         catIds: ['proc']                    },
+  { title: 'Warehouse',           catIds: ['wh']                      },
+  { title: 'Technician',          catIds: ['tech1', 'tech2', 'tech3'] },
 ]
 
 // ── Render one scope's 1-page Cost Summary (matches the legacy format) ───
@@ -264,7 +263,7 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(20)
   doc.setTextColor(...NAVY)
-  doc.text('ROUGH ORDER OF MAGNITUDE', W - margin, margin + 22, { align: 'right' })
+  doc.text('COST ESTIMATE', W - margin, margin + 22, { align: 'right' })
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
@@ -280,7 +279,7 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
   const infoRows = [
     ['Customer / Sponsor', rom.project.sponsor         || '—', 'Project / Room', rom.project.roomName             || '—'],
     ['Project Lead',       rom.project.projectEngineer || '—', 'Date',           rom.project.date                 || '—'],
-    ['Scope',              scope.name,                          'FY Funds',       fmt(rom.project.anticipatedFYFunds)],
+    ['Scope',              scope.name,                          '',                ''],
   ]
   y = table({
     startY: y, body: infoRows,
@@ -480,7 +479,7 @@ function applyFooter(doc, rom) {
     doc.line(margin, footerY - 28, W - margin, footerY - 28)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...MUTED)
     doc.text(
-      `${rom.project.sponsor || 'ROM Tool'} · Generated ${new Date().toLocaleDateString()}`,
+      `${rom.project.sponsor || 'Cost Estimate'} · Generated ${new Date().toLocaleDateString()}`,
       margin, footerY - 16
     )
     doc.text(`Page ${i} of ${pageCount}`, W - margin, footerY - 16, { align: 'right' })

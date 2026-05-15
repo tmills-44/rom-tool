@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icons/*.png'],
       manifest: {
-        name: 'ROM Tool — Rough Order of Magnitude Estimator',
-        short_name: 'ROM Tool',
-        description: 'Rough Order of Magnitude cost estimator — works offline.',
+        name: 'Cost Estimate Tool',
+        short_name: 'Cost Estimate',
+        description: 'Cost Estimate Tool — scope-based labor, travel, and material estimator. Works offline.',
         theme_color: '#1a3560',
         background_color: '#f4f6fb',
         display: 'standalone',

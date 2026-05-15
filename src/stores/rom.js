@@ -35,11 +35,10 @@ export const LABOR_CATS = [
   { id: 'prog1', label: 'PROG I',   role: 'programming', defaultRate: 75  },
   { id: 'prog2', label: 'PROG II',  role: 'programming', defaultRate: 100 },
   { id: 'prog3', label: 'PROG III', role: 'programming', defaultRate: 125 },
-  { id: 'pm1',   label: 'PM',                          role: 'pm',         defaultRate: 95  },
-  { id: 'pm2',   label: 'PM SPT',                      role: 'pm',         defaultRate: 125 },
-  { id: 'pmspt', label: 'Project Management Support',  role: 'pm',         defaultRate: 110 },
-  { id: 'proc',  label: 'PROC',                        role: 'pm',         defaultRate: 80  },
-  { id: 'wh',    label: 'WH I',                        role: 'pm',         defaultRate: 55  },
+  { id: 'pm1',   label: 'PM',       role: 'pm',         defaultRate: 95  },
+  { id: 'pm2',   label: 'PM SPT',   role: 'pm',         defaultRate: 125 },
+  { id: 'proc',  label: 'PROC',     role: 'pm',         defaultRate: 80  },
+  { id: 'wh',    label: 'WH I',     role: 'pm',         defaultRate: 55  },
   { id: 'tech1', label: 'TECH I',   role: 'technician', defaultRate: 65  },
   { id: 'tech2', label: 'TECH II',  role: 'technician', defaultRate: 75  },
   { id: 'tech3', label: 'TECH III', role: 'technician', defaultRate: 90  },
@@ -157,6 +156,7 @@ const DEFAULT_WBS = {
       { id: 'pm-pd-kickoff',  label: 'Project Kickoff Brief' },
       { id: 'pm-pd-schedule', label: 'Schedule Creation and Resource Management' },
       { id: 'pm-pd-weekly',   label: 'Weekly Coordination Meetings' },
+      { id: 'pm-pd-pms',      label: 'Project Management Support' },
     ],
     'system-delivery':  [{ id: 'pm-sd2-install-coord', label: 'Installation Coordination and Management' }],
     'project-closeout': [
@@ -517,6 +517,19 @@ export const useRomStore = defineStore('rom', () => {
 
   // line item shape: { id, role, phaseId, taskId, entity, laborCat, days, hoursPerDay, rate, coaId }
   const wbs       = reactive(saved?.wbs      ?? deepClone(DEFAULT_WBS))
+  // Backfill: ensure every default WBS task exists. Users keep their custom
+  // tasks, but any new tasks added in a later build show up automatically.
+  Object.entries(DEFAULT_WBS).forEach(([roleKey, phases]) => {
+    if (!wbs[roleKey]) wbs[roleKey] = {}
+    Object.entries(phases).forEach(([phaseId, defaultTasks]) => {
+      if (!Array.isArray(wbs[roleKey][phaseId])) wbs[roleKey][phaseId] = []
+      defaultTasks.forEach(defaultTask => {
+        if (!wbs[roleKey][phaseId].some(t => t.id === defaultTask.id)) {
+          wbs[roleKey][phaseId].push({ ...defaultTask })
+        }
+      })
+    })
+  })
   const lineItems = reactive(saved?.lineItems ?? [])
   // Editable labor categories (rates, labels). Defaults seeded from LABOR_CATS, persisted across sessions.
   const laborCats = reactive(saved?.laborCats ?? deepClone(LABOR_CATS))
@@ -554,22 +567,37 @@ export const useRomStore = defineStore('rom', () => {
     material.items.forEach(it => { if (!it.coaId) it.coaId = coas[0].id })
   }
   // Each COA carries its own overhead percentages — defaults below.
+  // overheadEnabled is a master toggle; per-item *Enabled flags let users
+  // pick exactly which lines roll into the Contract Fee total.
   function defaultOverhead() {
     return {
-      scpLabel: 'PM/Financial Support',     scpPct: 0.02,
-      globalLabel: 'Material Tracking',     globalPct: 0,
-      govLaborLabel: 'Government PM Labor', govLaborPct: 0.015,
-      managementReservePct: 0.01,
-      scrPct: 0.12,
+      overheadEnabled: true,
+      scpLabel: 'PM/Financial Support',     scpPct: 0.02,   scpEnabled: true,
+      globalLabel: 'Material Tracking',     globalPct: 0,   globalEnabled: true,
+      govLaborLabel: 'Government PM Labor', govLaborPct: 0.015, govLaborEnabled: true,
+      managementReservePct: 0.01,                          mgmtRsvEnabled: true,
+      scrPct: 0.12,                                        scrEnabled: true,
     }
+  }
+  // Migration: any overhead loaded from old saved state will be missing the
+  // *Enabled booleans. Backfill them so older data behaves identically (all on).
+  function backfillOverhead(oh) {
+    if (!oh) return
+    if (typeof oh.overheadEnabled  !== 'boolean') oh.overheadEnabled  = true
+    if (typeof oh.scpEnabled       !== 'boolean') oh.scpEnabled       = true
+    if (typeof oh.globalEnabled    !== 'boolean') oh.globalEnabled    = true
+    if (typeof oh.govLaborEnabled  !== 'boolean') oh.govLaborEnabled  = true
+    if (typeof oh.mgmtRsvEnabled   !== 'boolean') oh.mgmtRsvEnabled   = true
+    if (typeof oh.scrEnabled       !== 'boolean') oh.scrEnabled       = true
   }
   const overheadByCoa = reactive(saved?.overheadByCoa ?? {})
   // Migration: if a single saved.overhead exists from before COA support, move it onto the default COA
   if (Object.keys(overheadByCoa).length === 0) {
     overheadByCoa[coas[0].id] = saved?.overhead ?? defaultOverhead()
   }
-  // Make sure every COA has an overhead slot
+  // Make sure every COA has an overhead slot, and backfill enable flags on legacy data
   coas.forEach(c => { if (!overheadByCoa[c.id]) overheadByCoa[c.id] = defaultOverhead() })
+  Object.values(overheadByCoa).forEach(backfillOverhead)
   // Active-COA-scoped overhead — used everywhere existing code referenced `overhead.scpPct` etc.
   const overhead = computed(() => overheadByCoa[activeCoaId.value] ?? overheadByCoa[coas[0].id])
 
@@ -1039,15 +1067,21 @@ export const useRomStore = defineStore('rom', () => {
   }
   const materialTotalForQuote = computed(() =>
     quoteCoaIds.value.reduce((s, id) => s + materialTotalFor(id), 0))
+  // Per-item overhead helpers — return 0 when the master toggle or per-item
+  // toggle is off, OR when there's nothing to apply overhead to.
+  // All percentages now use unloaded project total as the base (no FY funds).
   const unloadedProjectTotal  = computed(() => engineeringTotal.value + travelTotal.value + materialTotal.value)
-  const scpCost               = computed(() => project.anticipatedFYFunds * (overhead.value?.scpPct ?? 0))
-  const globalCost            = computed(() => project.anticipatedFYFunds * (overhead.value?.globalPct ?? 0))
-  const govLaborCost          = computed(() => project.anticipatedFYFunds * (overhead.value?.govLaborPct ?? 0))
-  const managementReserveCost = computed(() => unloadedProjectTotal.value * (overhead.value?.managementReservePct ?? 0))
+  function ohOn(field)        { return !!overhead.value?.overheadEnabled && !!overhead.value?.[field] }
+  const scpCost               = computed(() => ohOn('scpEnabled')      ? unloadedProjectTotal.value * (overhead.value?.scpPct        ?? 0) : 0)
+  const globalCost            = computed(() => ohOn('globalEnabled')   ? unloadedProjectTotal.value * (overhead.value?.globalPct     ?? 0) : 0)
+  const govLaborCost          = computed(() => ohOn('govLaborEnabled') ? unloadedProjectTotal.value * (overhead.value?.govLaborPct   ?? 0) : 0)
+  const managementReserveCost = computed(() => ohOn('mgmtRsvEnabled')  ? unloadedProjectTotal.value * (overhead.value?.managementReservePct ?? 0) : 0)
   const projectOverheadTotal  = computed(() => scpCost.value + globalCost.value + govLaborCost.value + managementReserveCost.value)
   const projectWithOverhead   = computed(() => unloadedProjectTotal.value + projectOverheadTotal.value)
-  const scrCost               = computed(() => projectWithOverhead.value * (overhead.value?.scrPct ?? 0))
+  const scrCost               = computed(() => ohOn('scrEnabled') ? projectWithOverhead.value * (overhead.value?.scrPct ?? 0) : 0)
+  // "Contract Fee" — total of everything overhead-flavored that's enabled
   const totalOverhead         = computed(() => projectOverheadTotal.value + scrCost.value)
+  const contractFee           = totalOverhead
   const totalLoadedCost       = computed(() => projectWithOverhead.value + scrCost.value)
 
   // ── Mutations ─────────────────────────────────────────────────────
@@ -1341,18 +1375,21 @@ export const useRomStore = defineStore('rom', () => {
     const trips    = travelTotalFor(coaId)
     const mat      = materialTotalFor(coaId)
     const unloaded = labor + trips + mat
-    const scp      = project.anticipatedFYFunds * (oh.scpPct ?? 0)
-    const glob     = project.anticipatedFYFunds * (oh.globalPct ?? 0)
-    const govLab   = project.anticipatedFYFunds * (oh.govLaborPct ?? 0)
-    const mgmtRsv  = unloaded * (oh.managementReservePct ?? 0)
+    // Master toggle + per-item toggles. Each pct is applied to unloaded total.
+    const on = (f) => oh.overheadEnabled && oh[f]
+    const scp      = on('scpEnabled')      ? unloaded * (oh.scpPct        ?? 0) : 0
+    const glob     = on('globalEnabled')   ? unloaded * (oh.globalPct     ?? 0) : 0
+    const govLab   = on('govLaborEnabled') ? unloaded * (oh.govLaborPct   ?? 0) : 0
+    const mgmtRsv  = on('mgmtRsvEnabled')  ? unloaded * (oh.managementReservePct ?? 0) : 0
     const ohTotal  = scp + glob + govLab + mgmtRsv
     const withOh   = unloaded + ohTotal
-    const scr      = withOh * (oh.scrPct ?? 0)
+    const scr      = on('scrEnabled') ? withOh * (oh.scrPct ?? 0) : 0
     return {
       labor, trips, mat, unloaded,
       scp, glob, govLab, mgmtRsv, ohTotal,
       withOh, scr,
       totalLoaded: withOh + scr,
+      contractFee: ohTotal + scr,
     }
   }
   // Grand total across every included scope (used by the topbar + summary)
@@ -1464,7 +1501,7 @@ export const useRomStore = defineStore('rom', () => {
     engineeringTotal, engineeringHours, travelTotal,
     materialUnloaded, shippingCost, materialTotal, unloadedProjectTotal,
     scpCost, globalCost, govLaborCost, managementReserveCost,
-    projectOverheadTotal, projectWithOverhead, scrCost, totalOverhead, totalLoadedCost,
+    projectOverheadTotal, projectWithOverhead, scrCost, totalOverhead, contractFee, totalLoadedCost,
     laborCatRate, catsForRole, updateLaborCatRate, updateLaborCatLabel, updateLaborCatRole, moveLaborCat, reorderLaborCat, addLaborCat, removeLaborCat, resetLaborCats,
     addTask, removeTask, updateTask, moveTask, reorderTask, resetWbs,
     lineHours, lineCost, tasksFor, linesForPhase, linesForRole,

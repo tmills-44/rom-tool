@@ -21,6 +21,21 @@
       </div>
     </div>
 
+    <!-- ── Entity toolbar: add Gov / Sub tabs alongside Cronos ─────── -->
+    <div v-if="disabledEntityList.length" class="entity-toolbar">
+      <span class="entity-toolbar-label">Add tab:</span>
+      <button
+        v-for="ent in disabledEntityList"
+        :key="ent.id"
+        class="entity-add-btn"
+        :class="`entity-add-btn--${ent.id}`"
+        @click="rom.enableEntity(ent.id)"
+        :title="`Add a ${ent.label} section for this scope`"
+      >
+        <i class="ti ti-plus" aria-hidden="true"></i> {{ ent.label }}
+      </button>
+    </div>
+
     <!-- ── Entity cards ──────────────────────────────────────────── -->
     <div class="entities-wrap">
       <div

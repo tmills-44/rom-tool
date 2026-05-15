@@ -8,8 +8,8 @@
           <img src="/logo.png" alt="Cronos" class="app-logo-img" />
         </div>
         <div class="app-title">
-          <div class="app-name">ROM Tool</div>
-          <div class="app-sub">Rough Order of Magnitude Estimator</div>
+          <div class="app-name">Cost Estimate Tool</div>
+          <div class="app-sub">Scope-based labor + travel + material estimator</div>
         </div>
         <div v-if="rom.project.sponsor || rom.project.roomName" class="quote-id">
           <span v-if="rom.project.sponsor">{{ rom.project.sponsor }}</span>

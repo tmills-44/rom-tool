@@ -64,8 +64,7 @@ function projectInfoTable(rom, scope) {
       <td class="kv-l">Date</td>              <td class="kv-v">${esc(rom.project.date || '—')}</td>
     </tr>
     <tr>
-      <td class="kv-l">Scope</td>             <td class="kv-v">${esc(scope?.name || '—')}</td>
-      <td class="kv-l">FY Funds</td>          <td class="kv-v">${dollar(rom.project.anticipatedFYFunds)}</td>
+      <td class="kv-l">Scope</td>             <td class="kv-v" colspan="3">${esc(scope?.name || '—')}</td>
     </tr>
   </table>`
 }
@@ -255,7 +254,7 @@ function buildScopeHTML(rom, scope, logo) {
   const oh = rom.overheadByCoa?.[scope.id] || {}
 
   return `
-    ${headerBand(logo, 'ROUGH ORDER OF MAGNITUDE', `Cost Estimate · ${scope.name}`)}
+    ${headerBand(logo, 'COST ESTIMATE', scope.name)}
     ${projectInfoTable(rom, scope)}
     ${heroBox(scope.name, t)}
     ${breakdownTable(rom, scope, t, oh)}
@@ -292,7 +291,7 @@ function buildSummaryHTML(rom, included, logo) {
   }).join('')
 
   return `
-    ${headerBand(logo, 'ROUGH ORDER OF MAGNITUDE', 'Quote Summary')}
+    ${headerBand(logo, 'COST ESTIMATE', 'Quote Summary')}
     <table class="kv" cellspacing="0" cellpadding="0">
       <tr>
         <td class="kv-l">Customer / Sponsor</td><td class="kv-v">${esc(rom.project.sponsor || '—')}</td>
@@ -303,8 +302,7 @@ function buildSummaryHTML(rom, included, logo) {
         <td class="kv-l">Date</td>              <td class="kv-v">${esc(rom.project.date || '—')}</td>
       </tr>
       <tr>
-        <td class="kv-l">Scopes included</td>   <td class="kv-v">${included.length} of ${rom.coas.length}</td>
-        <td class="kv-l">FY Funds</td>          <td class="kv-v">${dollar(rom.project.anticipatedFYFunds)}</td>
+        <td class="kv-l">Scopes included</td>   <td class="kv-v" colspan="3">${included.length} of ${rom.coas.length}</td>
       </tr>
     </table>
 
@@ -406,7 +404,7 @@ export async function generateWord(rom) {
       xmlns="http://www.w3.org/TR/REC-html40">
 <head>
 <meta charset="utf-8">
-<title>ROM Tool — Cost Estimate</title>
+<title>Cost Estimate</title>
 ${styles}
 </head>
 <body>

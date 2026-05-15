@@ -77,12 +77,12 @@ function buildScopeSheet(XLSX, rom, scope) {
 
   // First build with plain arrays, then apply styles cell-by-cell.
   const rows = []
-  rows.push(['ROUGH ORDER OF MAGNITUDE — Cost Estimate'])
+  rows.push(['Cost Estimate'])
   rows.push([scope.name])
   rows.push([])
   rows.push(['Customer / Sponsor', rom.project.sponsor         || '', '', 'Project / Room', rom.project.roomName       || ''])
   rows.push(['Project Lead',       rom.project.projectEngineer || '', '', 'Date',           rom.project.date           || ''])
-  rows.push(['Scope',              scope.name,                            '', 'FY Funds',       rom.project.anticipatedFYFunds])
+  rows.push(['Scope',              scope.name,                            '', '',               ''])
   rows.push([])
   rows.push(['LOADED TOTAL', t.totalLoaded])
   rows.push([`Labor ${dollar(t.labor)}   ·   Travel ${dollar(t.trips)}   ·   Material ${dollar(t.mat)}   ·   Overhead ${dollar(t.ohTotal + t.scr)}`])
@@ -270,12 +270,12 @@ function buildScopeSheet(XLSX, rom, scope) {
 
 function buildSummarySheet(XLSX, rom, included) {
   const rows = []
-  rows.push(['ROUGH ORDER OF MAGNITUDE — Quote Summary'])
+  rows.push(['Cost Estimate — Quote Summary'])
   rows.push([`Generated ${new Date().toLocaleDateString()}`])
   rows.push([])
   rows.push(['Customer / Sponsor',  rom.project.sponsor         || '', '', 'Project / Room', rom.project.roomName       || ''])
   rows.push(['Project Lead',        rom.project.projectEngineer || '', '', 'Date',           rom.project.date           || ''])
-  rows.push(['FY Funds',            rom.project.anticipatedFYFunds,    '', 'Scopes included', `${included.length} of ${rom.coas.length}`])
+  rows.push(['Scopes included',     `${included.length} of ${rom.coas.length}`, '', '', ''])
   rows.push([])
   rows.push(['QUOTE GRAND TOTAL (LOADED)', rom.totalLoadedForQuote])
   rows.push([])
