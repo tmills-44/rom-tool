@@ -436,12 +436,15 @@ function lineStatus(line) {
 }
 
 // Aggregate completion state for a given role filter chip
-// Returns 'none' (no rows match), 'complete' (all rows complete), or 'partial' (any row needs work)
+// Rows without a labor category are "void" — they print as $0 and are ignored here.
+// Returns 'none' (nothing meaningful), 'complete' (all meaningful rows complete), or 'partial'
 function filterStatus(eid, pid, roleFilterId) {
   const all = linesForPhase(eid, pid)
   const matching = roleFilterId === 'all' ? all : all.filter(l => l.role === roleFilterId)
-  if (matching.length === 0) return 'none'
-  const allComplete = matching.every(l => lineStatus(l) === 'complete')
+  // Skip rows with no labor category — those are effectively void on print
+  const meaningful = matching.filter(l => !!l.laborCat)
+  if (meaningful.length === 0) return 'none'
+  const allComplete = meaningful.every(l => lineStatus(l) === 'complete')
   return allComplete ? 'complete' : 'partial'
 }
 
