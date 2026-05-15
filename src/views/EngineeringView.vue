@@ -583,7 +583,7 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .role-chip--pm.active          { background: #2e7d32; border-color: #2e7d32; color: #fff; }
 .role-chip--engineering.active { background: #1a5fb4; border-color: #1a5fb4; color: #fff; }
 .role-chip--programming.active { background: #6a1b9a; border-color: #6a1b9a; color: #fff; }
-.role-chip--technician.active  { background: #854f0b; border-color: #854f0b; color: #fff; }
+.role-chip--technician.active  { background: #b8860b; border-color: #b8860b; color: #fff; }
 
 /* Lines table */
 .lines-wrap { padding: 0 16px 0; overflow-x: auto; }
@@ -647,7 +647,7 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 }
 .role-badge--engineering { background: #dce8fb; color: #1a5fb4; }
 .role-badge--pm          { background: #d4edda; color: #2e7d32; }
-.role-badge--technician  { background: #faeeda; color: #854f0b; }
+.role-badge--technician  { background: #fdf6e3; color: #8a6508; }
 
 /* Cell inputs */
 .cell-select {
@@ -799,8 +799,8 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .role-pick-btn--engineering:hover { background: #1a5fb4; color: #fff; }
 .role-pick-btn--programming  { border-color: #6a1b9a; color: #6a1b9a; background: #f7f0ff; }
 .role-pick-btn--programming:hover { background: #6a1b9a; color: #fff; }
-.role-pick-btn--technician   { border-color: #854f0b; color: #854f0b; background: #fff8f0; }
-.role-pick-btn--technician:hover { background: #854f0b; color: #fff; }
+.role-pick-btn--technician   { border-color: #b8860b; color: #8a6508; background: #fdf6e3; }
+.role-pick-btn--technician:hover { background: #b8860b; color: #fff; }
 .role-pick-cancel {
   padding: 4px 10px; font-size: 11px; color: var(--rom-text-faint);
   background: none; border: 1px solid var(--rom-border); border-radius: 4px; cursor: pointer;

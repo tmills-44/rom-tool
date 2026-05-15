@@ -59,15 +59,23 @@
             <table class="rates-table">
               <thead>
                 <tr>
-                  <th>Code</th>
-                  <th>Label</th>
-                  <th>Role</th>
-                  <th class="amt">Rate ($/hr)</th>
+                  <th class="sortable" @click="toggleSort('id')">
+                    Code <span class="sort-arrow">{{ sortArrow('id') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('label')">
+                    Label <span class="sort-arrow">{{ sortArrow('label') }}</span>
+                  </th>
+                  <th class="sortable" @click="toggleSort('role')">
+                    Role <span class="sort-arrow">{{ sortArrow('role') }}</span>
+                  </th>
+                  <th class="amt sortable" @click="toggleSort('defaultRate')">
+                    Rate ($/hr) <span class="sort-arrow">{{ sortArrow('defaultRate') }}</span>
+                  </th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="cat in rom.LABOR_CATS" :key="cat.id">
+                <tr v-for="cat in sortedLaborCats" :key="cat.id">
                   <td class="mono">{{ cat.id }}</td>
                   <td>
                     <input
@@ -275,6 +283,42 @@ watch(() => rom.selectedTabId, (tab) => {
   if (tab !== 'admin') unlocked.value = false
 })
 
+// Sort state for the rates table
+const sortKey = ref(null)      // 'id' | 'label' | 'role' | 'defaultRate' | null (unsorted, preserves original order)
+const sortDir = ref('asc')     // 'asc' | 'desc'
+
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    // Same column clicked: asc → desc → unsorted → asc → …
+    if (sortDir.value === 'asc')      sortDir.value = 'desc'
+    else if (sortDir.value === 'desc') { sortKey.value = null; sortDir.value = 'asc' }
+    else                               sortDir.value = 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = 'asc'
+  }
+}
+
+function sortArrow(key) {
+  if (sortKey.value !== key) return ''
+  return sortDir.value === 'asc' ? ' ▲' : ' ▼'
+}
+
+const sortedLaborCats = computed(() => {
+  const list = [...rom.LABOR_CATS]
+  if (!sortKey.value) return list
+  const key = sortKey.value
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  return list.sort((a, b) => {
+    let va = a[key], vb = b[key]
+    if (typeof va === 'string') va = va.toLowerCase()
+    if (typeof vb === 'string') vb = vb.toLowerCase()
+    if (va < vb) return -1 * dir
+    if (va > vb) return  1 * dir
+    return 0
+  })
+})
+
 // New labor-category form state
 const newCat = ref({ label: '', role: 'engineering', defaultRate: 0 })
 
@@ -410,6 +454,9 @@ function resetWbs() {
   color: var(--rom-text-muted);
   padding: 8px 10px; border-bottom: 1px solid var(--rom-border);
 }
+.rates-table th.sortable { cursor: pointer; user-select: none; }
+.rates-table th.sortable:hover { color: var(--rom-text); }
+.sort-arrow { display: inline-block; min-width: 14px; color: var(--rom-accent, #1a5fb4); font-size: 10px; }
 .rates-table th.amt { text-align: right; }
 .rates-table td { padding: 6px 10px; border-bottom: 1px solid var(--rom-border); }
 .rates-table td.amt { text-align: right; }
@@ -422,14 +469,14 @@ function resetWbs() {
 .role-pill--engineering { background: #f0f5ff; color: #1a5fb4; }
 .role-pill--pm          { background: #f0faf0; color: #2e7d32; }
 .role-pill--programming { background: #f7f0ff; color: #6a1b9a; }
-.role-pill--technician  { background: #fff8f0; color: #854f0b; }
+.role-pill--technician  { background: #fdf6e3; color: #8a6508; }
 
 /* Role dropdown — tint to match the chosen role */
 .cell-input--role { font-weight: 600; font-size: 11px; padding: 4px 8px; }
 .role-select--engineering { background: #f0f5ff; color: #1a5fb4; }
 .role-select--pm          { background: #f0faf0; color: #2e7d32; }
 .role-select--programming { background: #f7f0ff; color: #6a1b9a; }
-.role-select--technician  { background: #fff8f0; color: #854f0b; }
+.role-select--technician  { background: #fdf6e3; color: #8a6508; }
 
 /* Delete / add category buttons */
 .cat-delete, .cat-add {
