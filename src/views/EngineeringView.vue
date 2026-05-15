@@ -102,6 +102,7 @@
                 <table class="lines-table">
                   <thead>
                     <tr>
+                      <th class="col-move"></th>
                       <th class="col-role">Role</th>
                       <th class="col-cat">Labor Category</th>
                       <th class="col-task">Task</th>
@@ -114,10 +115,24 @@
                   </thead>
                   <tbody>
                     <tr
-                      v-for="line in visibleLines(entity.id, phase.id)"
+                      v-for="(line, idx) in visibleLines(entity.id, phase.id)"
                       :key="line.id"
                       class="line-row"
                     >
+                      <!-- Move up/down -->
+                      <td class="col-move">
+                        <div class="move-btns">
+                          <button class="move-btn"
+                            :disabled="idx === 0"
+                            @click="moveLine(entity.id, phase.id, line.id, 'up')"
+                            title="Move up">▲</button>
+                          <button class="move-btn"
+                            :disabled="idx === visibleLines(entity.id, phase.id).length - 1"
+                            @click="moveLine(entity.id, phase.id, line.id, 'down')"
+                            title="Move down">▼</button>
+                        </div>
+                      </td>
+
                       <!-- Role badge -->
                       <td class="col-role">
                         <span class="role-badge" :class="`role-badge--${line.role}`">
@@ -142,10 +157,25 @@
 
                       <!-- Task -->
                       <td class="col-task">
-                        <select
+                        <!-- Custom text input mode -->
+                        <div v-if="customTaskMode[line.id]" class="custom-task-wrap">
+                          <input
+                            type="text"
+                            class="cell-input cell-input--task"
+                            :value="line.taskId"
+                            placeholder="Enter custom task…"
+                            @input="rom.updateLine(line.id, { taskId: $event.target.value })"
+                            autofocus
+                          />
+                          <button class="custom-task-back" title="Back to list" @click="customTaskMode[line.id] = false">
+                            <i class="ti ti-list"></i>
+                          </button>
+                        </div>
+                        <!-- Dropdown mode -->
+                        <select v-else
                           :value="line.taskId"
                           class="cell-select cell-select--task"
-                          @change="rom.updateLine(line.id, { taskId: $event.target.value })"
+                          @change="onTaskChange(line, $event.target.value)"
                         >
                           <option value="">— Select task —</option>
                           <option
@@ -153,6 +183,7 @@
                             :key="task.id"
                             :value="task.id"
                           >{{ task.label }}</option>
+                          <option value="__custom__">✏ Custom…</option>
                         </select>
                       </td>
 
@@ -284,16 +315,11 @@ function roleShort(role) { return ROLE_SHORT[role] ?? role.toUpperCase() }
 const phaseOpenState  = reactive(loadSaved(PHASE_STATE_KEY))
 const activeRoleState = reactive(loadSaved(ROLE_STATE_KEY))
 const pickerState     = reactive({})
+const customTaskMode  = reactive({})  // lineId → true when in custom text mode
 
 function loadSaved(key) {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
 }
-
-onMounted(() => {
-  // Watch and persist both states
-  watch(phaseOpenState,  v => localStorage.setItem(PHASE_STATE_KEY,  JSON.stringify(v)), { deep: true })
-  watch(activeRoleState, v => localStorage.setItem(ROLE_STATE_KEY,   JSON.stringify(v)), { deep: true })
-})
 
 function phaseKey(eid, pid)    { return `${eid}::${pid}` }
 function isPhaseOpen(eid, pid) { return !!phaseOpenState[phaseKey(eid, pid)] }
@@ -310,9 +336,11 @@ function closeAllPhases(eid) {
 function getActiveRole(eid, pid) { return activeRoleState[phaseKey(eid, pid)] ?? 'all' }
 function setActiveRole(eid, pid, role) { activeRoleState[phaseKey(eid, pid)] = role }
 
-// ── Lines for a phase — all roles (used for totals) ─────────────────
+// ── Lines for a phase — sorted by sortOrder ──────────────────────────
 function linesForPhase(eid, pid) {
-  return rom.lineItems.filter(l => l.entity === eid && l.phaseId === pid)
+  return rom.lineItems
+    .filter(l => l.entity === eid && l.phaseId === pid)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 }
 
 // ── Visible lines — respects the active role filter ──────────────────
@@ -321,6 +349,15 @@ function visibleLines(eid, pid) {
   const all = linesForPhase(eid, pid)
   if (active === 'all') return all
   return all.filter(l => l.role === active)
+}
+
+// ── Move a line up or down within the visible set ────────────────────
+function moveLine(eid, pid, lineId, dir) {
+  const visible = visibleLines(eid, pid)
+  const idx = visible.findIndex(l => l.id === lineId)
+  const swapIdx = dir === 'up' ? idx - 1 : idx + 1
+  if (swapIdx < 0 || swapIdx >= visible.length) return
+  rom.swapLineOrder(lineId, visible[swapIdx].id)
 }
 
 // ── Phase hours/cost (sum across all roles) ──────────────────────────
@@ -357,7 +394,28 @@ function roleIcon(role) {
   return { engineering: 'ti-cpu', pm: 'ti-clipboard-list', technician: 'ti-tool' }[role] ?? ''
 }
 
-// ── Update labor category ────────────────────────────────────────────
+// ── Task change — handle "Custom…" sentinel ──────────────────────────
+function onTaskChange(line, value) {
+  if (value === '__custom__') {
+    customTaskMode[line.id] = true
+    rom.updateLine(line.id, { taskId: '' })
+  } else {
+    rom.updateLine(line.id, { taskId: value })
+  }
+}
+
+// On mount, put any lines with non-WBS taskIds into custom mode
+onMounted(() => {
+  watch(phaseOpenState,  v => localStorage.setItem(PHASE_STATE_KEY,  JSON.stringify(v)), { deep: true })
+  watch(activeRoleState, v => localStorage.setItem(ROLE_STATE_KEY,   JSON.stringify(v)), { deep: true })
+
+  const allWbsIds = new Set(
+    Object.values(rom.wbs).flatMap(phases => Object.values(phases).flat().map(t => t.id))
+  )
+  rom.lineItems.forEach(l => {
+    if (l.taskId && !allWbsIds.has(l.taskId)) customTaskMode[l.id] = true
+  })
+})
 function onLaborCatChange(lineId, catId) {
   const cat = rom.LABOR_CATS.find(c => c.id === catId)
   rom.updateLine(lineId, {
@@ -490,6 +548,7 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .line-row:hover td { background: var(--rom-surface-alt); }
 
 /* Column widths */
+.col-move  { width: 36px; }
 .col-role  { width: 52px; }
 .col-cat   { width: 120px; }
 .col-task  { min-width: 200px; }
@@ -498,6 +557,18 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .col-rate  { width: 80px; }
 .col-total { width: 90px; font-weight: 700; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
 .col-del   { width: 36px; }
+
+/* Move buttons */
+.move-btns { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.move-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 14px; padding: 0;
+  font-size: 8px; line-height: 1;
+  border: 1px solid var(--rom-border); border-radius: 3px;
+  background: var(--rom-surface); color: var(--rom-text-muted); cursor: pointer;
+}
+.move-btn:hover:not(:disabled) { background: var(--rom-accent-bg); border-color: var(--rom-accent); color: var(--rom-accent); }
+.move-btn:disabled { opacity: .25; cursor: default; }
 
 /* Role badge */
 .role-badge {
@@ -520,6 +591,23 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   outline: none;
 }
 .cell-select--task { min-width: 180px; }
+
+.cell-input {
+  width: 100%; padding: 4px 6px; font-size: 12px;
+  border: 1px solid var(--rom-accent); border-radius: 4px;
+  background: var(--rom-accent-bg); color: var(--rom-text);
+}
+.cell-input:focus { outline: none; border-color: var(--rom-accent-dark); }
+.cell-input--task { min-width: 160px; }
+
+.custom-task-wrap { display: flex; align-items: center; gap: 4px; }
+.custom-task-back {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 4px;
+  border: 1px solid var(--rom-border); background: var(--rom-surface);
+  color: var(--rom-text-muted); cursor: pointer; font-size: 12px;
+}
+.custom-task-back:hover { border-color: var(--rom-accent); color: var(--rom-accent); }
 
 .cell-num {
   width: 100%; padding: 4px 6px; font-size: 12px; text-align: right;

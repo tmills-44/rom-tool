@@ -705,15 +705,30 @@ export const useRomStore = defineStore('rom', () => {
 
   // ── Mutations ─────────────────────────────────────────────────────
 
+  function nextSortOrder(entity, phaseId) {
+    const existing = lineItems.filter(l => l.entity === entity && l.phaseId === phaseId)
+    return existing.length ? Math.max(...existing.map(l => l.sortOrder ?? 0)) + 1 : 0
+  }
+
   function addLine(role, phaseId, taskId, opts = {}) {
     const entity   = opts.entity   ?? 'cronos'
     const laborCat = opts.laborCat ?? defaultCatForRole(role)
     lineItems.push({
       id: uuid(), role, phaseId, taskId: taskId ?? '', entity, laborCat,
-      days:       opts.days        ?? (taskId ? (TASK_DEFAULTS[taskId] ?? 0) : 0),
+      days:        opts.days        ?? (taskId ? (TASK_DEFAULTS[taskId] ?? 0) : 0),
       hoursPerDay: opts.hoursPerDay ?? 9,
-      rate:       opts.rate        ?? laborCatRate(laborCat),
+      rate:        opts.rate        ?? laborCatRate(laborCat),
+      sortOrder:   opts.sortOrder   ?? nextSortOrder(entity, phaseId),
     })
+  }
+
+  function swapLineOrder(idA, idB) {
+    const a = lineItems.find(l => l.id === idA)
+    const b = lineItems.find(l => l.id === idB)
+    if (!a || !b) return
+    const tmp = a.sortOrder ?? 0
+    a.sortOrder = b.sortOrder ?? 0
+    b.sortOrder = tmp
   }
 
   function removeLine(lineId) {
@@ -856,7 +871,7 @@ export const useRomStore = defineStore('rom', () => {
     laborCatRate, catsForRole,
     lineHours, lineCost, tasksFor, linesForPhase, linesForRole,
     phaseHours, phaseCost, roleHours, roleCost, entityHours, entityCost, travelLineCost,
-    addLine, removeLine, updateLine, enableEntity, disableEntity, applyTemplate, resetAll,
+    addLine, removeLine, updateLine, swapLineOrder, enableEntity, disableEntity, applyTemplate, resetAll,
     addMaterialItem, updateMaterialItem, removeMaterialItem,
     addTrip, updateTrip, removeTrip, tripCost,
     gsaRateMap, importGSARates, lookupGSARate, clearGSARates,
