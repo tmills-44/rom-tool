@@ -15,7 +15,6 @@
           <span v-if="rom.project.sponsor">{{ rom.project.sponsor }}</span>
           <span v-if="rom.project.sponsor && rom.project.roomName"> · </span>
           <span v-if="rom.project.roomName">{{ rom.project.roomName }}</span>
-          <span v-if="rom.project.templateName" class="template-badge">{{ rom.project.templateName }}</span>
         </div>
       </div>
 
@@ -131,7 +130,70 @@
       </div>
     </header>
 
-    <!-- ── Tab bar ─────────────────────────────────────────────── -->
+    <!-- ── Project Info drawer (sits between topbar and tabbar) ───── -->
+    <div class="proj-drawer" :class="{ 'proj-drawer--open': projInfoOpen }">
+      <button class="proj-drawer-tab" type="button" @click="projInfoOpen = !projInfoOpen" :aria-expanded="projInfoOpen">
+        <span class="proj-drawer-tab-label">Project Info</span>
+        <span v-if="projectSynopsis.length" class="proj-drawer-synopsis">
+          <span v-for="(item, i) in projectSynopsis" :key="i"
+            class="proj-drawer-syn-item"
+            :class="{ 'proj-drawer-syn-item--scope': item.label === 'Scope' }">
+            <span class="proj-drawer-syn-key">{{ item.label }}:</span> {{ item.value }}
+          </span>
+        </span>
+        <span v-else class="proj-drawer-synopsis proj-drawer-synopsis--empty">
+          No sponsor info yet — click to fill in
+        </span>
+        <i class="ti" :class="projInfoOpen ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true"></i>
+      </button>
+
+      <div v-show="projInfoOpen" class="proj-drawer-body">
+        <!-- Row 1 — Sponsor (narrow) · Room/Project · City/Base (wide) · Building (compact) -->
+        <div class="proj-field">
+          <label>Sponsor</label>
+          <input type="text" :value="rom.project.sponsor"
+            @input="rom.project.sponsor = $event.target.value" />
+        </div>
+        <div class="proj-field">
+          <label>Room / Project Name</label>
+          <input type="text" :value="rom.project.roomName"
+            @input="rom.project.roomName = $event.target.value" />
+        </div>
+        <div class="proj-field">
+          <label>City / Base</label>
+          <input type="text" :value="rom.project.cityBase"
+            @input="rom.project.cityBase = $event.target.value" />
+        </div>
+        <div class="proj-field">
+          <label>Building</label>
+          <input type="text" :value="rom.project.building"
+            @input="rom.project.building = $event.target.value" />
+        </div>
+        <!-- Row 2 — Cronos Lead (narrow) · Gov Lead · PM Support Lead · Date -->
+        <div class="proj-field">
+          <label>Cronos Project Lead</label>
+          <input type="text" :value="rom.project.projectEngineer"
+            @input="rom.project.projectEngineer = $event.target.value" />
+        </div>
+        <div class="proj-field">
+          <label>Government Project Lead</label>
+          <input type="text" :value="rom.project.govLead"
+            @input="rom.project.govLead = $event.target.value" />
+        </div>
+        <div class="proj-field">
+          <label>PM Support Lead</label>
+          <input type="text" :value="rom.project.pmSupportLead"
+            @input="rom.project.pmSupportLead = $event.target.value" />
+        </div>
+        <div class="proj-field proj-field--date">
+          <label>Date</label>
+          <input type="date" :value="rom.project.date"
+            @input="rom.project.date = $event.target.value" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab bar (Labor / Travel / Material / Overhead / …) ────── -->
     <nav class="tabbar" role="tablist" aria-label="Sections">
       <button
         v-for="tab in rom.TABS"
@@ -155,57 +217,6 @@
         </span>
       </button>
     </nav>
-
-    <!-- ── Project Info drawer ─────────────────────────────────────── -->
-    <div class="proj-drawer" :class="{ 'proj-drawer--open': projInfoOpen }">
-      <button class="proj-drawer-tab" type="button" @click="projInfoOpen = !projInfoOpen" :aria-expanded="projInfoOpen">
-        <span class="proj-drawer-tab-label">Project Info</span>
-        <i class="ti" :class="projInfoOpen ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true"></i>
-      </button>
-
-      <div v-show="projInfoOpen" class="proj-drawer-body">
-        <div class="proj-field">
-          <label>Sponsor</label>
-          <input type="text" :value="rom.project.sponsor"
-            @input="rom.project.sponsor = $event.target.value" />
-        </div>
-        <div class="proj-field">
-          <label>Building</label>
-          <input type="text" :value="rom.project.building"
-            @input="rom.project.building = $event.target.value" />
-        </div>
-        <div class="proj-field">
-          <label>Room / Project Name</label>
-          <input type="text" :value="rom.project.roomName"
-            @input="rom.project.roomName = $event.target.value" />
-        </div>
-        <div class="proj-field">
-          <label>City / Base</label>
-          <input type="text" :value="rom.project.cityBase"
-            @input="rom.project.cityBase = $event.target.value" />
-        </div>
-        <div class="proj-field">
-          <label>Cronos Project Lead</label>
-          <input type="text" :value="rom.project.projectEngineer"
-            @input="rom.project.projectEngineer = $event.target.value" />
-        </div>
-        <div class="proj-field">
-          <label>Government Project Lead</label>
-          <input type="text" :value="rom.project.govLead"
-            @input="rom.project.govLead = $event.target.value" />
-        </div>
-        <div class="proj-field">
-          <label>PM Support Lead</label>
-          <input type="text" :value="rom.project.pmSupportLead"
-            @input="rom.project.pmSupportLead = $event.target.value" />
-        </div>
-        <div class="proj-field proj-field--date">
-          <label>Date</label>
-          <input type="date" :value="rom.project.date"
-            @input="rom.project.date = $event.target.value" />
-        </div>
-      </div>
-    </div>
 
     <!-- ── Validation banner ─────────────────────────────────────── -->
     <!-- Hidden for now. To re-enable, change v-if to "validationWarnings.length". -->
@@ -324,6 +335,28 @@ onMounted(async () => {
 // Project info drawer — closed by default, click the tab to expand
 const projInfoOpen = ref(false)
 
+// One-line synopsis of project info shown in the collapsed drawer tab so the
+// user can glance at the key fields without opening the drawer. Active scope
+// name leads off so the user always knows which scope they're working in.
+const projectSynopsis = computed(() => {
+  const items = []
+  const scope = rom.activeCoa
+  if (scope?.name) items.push({ label: 'Scope', value: scope.name })
+  const order = [
+    { key: 'sponsor',         label: 'Sponsor' },
+    { key: 'roomName',        label: 'Project' },
+    { key: 'building',        label: 'Bldg' },
+    { key: 'cityBase',        label: 'City' },
+    { key: 'projectEngineer', label: 'Cronos' },
+    { key: 'govLead',         label: 'Gov' },
+  ]
+  order.forEach(f => {
+    const value = String(rom.project?.[f.key] ?? '').trim()
+    if (value) items.push({ label: f.label, value })
+  })
+  return items
+})
+
 const validationWarnings = computed(() => {
   const w = []
   if (!rom.project.templateId)                  w.push('No template selected — choose one via New.')
@@ -344,6 +377,7 @@ function fmtCompact(n) {
 }
 
 async function exportExcel() {
+  if (!confirmExportIfMissing()) return
   try {
     await generateExcel(rom)
   } catch (e) {
@@ -354,10 +388,36 @@ const exportMenuOpen = ref(false)
 // Used in the Export menu to show which scopes will land in the combined PDF
 // and to hide the "combined" option entirely when only one scope is included.
 const includedScopesForExport = computed(() => rom.coas.filter(c => c.includeInQuote))
+
+// Required project-info fields for a printed quote — if any are blank we ask
+// the user to confirm before exporting.
+const REQUIRED_PROJECT_FIELDS = [
+  { key: 'sponsor',         label: 'Sponsor' },
+  { key: 'projectEngineer', label: 'Cronos Project Lead' },
+  { key: 'govLead',         label: 'Government Project Lead' },
+  { key: 'roomName',        label: 'Room / Project Name' },
+  { key: 'cityBase',        label: 'City / Base' },
+  { key: 'building',        label: 'Building' },
+  { key: 'pmSupportLead',   label: 'PM Support Lead' },
+  { key: 'date',            label: 'Date' },
+]
+function missingProjectFields() {
+  return REQUIRED_PROJECT_FIELDS.filter(f => !String(rom.project?.[f.key] ?? '').trim())
+}
+// Returns true if export should proceed, false if the user bailed.
+function confirmExportIfMissing() {
+  const missing = missingProjectFields()
+  if (missing.length === 0) return true
+  const list = missing.map(f => `  • ${f.label}`).join('\n')
+  return window.confirm(
+    `Your project info is missing ${missing.length} field${missing.length === 1 ? '' : 's'}:\n\n${list}\n\nExport anyway?`
+  )
+}
 const saveMenuOpen   = ref(false)
 const loadFileInput  = ref(null)
 
 async function exportPDF(mode = 'separate') {
+  if (!confirmExportIfMissing()) return
   try {
     await generatePDF(rom, { mode })
   } catch (e) {
@@ -365,6 +425,7 @@ async function exportPDF(mode = 'separate') {
   }
 }
 async function exportWord() {
+  if (!confirmExportIfMissing()) return
   try {
     await generateWord(rom)
   } catch (e) {
@@ -706,8 +767,8 @@ body {
   border-bottom: 1px solid var(--rom-border, #c4cede);
 }
 .proj-drawer-tab {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 14px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 14px;
   margin: 0 18px;
   background: var(--rom-surface, #fff);
   border: 1px solid var(--rom-border, #c4cede);
@@ -719,6 +780,38 @@ body {
   color: var(--rom-text-muted, #4a5a78);
   cursor: pointer;
   transition: color .12s, background .12s;
+  text-align: left;
+  max-width: calc(100% - 36px);
+}
+.proj-drawer-tab-label { flex-shrink: 0; }
+.proj-drawer-synopsis {
+  display: flex; align-items: center; gap: 14px; flex-wrap: nowrap;
+  font-size: 11px; font-weight: 500;
+  text-transform: none; letter-spacing: 0;
+  color: var(--rom-text, #1a2133);
+  flex: 1; min-width: 0;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.proj-drawer-syn-item {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  padding: 0 8px 0 0;
+  border-right: 1px solid var(--rom-border, #c4cede);
+}
+.proj-drawer-syn-item:last-child { border-right: none; padding-right: 0; }
+.proj-drawer-syn-key {
+  font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--rom-text-muted, #4a5a78);
+}
+.proj-drawer-synopsis--empty {
+  font-style: italic; color: var(--rom-text-muted, #4a5a78);
+}
+.proj-drawer-syn-item--scope {
+  color: var(--rom-accent-dark, #1248a0);
+  font-weight: 700;
+}
+.proj-drawer-syn-item--scope .proj-drawer-syn-key {
+  color: var(--rom-accent, #1a5fb4);
 }
 .proj-drawer-tab:hover { color: var(--rom-accent, #1a5fb4); background: var(--rom-accent-bg, #e8f0fe); }
 .proj-drawer--open .proj-drawer-tab {
@@ -730,8 +823,10 @@ body {
 
 .proj-drawer-body {
   display: grid;
-  grid-template-columns: 1.6fr 1.4fr 1fr 150px;
-  gap: 16px;
+  /* Sponsor + Cronos Lead get the narrowest non-fixed column, City/Base gets
+     the widest, Building + Date are compact, leads sit in the middle */
+  grid-template-columns: 0.9fr 1fr 1.5fr 130px;
+  gap: 14px;
   padding: 12px 18px 14px;
   background: var(--rom-surface, #fff);
   border-top: 1px solid var(--rom-border, #c4cede);

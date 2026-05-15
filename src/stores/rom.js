@@ -1246,6 +1246,12 @@ export const useRomStore = defineStore('rom', () => {
 
     project.templateId   = tmpl.id
     project.templateName = tmpl.name
+
+    // Rename the active scope to match the template the user picked,
+    // so the Scopes dropdown shows e.g. "Baseline A — Huddle Room"
+    // instead of the generic "Scope 1 — Primary".
+    const activeScope = coas.find(c => c.id === targetCoa)
+    if (activeScope) activeScope.name = tmpl.name
   }
 
   // ── Snapshots ─────────────────────────────────────────────────────
