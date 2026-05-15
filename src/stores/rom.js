@@ -698,8 +698,69 @@ export const useRomStore = defineStore('rom', () => {
   const engineeringHoursForQuote = computed(() =>
     lineItems.filter(l => quoteCoaIds.value.includes(l.coaId)).reduce((s, l) => s + lineHours(l), 0))
 
-  // ── Trip cost calculation ────────────────────────────────────────
+  // ── Travel data migration ─────────────────────────────────────────
+  // Move pre-existing single-row trips into the new trip-with-travelers shape.
+  // Also tag each trip with a COA id and a default trip name.
+  function migrateTrip(t) {
+    if (!t) return t
+    if (Array.isArray(t.travelers)) {
+      // Already new shape — only make sure coaId exists
+      if (!t.coaId) t.coaId = coas[0].id
+      return t
+    }
+    // Convert old shape → new
+    const traveler = {
+      id: uuid(),
+      name: t.travelerName || '',
+      qty: Math.max(1, t.persons || 1),
+      days: t.days ?? 0,
+      travelHours: t.travelHours ?? 4,
+      hotel:   t.hotel   ?? true,
+      car:     t.rentalCar ?? false,
+      airfare: t.airfare ?? false,
+      misc:    false,
+    }
+    Object.assign(t, {
+      tripName:           t.travelerName || '',
+      defaultTravelHours: t.travelHours ?? 4,
+      defaultCarRate:     t.rentalCarRate ?? 75,
+      defaultAirfareRate: t.airfareRate ?? 600,
+      defaultMiscRate:    50,
+      travelers:          [traveler],
+      coaId:              t.coaId || coas[0].id,
+    })
+    return t
+  }
+  // Migrate every existing trip on load
+  Object.values(travel).forEach(arr => {
+    if (Array.isArray(arr)) arr.forEach(migrateTrip)
+  })
+
+  // ── Cost calculations ─────────────────────────────────────────────
+  // Per-traveler cost — applies trip defaults when a toggle is on.
+  function travelerCost(trip, tr) {
+    const qty  = Math.max(1, tr.qty || 1)
+    const days = Math.max(0, tr.days || 0)
+    let c = 0
+    if (tr.hotel) {
+      // Lodging + M&IE per day. Lodging multiplied by nights (days-1) so a 1-day trip is M&IE only.
+      const nights = Math.max(0, days - 1)
+      c += (trip.lodgingRate || 0) * nights
+      c += (trip.mieRate     || 0) * days
+    }
+    if (tr.car)     c += (trip.defaultCarRate     || 0) * days
+    if (tr.airfare) c += (trip.defaultAirfareRate || 0)
+    if (tr.misc)    c += (trip.defaultMiscRate    || 0)
+    return c * qty
+  }
+
   function tripCost(trip) {
+    if (!trip) return 0
+    migrateTrip(trip)
+    if (Array.isArray(trip.travelers)) {
+      return trip.travelers.reduce((s, tr) => s + travelerCost(trip, tr), 0)
+    }
+    // Legacy fallthrough — should be unreachable after migration
     const persons = Math.max(1, trip.persons || 1)
     const days    = Math.max(1, trip.days    || 1)
     const nights  = Math.max(0, days - 1)
@@ -717,31 +778,74 @@ export const useRomStore = defineStore('rom', () => {
   // keep travelLineCost as alias for legacy references
   function travelLineCost(line, catId) { return tripCost(line) }
 
+  // Travel total scoped to the active COA (matches Labor behavior)
   const travelTotal = computed(() => {
+    const coaId = activeCoaId.value
     let t = 0
-    ENTITIES.forEach(e => (travel[e.id] ?? []).forEach(trip => { t += tripCost(trip) }))
+    ENTITIES.forEach(e => (travel[e.id] ?? []).forEach(trip => {
+      if ((trip.coaId ?? coas[0].id) === coaId) t += tripCost(trip)
+    }))
+    return t
+  })
+  // Travel total summed across all COAs flagged for the final quote
+  const travelTotalForQuote = computed(() => {
+    const ids = quoteCoaIds.value
+    let t = 0
+    ENTITIES.forEach(e => (travel[e.id] ?? []).forEach(trip => {
+      if (ids.includes(trip.coaId ?? coas[0].id)) t += tripCost(trip)
+    }))
     return t
   })
 
-  // ── Trip mutations ────────────────────────────────────────────────
+  // ── Trip + traveler mutations ─────────────────────────────────────
   function addTrip(entityId) {
     if (!travel[entityId]) travel[entityId] = []
     const curMonth = new Date().toLocaleString('en-US', { month: 'short' })
     travel[entityId].push({
-      id: uuid(), entity: entityId,
-      travelerName: '', region: 'conus', country: '', destination: '', state: '',
+      id: uuid(),
+      entity: entityId,
+      coaId: activeCoaId.value,
+      tripName: '',
+      region: 'conus', country: '', destination: '', state: '',
       travelMonth: curMonth,
-      days: 3, persons: 1, travelHours: 4,
       lodgingRate: 0, mieRate: 0,
-      hotel: true, rentalCar: false, airfare: false,
-      airfareRate: 600, baggageFees: 0,
-      rentalCarRate: 75, otherFees: 0,
+      defaultTravelHours: 4,
+      defaultCarRate:     75,
+      defaultAirfareRate: 600,
+      defaultMiscRate:    50,
+      travelers: [],
       gsaMonthlyRates: null,
     })
   }
   function updateTrip(entityId, tripId, patch) {
     const trip = (travel[entityId] ?? []).find(t => t.id === tripId)
     if (trip) Object.assign(trip, patch)
+  }
+
+  function addTraveler(entityId, tripId) {
+    const trip = (travel[entityId] ?? []).find(t => t.id === tripId)
+    if (!trip) return
+    migrateTrip(trip)
+    trip.travelers.push({
+      id: uuid(),
+      name: '',
+      qty: 1,
+      days: 0,
+      travelHours: trip.defaultTravelHours ?? 4,
+      hotel: false, car: false, airfare: false, misc: false,
+    })
+  }
+  function updateTraveler(entityId, tripId, travelerId, patch) {
+    const trip = (travel[entityId] ?? []).find(t => t.id === tripId)
+    if (!trip || !Array.isArray(trip.travelers)) return
+    const tr = trip.travelers.find(t => t.id === travelerId)
+    if (tr) Object.assign(tr, patch)
+  }
+  function removeTraveler(entityId, tripId, travelerId) {
+    const trip = (travel[entityId] ?? []).find(t => t.id === tripId)
+    if (!trip || !Array.isArray(trip.travelers)) return
+    const i = trip.travelers.findIndex(t => t.id === travelerId)
+    if (i >= 0) trip.travelers.splice(i, 1)
   }
   // Common city aliases — maps what people type → what GSA calls it
   const CITY_ALIASES = {
@@ -1135,7 +1239,9 @@ export const useRomStore = defineStore('rom', () => {
     addCoa, removeCoa, renameCoa, toggleCoaIncluded, setActiveCoa, duplicateCoa,
     showRates, showRowStatus, undo, redo, canUndo, canRedo,
     addMaterialItem, updateMaterialItem, removeMaterialItem,
-    addTrip, updateTrip, removeTrip, tripCost,
+    addTrip, updateTrip, removeTrip, tripCost, travelerCost,
+    addTraveler, updateTraveler, removeTraveler,
+    travelTotalForQuote,
     gsaRateMap, importGSARates, lookupGSARate, clearGSARates,
     loadCONUSRates,
     oconusMap, oconusCountries, oconusByCountry, loadOCONUSRates, lookupOCONUSRate,

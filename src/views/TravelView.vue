@@ -60,10 +60,10 @@
                 <i class="ti ti-map-pin" aria-hidden="true"></i>
                 <input
                   type="text"
-                  :value="trip.travelerName"
-                  placeholder="Traveler / role (e.g. Systems Engineer)"
+                  :value="trip.tripName ?? trip.travelerName ?? ''"
+                  placeholder="Trip name (e.g. System Install — MacDill AFB)"
                   class="trip-name-input"
-                  @input="rom.updateTrip(entity.id, trip.id, { travelerName: $event.target.value })"
+                  @input="rom.updateTrip(entity.id, trip.id, { tripName: $event.target.value })"
                 />
               </div>
               <div class="trip-head-right">
@@ -204,104 +204,146 @@
                 </div>
               </div>
 
-              <!-- Row 2: Trip details -->
-              <div class="trip-row">
-                <div class="trip-field trip-field--sm">
-                  <label>Days</label>
-                  <input type="number" min="1" step="1"
-                    :value="trip.days"
-                    @input="rom.updateTrip(entity.id, trip.id, { days: +$event.target.value })" />
-                </div>
-                <div class="trip-field trip-field--sm">
-                  <label>Persons</label>
-                  <input type="number" min="1" step="1"
-                    :value="trip.persons"
-                    @input="rom.updateTrip(entity.id, trip.id, { persons: +$event.target.value })" />
-                </div>
-                <div class="trip-field trip-field--sm">
-                  <label>Travel hrs/person</label>
+              <!-- Defaults bar — these values pre-fill any new traveler row and feed each toggle's cost -->
+              <div class="defaults-bar">
+                <span class="defaults-label">Defaults</span>
+
+                <div class="default-field">
+                  <i class="ti ti-clock" aria-hidden="true"></i>
+                  <label>Travel hrs</label>
                   <input type="number" min="0" step="0.5"
-                    :value="trip.travelHours"
-                    @input="rom.updateTrip(entity.id, trip.id, { travelHours: +$event.target.value })" />
-                </div>
-                <div class="trip-field trip-field--sm">
-                  <label>Total travel hrs</label>
-                  <div class="computed-field">{{ Math.round((trip.travelHours || 0) * (trip.persons || 1)) }}</div>
-                </div>
-              </div>
-
-              <!-- Row 3: Services -->
-              <div class="trip-row trip-row--services">
-                <div class="service-block" :class="{ 'service-block--active': trip.hotel }">
-                  <label class="service-check">
-                    <input type="checkbox" :checked="trip.hotel"
-                      @change="rom.updateTrip(entity.id, trip.id, { hotel: $event.target.checked })" />
-                    <i class="ti ti-bed"></i> Hotel
-                  </label>
-                  <div v-if="trip.hotel" class="service-detail">
-                    {{ Math.max(0, (trip.days||1) - 1) }} nights × {{ fmt(trip.lodgingRate || 0) }}/night × {{ trip.persons || 1 }} persons
-                    = <strong>{{ fmt(Math.max(0,(trip.days||1)-1) * (trip.lodgingRate||0) * (trip.persons||1)) }}</strong>
-                  </div>
+                    :value="trip.defaultTravelHours ?? 4"
+                    @change="rom.updateTrip(entity.id, trip.id, { defaultTravelHours: +$event.target.value })" />
                 </div>
 
-                <div class="service-block service-block--mie">
-                  <div class="service-label"><i class="ti ti-utensils"></i> M&amp;IE</div>
-                  <div class="service-detail">
-                    {{ trip.days || 1 }} days × {{ fmt(trip.mieRate || 0) }}/day × {{ trip.persons || 1 }} persons
-                    = <strong>{{ fmt((trip.days||1) * (trip.mieRate||0) * (trip.persons||1)) }}</strong>
-                  </div>
+                <div class="default-field">
+                  <i class="ti ti-bed" aria-hidden="true"></i>
+                  <label>Hotel/night</label>
+                  <input type="number" min="0" step="1"
+                    :value="trip.lodgingRate || 0"
+                    @input="rom.updateTrip(entity.id, trip.id, { lodgingRate: +$event.target.value })" />
+                  <span class="default-tag">GSA</span>
                 </div>
 
-                <div class="service-block" :class="{ 'service-block--active': trip.rentalCar }">
-                  <label class="service-check">
-                    <input type="checkbox" :checked="trip.rentalCar"
-                      @change="rom.updateTrip(entity.id, trip.id, { rentalCar: $event.target.checked })" />
-                    <i class="ti ti-car"></i> Rental Car
-                  </label>
-                  <div v-if="trip.rentalCar" class="service-detail service-with-input">
-                    <span>{{ trip.days || 1 }} days ×</span>
-                    <input type="number" min="0" step="5"
-                      :value="trip.rentalCarRate"
-                      @input="rom.updateTrip(entity.id, trip.id, { rentalCarRate: +$event.target.value })"
-                      class="inline-num" />
-                    <span>/day = <strong>{{ fmt((trip.days||1) * (trip.rentalCarRate||75)) }}</strong></span>
-                  </div>
+                <div class="default-field">
+                  <i class="ti ti-utensils" aria-hidden="true"></i>
+                  <label>M&amp;IE/day</label>
+                  <input type="number" min="0" step="1"
+                    :value="trip.mieRate || 0"
+                    @input="rom.updateTrip(entity.id, trip.id, { mieRate: +$event.target.value })" />
                 </div>
 
-                <div class="service-block" :class="{ 'service-block--active': trip.airfare }">
-                  <label class="service-check">
-                    <input type="checkbox" :checked="trip.airfare"
-                      @change="rom.updateTrip(entity.id, trip.id, { airfare: $event.target.checked })" />
-                    <i class="ti ti-plane"></i> Airfare
-                  </label>
-                  <div v-if="trip.airfare" class="service-detail service-with-input">
-                    <span>{{ trip.persons || 1 }} persons ×</span>
-                    <input type="number" min="0" step="50"
-                      :value="trip.airfareRate"
-                      @input="rom.updateTrip(entity.id, trip.id, { airfareRate: +$event.target.value })"
-                      class="inline-num" />
-                    <span>/ticket = <strong>{{ fmt((trip.persons||1) * (trip.airfareRate||600)) }}</strong></span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Row 4: Extra fees -->
-              <div class="trip-row">
-                <div class="trip-field trip-field--sm">
-                  <label>Baggage/person ($)</label>
+                <div class="default-field">
+                  <i class="ti ti-car" aria-hidden="true"></i>
+                  <label>Car/day</label>
                   <input type="number" min="0" step="5"
-                    :value="trip.baggageFees"
-                    @input="rom.updateTrip(entity.id, trip.id, { baggageFees: +$event.target.value })" />
+                    :value="trip.defaultCarRate ?? 75"
+                    @change="rom.updateTrip(entity.id, trip.id, { defaultCarRate: +$event.target.value })" />
                 </div>
-                <div class="trip-field trip-field--sm">
-                  <label>Other fees ($)</label>
-                  <input type="number" min="0" step="10"
-                    :value="trip.otherFees"
-                    @input="rom.updateTrip(entity.id, trip.id, { otherFees: +$event.target.value })" />
+
+                <div class="default-field">
+                  <i class="ti ti-plane" aria-hidden="true"></i>
+                  <label>Airfare</label>
+                  <input type="number" min="0" step="25"
+                    :value="trip.defaultAirfareRate ?? 600"
+                    @change="rom.updateTrip(entity.id, trip.id, { defaultAirfareRate: +$event.target.value })" />
                 </div>
-                <div class="trip-field trip-total-field">
-                  <label>Trip Total</label>
-                  <div class="trip-grand-total">{{ fmt(rom.tripCost(trip)) }}</div>
+
+                <div class="default-field">
+                  <i class="ti ti-dots" aria-hidden="true"></i>
+                  <label>Misc</label>
+                  <input type="number" min="0" step="5"
+                    :value="trip.defaultMiscRate ?? 50"
+                    @change="rom.updateTrip(entity.id, trip.id, { defaultMiscRate: +$event.target.value })" />
+                </div>
+              </div>
+
+              <!-- Travelers table -->
+              <div v-if="(trip.travelers || []).length" class="travelers-wrap">
+                <table class="travelers-table">
+                  <thead>
+                    <tr>
+                      <th class="t-col-name">Traveler</th>
+                      <th class="t-col-qty">Qty</th>
+                      <th class="t-col-days">Days</th>
+                      <th class="t-col-hrs">Travel hrs</th>
+                      <th class="t-col-svc">Hotel + M&amp;IE</th>
+                      <th class="t-col-svc">Car</th>
+                      <th class="t-col-svc">Airfare</th>
+                      <th class="t-col-svc">Misc</th>
+                      <th class="t-col-total">Total</th>
+                      <th class="t-col-del"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="tr in trip.travelers" :key="tr.id" class="traveler-row">
+                      <td class="t-col-name">
+                        <input type="text"
+                          :value="tr.name"
+                          placeholder="e.g. Aaron Mills"
+                          @input="rom.updateTraveler(entity.id, trip.id, tr.id, { name: $event.target.value })" />
+                      </td>
+                      <td class="t-col-qty">
+                        <input type="number" min="1" step="1"
+                          :value="tr.qty || 1"
+                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { qty: Math.max(1, +$event.target.value || 1) })" />
+                      </td>
+                      <td class="t-col-days">
+                        <input type="number" min="0" step="0.5"
+                          :value="tr.days || 0"
+                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { days: +$event.target.value || 0 })" />
+                      </td>
+                      <td class="t-col-hrs">
+                        <input type="number" min="0" step="0.5"
+                          :value="tr.travelHours ?? trip.defaultTravelHours ?? 4"
+                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { travelHours: +$event.target.value || 0 })" />
+                      </td>
+                      <td class="t-col-svc">
+                        <label class="svc-toggle" :class="{ 'svc-toggle--on': tr.hotel }">
+                          <input type="checkbox" :checked="tr.hotel"
+                            @change="rom.updateTraveler(entity.id, trip.id, tr.id, { hotel: $event.target.checked })" />
+                          <span class="svc-cost">{{ tr.hotel ? fmt(hotelCost(trip, tr)) : '—' }}</span>
+                        </label>
+                      </td>
+                      <td class="t-col-svc">
+                        <label class="svc-toggle" :class="{ 'svc-toggle--on': tr.car }">
+                          <input type="checkbox" :checked="tr.car"
+                            @change="rom.updateTraveler(entity.id, trip.id, tr.id, { car: $event.target.checked })" />
+                          <span class="svc-cost">{{ tr.car ? fmt(carCost(trip, tr)) : '—' }}</span>
+                        </label>
+                      </td>
+                      <td class="t-col-svc">
+                        <label class="svc-toggle" :class="{ 'svc-toggle--on': tr.airfare }">
+                          <input type="checkbox" :checked="tr.airfare"
+                            @change="rom.updateTraveler(entity.id, trip.id, tr.id, { airfare: $event.target.checked })" />
+                          <span class="svc-cost">{{ tr.airfare ? fmt(airfareCost(trip, tr)) : '—' }}</span>
+                        </label>
+                      </td>
+                      <td class="t-col-svc">
+                        <label class="svc-toggle" :class="{ 'svc-toggle--on': tr.misc }">
+                          <input type="checkbox" :checked="tr.misc"
+                            @change="rom.updateTraveler(entity.id, trip.id, tr.id, { misc: $event.target.checked })" />
+                          <span class="svc-cost">{{ tr.misc ? fmt(miscCost(trip, tr)) : '—' }}</span>
+                        </label>
+                      </td>
+                      <td class="t-col-total">{{ fmt(rom.travelerCost(trip, tr)) }}</td>
+                      <td class="t-col-del">
+                        <button class="del-btn" @click="rom.removeTraveler(entity.id, trip.id, tr.id)" title="Remove traveler">
+                          <i class="ti ti-trash" aria-hidden="true"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="trip-footer-bar">
+                <button class="add-traveler-btn" @click="rom.addTraveler(entity.id, trip.id)">
+                  <i class="ti ti-plus" aria-hidden="true"></i> Add traveler
+                </button>
+                <div class="trip-total-pill">
+                  <span class="trip-total-label">Trip total</span>
+                  <span class="trip-total-value">{{ fmt(rom.tripCost(trip)) }}</span>
                 </div>
               </div>
 
@@ -383,13 +425,39 @@ function oconusLocations(country) {
   return rom.oconusByCountry?.[country] ?? []
 }
 
-const allTrips     = computed(() => rom.visibleEntities.flatMap(e => rom.travel[e.id] ?? []))
-const totalPersons = computed(() => allTrips.value.reduce((s, t) => s + (t.persons || 1), 0))
-const totalHours   = computed(() => allTrips.value.reduce((s, t) => s + (t.travelHours || 0) * (t.persons || 1), 0))
+// Scope visible trips to the currently active COA (matches Labor view behavior)
+const allTrips     = computed(() => rom.visibleEntities.flatMap(e => trips(e.id)))
+const totalPersons = computed(() =>
+  allTrips.value.reduce((s, t) => s + (t.travelers || []).reduce((a, tr) => a + (tr.qty || 1), 0), 0))
+const totalHours   = computed(() =>
+  allTrips.value.reduce((s, t) => s + (t.travelers || []).reduce(
+    (a, tr) => a + (tr.travelHours ?? t.defaultTravelHours ?? 0) * (tr.qty || 1), 0), 0))
 
-function trips(entityId)      { return rom.travel[entityId] ?? [] }
+function trips(entityId) {
+  const coaId = rom.activeCoaId
+  return (rom.travel[entityId] ?? []).filter(t => (t.coaId ?? rom.coas[0]?.id) === coaId)
+}
 function entityTotal(entityId){ return trips(entityId).reduce((s, t) => s + rom.tripCost(t), 0) }
 function fmt(n)               { return '$' + Math.round(n || 0).toLocaleString() }
+
+// Per-toggle cost helpers — match what travelerCost() computes in the store
+function hotelCost(trip, tr) {
+  const qty   = Math.max(1, tr.qty || 1)
+  const days  = Math.max(0, tr.days || 0)
+  const nights = Math.max(0, days - 1)
+  return qty * ((trip.lodgingRate || 0) * nights + (trip.mieRate || 0) * days)
+}
+function carCost(trip, tr) {
+  const qty  = Math.max(1, tr.qty || 1)
+  const days = Math.max(0, tr.days || 0)
+  return qty * (trip.defaultCarRate || 0) * days
+}
+function airfareCost(trip, tr) {
+  return Math.max(1, tr.qty || 1) * (trip.defaultAirfareRate || 0)
+}
+function miscCost(trip, tr) {
+  return Math.max(1, tr.qty || 1) * (trip.defaultMiscRate || 0)
+}
 
 // ── GSA Fiscal Year ──────────────────────────────────────────────────
 function gsaFiscalYear() {
@@ -861,4 +929,113 @@ onMounted(() => {
   background: transparent; color: var(--rom-text-muted); cursor: pointer;
 }
 .add-trip-btn:hover { border-color: var(--rom-accent); color: var(--rom-accent); background: var(--rom-accent-bg); }
+
+/* ─── Defaults bar ─────────────────────────────────────────────── */
+.defaults-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
+  padding: 8px 14px;
+  background: #fdf6e3;
+  border-top: 1px solid #c4cede;
+  border-bottom: 1px solid #c4cede;
+}
+.defaults-label {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: #8a6508;
+  padding-right: 6px;
+}
+.default-field {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px;
+}
+.default-field i { font-size: 13px; color: #8a6508; }
+.default-field label { color: #5f5e5a; }
+.default-field input {
+  width: 60px; padding: 2px 4px;
+  border: 1px solid #b8860b; border-radius: 3px;
+  font-weight: 700; text-align: center;
+  color: var(--rom-accent-dark, #1248a0);
+  background: #fff;
+}
+.default-field input:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; }
+.default-tag {
+  font-size: 9px; padding: 1px 4px; border-radius: 3px;
+  background: #fff; color: #8a6508; opacity: .75;
+  border: 1px solid #b8860b;
+}
+
+/* ─── Travelers table ──────────────────────────────────────────── */
+.travelers-wrap { padding: 8px 14px 0; overflow-x: auto; }
+.travelers-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.travelers-table th {
+  text-align: left; padding: 6px 8px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--rom-text-muted);
+  border-bottom: 2px solid var(--rom-border);
+  background: var(--rom-surface);
+  white-space: nowrap;
+}
+.t-col-name  { min-width: 160px; }
+.t-col-qty   { width: 60px;  text-align: center !important; }
+.t-col-days  { width: 70px;  text-align: center !important; }
+.t-col-hrs   { width: 80px;  text-align: center !important; }
+.t-col-svc   { width: 105px; text-align: center !important; }
+.t-col-total { width: 90px;  text-align: right !important; }
+.t-col-del   { width: 36px; }
+
+.traveler-row td { padding: 4px 8px; border-bottom: 1px solid var(--rom-border); vertical-align: middle; }
+.traveler-row td input[type="text"],
+.traveler-row td input[type="number"] {
+  width: 100%; padding: 3px 6px; font-size: 12px;
+  border: 1px solid var(--rom-border); border-radius: 4px;
+  background: var(--rom-surface); color: var(--rom-text);
+}
+.traveler-row .t-col-qty input,
+.traveler-row .t-col-days input,
+.traveler-row .t-col-hrs input { text-align: right; }
+.traveler-row .t-col-total { font-weight: 700; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
+
+.svc-toggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border-radius: 4px;
+  background: var(--rom-surface-alt); cursor: pointer;
+  border: 1px solid transparent;
+  transition: background .12s;
+}
+.svc-toggle:hover { background: #dfe7f5; }
+.svc-toggle input[type="checkbox"] { margin: 0; width: 12px; height: 12px; cursor: pointer; }
+.svc-toggle .svc-cost { font-size: 11px; font-weight: 600; color: var(--rom-text-faint); }
+.svc-toggle--on { background: var(--rom-accent-bg); border-color: var(--rom-accent); }
+.svc-toggle--on .svc-cost { color: var(--rom-accent-dark); }
+
+/* ─── Trip footer (Add traveler + Trip total) ─────────────────── */
+.trip-footer-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--rom-surface-alt);
+  border-top: 2px solid var(--rom-border);
+}
+.add-traveler-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  font-size: 12px; font-weight: 600;
+  border: 1px solid var(--rom-accent);
+  border-radius: var(--rom-radius);
+  background: var(--rom-accent); color: #fff;
+  cursor: pointer;
+}
+.add-traveler-btn:hover { background: var(--rom-accent-dark); border-color: var(--rom-accent-dark); }
+.add-traveler-btn .ti { font-size: 14px; }
+.trip-total-pill {
+  display: inline-flex; align-items: baseline; gap: 8px;
+}
+.trip-total-label {
+  font-size: 11px; font-weight: 700;
+  color: var(--rom-text-muted);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.trip-total-value {
+  font-size: 18px; font-weight: 800;
+  color: var(--rom-accent-dark);
+}
 </style>
