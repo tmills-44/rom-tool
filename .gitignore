@@ -42,6 +42,3 @@ src/assets/vite.svg
 src/assets/vue.svg
 src/components/HelloWorld.vue
 src/components/SidebarTree.vue
-src/views/LaborView.vue
-src/views/OverheadView.vue
-src/views/StubView.vue
