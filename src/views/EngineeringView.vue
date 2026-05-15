@@ -237,24 +237,33 @@
 
               <!-- Add row -->
               <div class="phase-add-row">
-                <template v-if="showingPicker(entity.id, phase.id)">
-                  <div class="role-picker">
-                    <span class="role-picker-label">Add row for:</span>
-                    <button
-                      v-for="rf in ROLE_FILTERS.filter(r => r.id !== 'all')"
-                      :key="rf.id"
-                      class="role-pick-btn"
-                      :class="`role-pick-btn--${rf.id}`"
-                      @click="pickRole(entity.id, phase.id, rf.id)"
-                    >
-                      <i class="ti" :class="roleIcon(rf.id)"></i>
-                      {{ rf.label }}
-                    </button>
-                    <button class="role-pick-cancel" @click="hidePicker(entity.id, phase.id)">Cancel</button>
-                  </div>
+                <!-- Filter is "All" → show picker -->
+                <template v-if="getActiveRole(entity.id, phase.id) === 'all'">
+                  <template v-if="showingPicker(entity.id, phase.id)">
+                    <div class="role-picker">
+                      <span class="role-picker-label">Add row for:</span>
+                      <button
+                        v-for="rf in ROLE_FILTERS.filter(r => r.id !== 'all')"
+                        :key="rf.id"
+                        class="role-pick-btn"
+                        :class="`role-pick-btn--${rf.id}`"
+                        @click="pickRole(entity.id, phase.id, rf.id)"
+                      >
+                        <i class="ti" :class="roleIcon(rf.id)"></i>
+                        {{ rf.label }}
+                      </button>
+                      <button class="role-pick-cancel" @click="hidePicker(entity.id, phase.id)">Cancel</button>
+                    </div>
+                  </template>
+                  <button v-else class="add-line-btn" @click="showPicker(entity.id, phase.id)">
+                    <i class="ti ti-plus" aria-hidden="true"></i> Add row
+                  </button>
                 </template>
-                <button v-else class="add-line-btn" @click="showPicker(entity.id, phase.id)">
-                  <i class="ti ti-plus" aria-hidden="true"></i> Add row
+
+                <!-- Filter is specific role → direct add -->
+                <button v-else class="add-line-btn" @click="pickRole(entity.id, phase.id, getActiveRole(entity.id, phase.id))">
+                  <i class="ti ti-plus" aria-hidden="true"></i>
+                  Add {{ ROLE_FILTERS.find(r => r.id === getActiveRole(entity.id, phase.id))?.label }} row
                 </button>
               </div>
 
