@@ -124,17 +124,36 @@
                           class="cell-select"
                           @change="onLaborCatChange(line.id, $event.target.value)"
                         >
-                          <optgroup
-                            v-for="role in rom.ROLES"
-                            :key="role.id"
-                            :label="role.label"
-                          >
+                          <!-- Current value if it's outside the active filter -->
+                          <option
+                            v-if="isOutsideFilter(entity.id, phase.id, line)"
+                            :value="line.laborCat"
+                            disabled
+                          >{{ catLabel(line.laborCat) }} ← current</option>
+
+                          <!-- All roles when filter is "All" -->
+                          <template v-if="getActiveRole(entity.id, phase.id) === 'all'">
+                            <optgroup
+                              v-for="role in rom.ROLES"
+                              :key="role.id"
+                              :label="role.label"
+                            >
+                              <option
+                                v-for="cat in rom.LABOR_CATS.filter(c => c.role === role.id)"
+                                :key="cat.id"
+                                :value="cat.id"
+                              >{{ cat.label }}</option>
+                            </optgroup>
+                          </template>
+
+                          <!-- Filtered to active role -->
+                          <template v-else>
                             <option
-                              v-for="cat in rom.LABOR_CATS.filter(c => c.role === role.id)"
+                              v-for="cat in rom.LABOR_CATS.filter(c => c.role === getActiveRole(entity.id, phase.id))"
                               :key="cat.id"
                               :value="cat.id"
                             >{{ cat.label }}</option>
-                          </optgroup>
+                          </template>
                         </select>
                       </td>
 
@@ -292,6 +311,19 @@ function addLineLabel(eid, pid) {
   const r = getActiveRole(eid, pid)
   if (r === 'all') return ''
   return ROLE_FILTERS.find(f => f.id === r)?.label ?? ''
+}
+
+// ── Labor cat helpers ────────────────────────────────────────────────
+function catLabel(catId) {
+  return rom.LABOR_CATS.find(c => c.id === catId)?.label ?? catId
+}
+
+// Returns true if the row's laborCat is outside the active role filter
+function isOutsideFilter(eid, pid, line) {
+  const active = getActiveRole(eid, pid)
+  if (active === 'all') return false
+  const cat = rom.LABOR_CATS.find(c => c.id === line.laborCat)
+  return cat?.role !== active
 }
 
 // ── Update labor category (also syncs role) ──────────────────────────
