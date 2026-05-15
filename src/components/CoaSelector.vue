@@ -178,7 +178,7 @@ const vClickOutside = {
 .coa-panel {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 200;
   width: 420px; max-width: 90vw;
-  background: #ffffff;
+  background: var(--rom-surface);   /* follows the active theme — solid in light + dark */
   color: var(--rom-text, #1a2133);
   border: 1px solid var(--rom-border, #c4cede);
   border-radius: 8px;
@@ -237,6 +237,8 @@ const vClickOutside = {
   width: 100%;
   font-size: 13px; padding: 3px 6px;
   border: 1px solid var(--rom-accent, #1a5fb4); border-radius: 4px;
+  background: var(--rom-surface);
+  color: var(--rom-text);
   font-family: inherit;
 }
 

@@ -7,7 +7,10 @@
         <div class="app-logo-chip">
           <img src="/logo.png" alt="Cronos" class="app-logo-img" />
         </div>
-        <div class="sidebar-brand-text">Cost Estimate Tool</div>
+        <div class="sidebar-brand-text">
+          <div>Cost Estimate Tool</div>
+          <div class="sidebar-build-tag">Test Build #1</div>
+        </div>
       </div>
 
       <nav class="sidebar-nav" role="tablist">
@@ -81,6 +84,11 @@
         </div>
 
         <div class="topbar-actions">
+          <button class="btn btn-icon" @click="toggleTheme"
+            :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+            :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
+            <i class="ti" :class="theme === 'dark' ? 'ti-sun' : 'ti-moon'" aria-hidden="true"></i>
+          </button>
           <button class="btn btn-icon" :disabled="!rom.canUndo" @click="rom.undo" title="Undo">
             <i class="ti ti-arrow-back-up" aria-hidden="true"></i>
           </button>
@@ -353,6 +361,20 @@ watch(sidebarCollapsed, v => {
   try { localStorage.setItem(SIDEBAR_KEY, v ? '1' : '0') } catch {}
 })
 
+// Theme (light / dark) — applied via data-theme attribute on the document root
+// so the dark-mode CSS variable overrides can target it. Persisted to localStorage.
+const THEME_KEY = 'rom-theme'
+const theme = ref(localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light')
+function applyTheme(t) {
+  try { document.documentElement.setAttribute('data-theme', t) } catch {}
+}
+applyTheme(theme.value)
+watch(theme, t => {
+  applyTheme(t)
+  try { localStorage.setItem(THEME_KEY, t) } catch {}
+})
+function toggleTheme() { theme.value = theme.value === 'dark' ? 'light' : 'dark' }
+
 // Per-tab completion status — drives the sidebar tab badge color.
 // Returns 'empty' (no badge), 'partial' (orange — something needs filling in), or 'complete' (green)
 const laborTabStatus = computed(() => {
@@ -580,7 +602,70 @@ function doReset() {
   --rom-radius-lg:    12px;
 }
 
-/* Dark mode intentionally omitted — light theme only to match suite */
+/* ═══ Dark mode — override the design tokens when data-theme="dark" ════ */
+:root[data-theme="dark"] {
+  --rom-bg:           #0f1521;
+  --rom-surface:      #1a2333;
+  --rom-surface-alt:  #243049;
+  --rom-border:       #344058;
+  --rom-readonly:     #1c2535;
+  --rom-text:         #e4e8f0;
+  --rom-text-muted:   #a4b0cc;
+  --rom-text-faint:   #6a7790;
+
+  --rom-accent:       #4d8fd6;
+  --rom-accent-bg:    #1e3050;
+  --rom-accent-dark:  #7db4f0;
+  --rom-info:         #4d8fd6;
+  --rom-info-bg:      #1e3050;
+  --rom-warn:         #f5c97a;
+  --rom-warn-bg:      #3a2d12;
+  --rom-danger:       #e67373;
+
+  --rom-cronos-bg:    #1e3050;
+  --rom-cronos-border:#4d8fd6;
+  --rom-cronos-text:  #b5d4f4;
+  --rom-gov-bg:       #1a2c44;
+  --rom-gov-border:   #378add;
+  --rom-gov-text:     #b5d4f4;
+  --rom-sub-bg:       #3a2d12;
+  --rom-sub-border:   #ef9f27;
+  --rom-sub-text:     #fac775;
+
+  --rom-header-bg:    #0a1020;
+  --rom-header-text:  #f0f3f8;
+}
+
+/* Specific dark-mode overrides for hard-coded light backgrounds in scoped
+   component CSS. We use a higher-specificity prefix so the scoped rules
+   (which carry an extra data-v-* attribute) still get overridden. */
+
+/* Entity card headers (Labor + Travel views) — light blue/amber → dark tints */
+:root[data-theme="dark"] .entity--cronos .entity-head { background: #1e3050; border-bottom-color: #4d8fd6; }
+:root[data-theme="dark"] .entity--gov    .entity-head { background: #1a2c44; border-bottom-color: #378add; }
+:root[data-theme="dark"] .entity--sub    .entity-head { background: #3a2d12; border-bottom-color: #ef9f27; }
+:root[data-theme="dark"] .entity--cronos .entity-pill { background: #4d8fd6; }
+:root[data-theme="dark"] .entity--gov    .entity-pill { background: #378add; }
+:root[data-theme="dark"] .entity--sub    .entity-pill { background: #ba7517; }
+
+/* Phase backgrounds inside entity cards */
+:root[data-theme="dark"] .phases-wrap   { background: #161e2e; }
+:root[data-theme="dark"] .phase-section { border-color: #344058; }
+:root[data-theme="dark"] .phase-section--has-lines { border-color: #4d8fd6; }
+
+/* SummaryView subtotal/strong rows */
+:root[data-theme="dark"] .break-sub-row td        { background: #243049; }
+:root[data-theme="dark"] .break-sub-row--strong td { background: #2a3654; }
+
+/* Small inline pill colors that were tuned for light bg */
+:root[data-theme="dark"] .oh-info-pill--withoh { background: #3a2d12; color: #fac775; }
+
+/* Travel service-block "MIE" row also uses an alt surface */
+:root[data-theme="dark"] .service-block--mie { background: #243049; }
+
+/* Hover surfaces with hardcoded near-white */
+:root[data-theme="dark"] .del-btn:hover,
+:root[data-theme="dark"] .oh-row-del:hover { background: #4a1e1e; }
 
 /* ═══ Reset ════════════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -624,6 +709,17 @@ body {
   font-size: 13px; font-weight: 500; color: #fff;
   line-height: 1.15;
   flex: 1; min-width: 0;
+}
+.sidebar-build-tag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 6px;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+  background: rgba(125,211,252,0.18);
+  color: #b6e2fc;
+  border: 1px solid rgba(125,211,252,0.4);
+  border-radius: 4px;
 }
 .sidebar-toggle {
   display: inline-flex; align-items: center; justify-content: center;

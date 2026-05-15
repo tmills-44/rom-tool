@@ -1103,7 +1103,7 @@ onMounted(() => {
 .traveler-row .t-col-qty input,
 .traveler-row .t-col-days input,
 .traveler-row .t-col-hrs input { text-align: right; }
-.traveler-row .t-col-total { font-weight: 700; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
+.traveler-row .t-col-total { font-weight: 700; color: var(--rom-text); text-align: right; white-space: nowrap; }
 
 .svc-cell {
   display: inline-flex; flex-direction: column; align-items: stretch;
@@ -1122,7 +1122,7 @@ onMounted(() => {
 }
 .svc-row input[type="checkbox"] { margin: 0; width: 12px; height: 12px; cursor: pointer; }
 .svc-row .svc-cost { font-size: 11px; font-weight: 600; color: var(--rom-text-faint); }
-.svc-cell--on .svc-cost { color: var(--rom-accent-dark); }
+.svc-cell--on .svc-cost { color: var(--rom-text); }
 
 .svc-rate-row {
   display: inline-flex; align-items: center; gap: 4px;
@@ -1146,9 +1146,9 @@ onMounted(() => {
 }
 .svc-rate-input--override {
   font-weight: 700;
-  color: var(--rom-accent-dark);
+  color: var(--rom-text);
   border-color: var(--rom-accent);
-  background: #fff;
+  background: var(--rom-surface);
 }
 .svc-unit {
   font-size: 9px; color: var(--rom-text-muted); opacity: .8;

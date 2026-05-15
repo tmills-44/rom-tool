@@ -60,11 +60,68 @@
       <!-- Overhead items — fully editable, deletable, addable. -->
       <div class="oh-section" :class="{ 'oh-section--off': !rom.overhead.overheadEnabled }">
         <div class="oh-section-head">
-          Overhead items
-          <span class="oh-section-note">% of Unloaded Project Total · tick each to include in Contract Fee</span>
+          <span>Overhead items
+            <span class="oh-section-note">% of Unloaded Project Total · tick each to include in Contract Fee</span>
+          </span>
+          <button class="oh-info-btn"
+            type="button"
+            @click="infoOpen = !infoOpen"
+            :title="infoOpen ? 'Hide help' : 'How does the base column work?'"
+            :aria-expanded="infoOpen">
+            <i class="ti ti-info-circle" aria-hidden="true"></i>
+            <span class="oh-info-btn-label">How the base column works</span>
+            <i class="ti oh-info-btn-chevron" :class="infoOpen ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true"></i>
+          </button>
         </div>
 
-        <div v-for="(item, idx) in (rom.overhead.items || [])" :key="item.id" class="oh-row">
+        <!-- Collapsible help panel — explains × Unloaded vs × Unloaded + Overhead -->
+        <div v-if="infoOpen" class="oh-info-drop">
+          <p>
+            Each overhead item has a <strong>base</strong> — the dollar number its
+            percentage multiplies against. Two options:
+          </p>
+          <div class="oh-info-drop-grid">
+            <div class="oh-info-item">
+              <div class="oh-info-pill oh-info-pill--unloaded">× Unloaded</div>
+              <p>
+                Multiplied by the <strong>unloaded project total</strong>
+                (Labor + Travel + Material). Use this for most overhead lines.
+              </p>
+              <p class="oh-info-example"><strong>Ex:</strong> 2% × $100,000 = <strong>$2,000</strong></p>
+            </div>
+            <div class="oh-info-item">
+              <div class="oh-info-pill oh-info-pill--withoh">× Unloaded + Overhead</div>
+              <p>
+                Multiplied by <strong>unloaded + all enabled "× Unloaded" items</strong>.
+                It compounds. SCR uses this pattern.
+              </p>
+              <p class="oh-info-example"><strong>Ex:</strong> ($100k + $4.5k) × 12% = <strong>$12,540</strong></p>
+            </div>
+          </div>
+          <div class="oh-info-note">
+            <strong>Default:</strong> first four items use × Unloaded; SCR uses × Unloaded + Overhead.
+          </div>
+        </div>
+
+        <div
+          v-for="(item, idx) in (rom.overhead.items || [])"
+          :key="item.id"
+          class="oh-row"
+          :class="{
+            'oh-row--dragging':  dragState.dragId === item.id,
+            'oh-row--drag-over': dragState.overId === item.id && dragState.dragId !== item.id,
+          }"
+          :draggable="dragState.armedId === item.id"
+          @dragstart="dragState.dragId = item.id"
+          @dragend="resetDrag()"
+          @dragover.prevent="dragState.overId = item.id"
+          @dragleave="dragState.overId = null"
+          @drop.prevent="rom.reorderOverheadItem(rom.activeCoaId, dragState.dragId, item.id); resetDrag()"
+        >
+          <span class="oh-drag-handle"
+            title="Drag to reorder"
+            @mousedown="dragState.armedId = item.id"
+            @mouseup="dragState.armedId = null">⠿</span>
           <input type="checkbox" class="oh-tick"
             :checked="item.enabled"
             @change="rom.updateOverheadItem(rom.activeCoaId, item.id, { enabled: $event.target.checked })" />
@@ -104,6 +161,7 @@
 
         <div class="oh-row oh-row--fee">
           <div></div>
+          <div></div>
           <div class="oh-label-wrap"><strong class="oh-fee-label">Contract Fee</strong></div>
           <div class="oh-pct-wrap"><span class="oh-fee-hint">sum of ticked items</span></div>
           <div></div>
@@ -111,6 +169,7 @@
           <div></div>
         </div>
       </div>
+
 
       <!-- Grand total — the Contract Fee box above already sums overhead;
            this just shows the final loaded number for quick reference -->
@@ -126,8 +185,21 @@
 </template>
 
 <script setup>
+import { ref, reactive } from 'vue'
 import { useRomStore } from '../stores/rom'
 const rom = useRomStore()
+
+// Whether the "How the base column works" help dropdown is open
+const infoOpen = ref(false)
+
+// Drag-to-reorder state — only armed when mouse goes down on the grip handle,
+// so clicking anywhere else in a row doesn't start a drag.
+const dragState = reactive({ dragId: null, overId: null, armedId: null })
+function resetDrag() {
+  dragState.dragId  = null
+  dragState.overId  = null
+  dragState.armedId = null
+}
 function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 function pctDisplay(v) { return ((v || 0) * 100).toFixed(1) }
 
@@ -179,13 +251,91 @@ function placeholderFor(idx) {
 .summary-card--accent .summary-label { color: var(--rom-accent-dark); opacity: .8; }
 .summary-card--accent .summary-value { color: var(--rom-accent-dark); }
 
-/* Body */
+/* Body — single column, capped width so it reads nicely */
 .oh-body {
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 860px;
+  max-width: 1000px;
+}
+
+/* Info trigger that sits inside the "Overhead items" section head */
+.oh-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+}
+.oh-info-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.9);
+  font-size: 11px; font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-transform: none; letter-spacing: 0;
+  flex-shrink: 0;
+}
+.oh-info-btn:hover { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.45); }
+.oh-info-btn i { font-size: 13px; }
+.oh-info-btn-label { white-space: nowrap; }
+.oh-info-btn-chevron { font-size: 12px; opacity: .8; }
+
+/* Collapsible help drop — sits between section head and the items list */
+.oh-info-drop {
+  padding: 14px 18px;
+  background: var(--rom-accent-bg);
+  border-bottom: 1px solid var(--rom-border);
+  font-size: 13px; color: var(--rom-text); line-height: 1.5;
+}
+.oh-info-drop p {
+  margin: 0 0 8px;
+  color: var(--rom-text-muted);
+}
+.oh-info-drop strong { color: var(--rom-text); font-weight: 600; }
+.oh-info-drop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 8px 0;
+}
+@media (max-width: 760px) {
+  .oh-info-drop-grid { grid-template-columns: 1fr; }
+}
+.oh-info-item {
+  background: var(--rom-surface);
+  border: 1px solid var(--rom-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.oh-info-item p { margin: 0 0 4px; font-size: 12px; }
+.oh-info-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 11px; font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: .02em;
+}
+.oh-info-pill--unloaded { background: var(--rom-accent-bg); color: var(--rom-accent-dark); }
+.oh-info-pill--withoh   { background: #fdf6e3; color: #8a6508; }
+.oh-info-example {
+  font-size: 11.5px !important;
+  background: var(--rom-surface-alt);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border-left: 3px solid var(--rom-accent);
+  margin-top: 4px !important;
+}
+.oh-info-note {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: var(--rom-surface);
+  border-left: 3px solid var(--rom-accent);
+  font-size: 12px;
+  color: var(--rom-text);
 }
 
 /* Sections */
@@ -212,15 +362,26 @@ function placeholderFor(idx) {
   color: rgba(255,255,255,.6);
 }
 
-/* Rows — checkbox, label, percent, base, computed amount, delete */
+/* Rows — drag handle, checkbox, label, percent, base, computed amount, delete */
 .oh-row {
   display: grid;
-  grid-template-columns: 22px 1fr 110px 160px 120px 32px;
+  grid-template-columns: 20px 22px 1fr 110px 160px 120px 32px;
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--rom-border);
 }
+
+/* Drag handle (⠿) — same pattern as the Labor line rows */
+.oh-drag-handle {
+  display: block; text-align: center;
+  font-size: 14px; color: var(--rom-text-faint, #8a9ab8);
+  cursor: grab; user-select: none; line-height: 1;
+  padding: 2px 0;
+}
+.oh-drag-handle:active { cursor: grabbing; }
+.oh-row--dragging  { opacity: .45; }
+.oh-row--drag-over { border-top: 2px solid var(--rom-accent) !important; background: var(--rom-accent-bg); }
 .oh-row:last-child { border-bottom: none; }
 .oh-row:hover { background: var(--rom-surface-alt); }
 .oh-tick { width: 16px; height: 16px; margin: 0; cursor: pointer; }
@@ -284,18 +445,29 @@ function placeholderFor(idx) {
 }
 .oh-row-del:hover { background: #fff0f0; color: var(--rom-danger, #c0392b); }
 
-/* Add-row affordance */
+/* Add-row affordance — matches the solid primary "+ Add" buttons used
+   across the app (Add row, Add traveler, Add Government, Add Subcontractor) */
 .oh-row--add { grid-template-columns: 1fr; padding: 10px 16px; }
 .oh-add-btn {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 14px;
-  font-size: 12px; font-weight: 600;
-  border: 1px dashed var(--rom-accent);
+  padding: 7px 16px;
+  font-size: 12px; font-weight: 600; letter-spacing: .01em;
+  border: 1px solid var(--rom-accent, #1a5fb4);
   border-radius: var(--rom-radius, 6px);
-  background: transparent; color: var(--rom-accent);
-  cursor: pointer; font-family: inherit;
+  background: var(--rom-accent, #1a5fb4);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  transition: background-color .12s, box-shadow .12s, transform .04s;
+  white-space: nowrap;
+  font-family: inherit;
 }
-.oh-add-btn:hover { background: var(--rom-accent-bg); }
+.oh-add-btn:hover {
+  background: var(--rom-accent-dark, #1248a0);
+  border-color: var(--rom-accent-dark, #1248a0);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.10);
+}
+.oh-add-btn:active { transform: translateY(1px); box-shadow: 0 1px 1px rgba(0,0,0,0.10); }
 .oh-add-btn .ti { font-size: 14px; }
 
 /* "On printed quote" radio options — section-head stays as the navy banner;

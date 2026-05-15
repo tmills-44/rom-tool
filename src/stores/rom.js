@@ -1499,6 +1499,21 @@ export const useRomStore = defineStore('rom', () => {
     const it = oh.items.find(i => i.id === itemId)
     if (it) Object.assign(it, patch)
   }
+  function reorderOverheadItem(coaId, dragId, dropId) {
+    const oh = overheadByCoa[coaId]
+    if (!oh || !Array.isArray(oh.items)) return
+    if (!dragId || dragId === dropId) return
+    const dragIdx = oh.items.findIndex(i => i.id === dragId)
+    if (dragIdx < 0) return
+    const [moved] = oh.items.splice(dragIdx, 1)
+    const dropIdx = oh.items.findIndex(i => i.id === dropId)
+    if (dropIdx < 0) {
+      // Couldn't find the drop target — put the moved item back where it was
+      oh.items.splice(dragIdx, 0, moved)
+      return
+    }
+    oh.items.splice(dropIdx, 0, moved)
+  }
   // Grand total across every included scope (used by the topbar + summary)
   const totalLoadedForQuote = computed(() =>
     quoteCoaIds.value.reduce((s, id) => s + coaTotals(id).totalLoaded, 0))
@@ -1619,7 +1634,7 @@ export const useRomStore = defineStore('rom', () => {
     activeMaterialItems, materialUnloadedFor, materialTotalFor, materialTotalForQuote,
     overheadByCoa, laborTotalFor, laborHoursFor, travelTotalFor, coaTotals, totalLoadedForQuote,
     roleCostForCoa, phaseCostForCoa, entityCostForCoa,
-    addOverheadItem, removeOverheadItem, updateOverheadItem,
+    addOverheadItem, removeOverheadItem, updateOverheadItem, reorderOverheadItem,
     addCoa, removeCoa, renameCoa, toggleCoaIncluded, setActiveCoa, duplicateCoa,
     exportStateForBackup, importStateFromBackup,
     showRates, showRowStatus, undo, redo, canUndo, canRedo,
