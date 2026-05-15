@@ -4,13 +4,6 @@
     <!-- ── Left sidebar (brand + tabs + quote total) ──────────────── -->
     <aside class="sidebar" role="navigation" aria-label="Sections">
       <div class="sidebar-brand">
-        <button class="sidebar-toggle"
-          type="button"
-          @click="sidebarCollapsed = !sidebarCollapsed"
-          :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-          :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
-          <i class="ti ti-menu-2" aria-hidden="true"></i>
-        </button>
         <div class="app-logo-chip">
           <img src="/logo.png" alt="Cronos" class="app-logo-img" />
         </div>
@@ -59,8 +52,15 @@
     <!-- ── Right column: light topbar + main + status ─────────────── -->
     <div class="main-col">
 
-      <!-- Light topbar: scope chip · project info pills · actions -->
+      <!-- Light topbar: hamburger · scope chip · project info pills · actions -->
       <header class="topbar topbar--light">
+        <button class="sidebar-toggle sidebar-toggle--top"
+          type="button"
+          @click="sidebarCollapsed = !sidebarCollapsed"
+          :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+          <i class="ti ti-menu-2" aria-hidden="true"></i>
+        </button>
         <CoaSelector />
 
         <div class="info-pills">
@@ -641,6 +641,19 @@ body {
 }
 .sidebar-toggle:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .sidebar-toggle i { font-size: 18px; }
+
+/* When the toggle lives in the light topbar instead of the dark sidebar */
+.sidebar-toggle--top {
+  width: 34px; height: 34px;
+  border: 1px solid var(--rom-border);
+  background: var(--rom-surface);
+  color: var(--rom-text-muted);
+}
+.sidebar-toggle--top:hover {
+  background: var(--rom-accent-bg);
+  border-color: var(--rom-accent);
+  color: var(--rom-accent);
+}
 .sidebar-nav { display: flex; flex-direction: column; padding: 4px 6px; gap: 2px; }
 .sidebar-tab {
   display: flex; align-items: center; gap: 10px;
@@ -688,10 +701,10 @@ body {
    to a 64px rail showing only icons + the C logo + the loaded total. */
 .app--sidebar-collapsed { grid-template-columns: 64px 1fr; }
 .app--sidebar-collapsed .sidebar-brand {
-  flex-direction: column; gap: 6px; padding: 0 0 10px;
+  justify-content: center;
+  padding: 0 0 12px;
 }
 .app--sidebar-collapsed .sidebar-brand-text { display: none; }
-.app--sidebar-collapsed .sidebar-toggle { margin-bottom: 2px; }
 
 .app--sidebar-collapsed .sidebar-nav { padding: 4px 6px; }
 .app--sidebar-collapsed .sidebar-tab {

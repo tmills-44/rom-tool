@@ -154,26 +154,27 @@ const vClickOutside = {
 
 .coa-trigger {
   display: inline-flex; align-items: center; gap: 8px;
-  padding: 5px 12px;
+  padding: 6px 14px;
   border-radius: 14px;
-  background: rgba(125,211,252,0.18);
-  border: 1px solid rgba(125,211,252,0.5);
-  color: #b6e2fc;
+  background: var(--rom-header-bg, #1a3560);
+  border: 1px solid var(--rom-accent-dark, #1248a0);
+  color: #fff;
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
-  transition: background .12s;
+  transition: background .12s, border-color .12s;
 }
-.coa-trigger:hover { background: rgba(125,211,252,0.28); }
-.coa-trigger-icon { font-size: 13px; }
-.coa-trigger-label { font-weight: 500; opacity: .8; }
+.coa-trigger:hover { background: var(--rom-accent-dark, #1248a0); border-color: var(--rom-accent, #1a5fb4); }
+.coa-trigger-icon { font-size: 13px; color: #7dd3fc; }
+.coa-trigger-label { font-weight: 500; color: rgba(255,255,255,0.7); }
 .coa-trigger-name { font-weight: 700; color: #fff; }
 .coa-trigger-count {
   font-size: 10px; padding: 1px 8px; border-radius: 8px;
-  background: rgba(255,255,255,0.15);
+  background: rgba(125,211,252,0.25);
   color: #fff;
+  border: 1px solid rgba(125,211,252,0.4);
 }
-.coa-trigger-chevron { font-size: 12px; }
+.coa-trigger-chevron { font-size: 12px; color: #7dd3fc; }
 
 .coa-panel {
   position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
