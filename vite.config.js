@@ -3,8 +3,8 @@ import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  // For GitHub Pages: must match the repo name path so asset URLs resolve.
-  // If your repo is at github.com/USER/REPO-NAME, this should be '/REPO-NAME/'.
+  // Cloudflare Pages serves at the root URL (rom-tool.pages.dev/) so base = '/'.
+  // GitHub Pages serves under /rom-tool/, so we override there using the CI env var.
   base: process.env.GITHUB_ACTIONS ? '/rom-tool/' : '/',
   plugins: [
     vue(),
