@@ -21,21 +21,6 @@
       </div>
     </div>
 
-    <!-- ── Entity toolbar: add Gov / Sub tabs alongside Cronos ─────── -->
-    <div v-if="disabledEntityList.length" class="entity-toolbar">
-      <span class="entity-toolbar-label">Add tab:</span>
-      <button
-        v-for="ent in disabledEntityList"
-        :key="ent.id"
-        class="entity-add-btn"
-        :class="`entity-add-btn--${ent.id}`"
-        @click="rom.enableEntity(ent.id)"
-        :title="`Add a ${ent.label} section for this scope`"
-      >
-        <i class="ti ti-plus" aria-hidden="true"></i> {{ ent.label }}
-      </button>
-    </div>
-
     <!-- ── Entity cards ──────────────────────────────────────────── -->
     <div class="entities-wrap">
       <div
@@ -388,17 +373,37 @@
         </div>
 
       </div>
+
+      <!-- Add Government / Subcontractor as a quiet inline action — sits below
+           the last entity card, smaller buttons, no header label -->
+      <div v-if="disabledEntityList.length" class="entity-add-inline">
+        <button
+          v-for="ent in disabledEntityList"
+          :key="ent.id"
+          class="entity-add-btn-sm"
+          :class="`entity-add-btn-sm--${ent.id}`"
+          @click="rom.enableEntity(ent.id)"
+          :title="`Add a ${ent.label} section for this scope`"
+        >
+          <i class="ti ti-plus" aria-hidden="true"></i> Add {{ ent.label }}
+        </button>
+      </div>
     </div>
 
   </div>
 </template>
 
 <script setup>
-import { reactive, watch, onMounted } from 'vue'
+import { reactive, watch, onMounted, computed } from 'vue'
 import { useRomStore } from '../stores/rom'
 import { TASK_DEFAULTS } from '../stores/rom'
 
 const rom = useRomStore()
+
+// Entities that aren't currently shown — the toolbar lets users add them as a tab/section
+const disabledEntityList = computed(() =>
+  rom.ENTITIES.filter(e => !e.alwaysVisible && !rom.visibleEntities.some(v => v.id === e.id))
+)
 
 const PHASE_STATE_KEY    = 'rom-phase-open-state'
 const ROLE_STATE_KEY     = 'rom-phase-role-state'
@@ -643,6 +648,27 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .summary-card--accent { background: var(--rom-accent-bg); }
 .summary-card--accent .summary-label { color: var(--rom-accent-dark); opacity: .8; }
 .summary-card--accent .summary-value { color: var(--rom-accent-dark); }
+
+/* Inline "Add Government / Subcontractor" — sits below the last entity card,
+   compact and unobtrusive (no toolbar header) */
+.entity-add-inline {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 2px 0 0 4px;
+  margin-top: -4px;
+}
+.entity-add-btn-sm {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 10px;
+  font-size: 10px; font-weight: 600;
+  border: 1px dashed; background: transparent;
+  cursor: pointer; font-family: inherit;
+  letter-spacing: 0.02em;
+}
+.entity-add-btn-sm .ti { font-size: 11px; }
+.entity-add-btn-sm--gov { color: #185fa5; border-color: #185fa5; }
+.entity-add-btn-sm--gov:hover { background: #d6e8f8; }
+.entity-add-btn-sm--sub { color: #854f0b; border-color: #854f0b; }
+.entity-add-btn-sm--sub:hover { background: #faeeda; }
 
 /* Entity cards */
 .entities-wrap { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
