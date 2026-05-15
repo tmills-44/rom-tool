@@ -7,7 +7,7 @@
         <i class="ti ti-anchor app-logo" aria-hidden="true"></i>
         <div class="app-title">
           <div class="app-name">ROM Tool</div>
-          <div class="app-sub">Rough Order of Magnitude · C4NAV</div>
+          <div class="app-sub">Rough Order of Magnitude Estimator</div>
         </div>
         <div v-if="rom.project.sponsor || rom.project.roomName" class="quote-id">
           <span v-if="rom.project.sponsor">{{ rom.project.sponsor }}</span>
@@ -18,6 +18,10 @@
       </div>
 
       <div class="topbar-right">
+        <div v-if="ratesLoadedAt" class="rates-chip" :title="ratesChipDetail">
+          <i class="ti ti-database"></i>
+          Rates: {{ ratesLoadedAt }}
+        </div>
         <div class="quote-total">
           <span class="quote-total-label">QUOTE TOTAL</span>
           <span class="quote-total-value">{{ fmt(rom.totalLoadedCost) }}</span>
@@ -142,6 +146,8 @@ const showPicker    = ref(false)
 const showReset     = ref(false)
 const showSnapshots = ref(false)
 const ratesStatus   = reactive({ conus: '', oconus: '', errors: [] })
+const ratesLoadedAt   = ref('')   // e.g. "May 15 · 2:34 PM"
+const ratesChipDetail = ref('')   // tooltip detail
 
 onMounted(async () => {
   if (!rom.project.templateId) showPicker.value = true
@@ -153,11 +159,17 @@ onMounted(async () => {
 
     if (conus && Object.keys(conus).length) {
       rom.loadCONUSRates(conus)
-      ratesStatus.conus = `${Object.keys(conus).length} CONUS cities loaded`
+      ratesStatus.conus = `${Object.keys(conus).length} CONUS cities`
     }
     if (oconus && oconus.countries.length) {
       rom.loadOCONUSRates(oconus)
-      ratesStatus.oconus = `${oconus.countries.length} countries / ${Object.keys(oconus.map).length} locations loaded`
+      ratesStatus.oconus = `${oconus.countries.length} countries / ${Object.keys(oconus.map).length} OCONUS locations`
+    }
+    if (ratesStatus.conus || ratesStatus.oconus) {
+      const now = new Date()
+      ratesLoadedAt.value = now.toLocaleString('en-US', { month: 'short', day: 'numeric' })
+        + ' · ' + now.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+      ratesChipDetail.value = [ratesStatus.conus, ratesStatus.oconus].filter(Boolean).join(' · ')
     }
   } catch {
     // Files not present yet — normal on first run
@@ -284,6 +296,14 @@ body {
 }
 .topbar-left  { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.rates-chip {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 12px;
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+  font-size: 11px; color: rgba(255,255,255,.85); white-space: nowrap;
+  cursor: default;
+}
+.rates-chip .ti { font-size: 12px; }
 
 .app-logo { font-size: 22px; }
 .app-title { display: flex; flex-direction: column; line-height: 1.2; }
