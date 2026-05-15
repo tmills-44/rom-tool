@@ -86,6 +86,7 @@
       <MaterialView    v-else-if="rom.selectedTabId === 'material'" />
       <OverheadView    v-else-if="rom.selectedTabId === 'overhead'" />
       <SummaryView     v-else-if="rom.selectedTabId === 'summary'" />
+      <AdminView       v-else-if="rom.selectedTabId === 'admin'" />
     </main>
 
     <!-- ── Status bar ──────────────────────────────────────────── -->
@@ -139,6 +140,7 @@ import TravelView from './views/TravelView.vue'
 import MaterialView from './views/MaterialView.vue'
 import OverheadView from './views/OverheadView.vue'
 import SummaryView from './views/SummaryView.vue'
+import AdminView from './views/AdminView.vue'
 
 const rom = useRomStore()
 

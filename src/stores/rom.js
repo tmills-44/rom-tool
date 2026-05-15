@@ -32,9 +32,9 @@ export const LABOR_CATS = [
   { id: 'eng1',  label: 'ENG I',    role: 'engineering', defaultRate: 85  },
   { id: 'eng2',  label: 'ENG II',   role: 'engineering', defaultRate: 110 },
   { id: 'eng3',  label: 'ENG III',  role: 'engineering', defaultRate: 135 },
-  { id: 'prog1', label: 'PROG I',   role: 'engineering', defaultRate: 75  },
-  { id: 'prog2', label: 'PROG II',  role: 'engineering', defaultRate: 100 },
-  { id: 'prog3', label: 'PROG III', role: 'engineering', defaultRate: 125 },
+  { id: 'prog1', label: 'PROG I',   role: 'programming', defaultRate: 75  },
+  { id: 'prog2', label: 'PROG II',  role: 'programming', defaultRate: 100 },
+  { id: 'prog3', label: 'PROG III', role: 'programming', defaultRate: 125 },
   { id: 'pm1',   label: 'PM',       role: 'pm',         defaultRate: 95  },
   { id: 'pm2',   label: 'PM SPT',   role: 'pm',         defaultRate: 125 },
   { id: 'proc',  label: 'PROC',     role: 'pm',         defaultRate: 80  },
@@ -82,6 +82,7 @@ export const TABS = [
   { id: 'material',    label: 'Material & Shipping',      icon: 'ti-package' },
   { id: 'overhead',    label: 'Overhead',                 icon: 'ti-percentage' },
   { id: 'summary',     label: 'Summary',                  icon: 'ti-chart-bar' },
+  { id: 'admin',       label: 'Administration',           icon: 'ti-shield-lock' },
 ]
 
 // ─── Default WBS ────────────────────────────────────────────────────
@@ -494,6 +495,8 @@ export const useRomStore = defineStore('rom', () => {
   // line item shape: { id, role, phaseId, taskId, entity, laborCat, days, hoursPerDay, rate }
   const wbs       = reactive(saved?.wbs      ?? deepClone(DEFAULT_WBS))
   const lineItems = reactive(saved?.lineItems ?? [])
+  // Editable labor categories (rates, labels). Defaults seeded from LABOR_CATS, persisted across sessions.
+  const laborCats = reactive(saved?.laborCats ?? deepClone(LABOR_CATS))
   const travel    = reactive(saved?.travel    ?? emptyTravelData())
   const gsaRateMap  = reactive(saved?.gsaRateMap ?? {})   // "city|ST" → { lodging, mie, months }
 
@@ -518,9 +521,70 @@ export const useRomStore = defineStore('rom', () => {
 
   // ── Computation helpers ──────────────────────────────────────────
 
-  function laborCatRate(catId)        { return LABOR_CATS.find(c => c.id === catId)?.defaultRate ?? 0 }
-  function catsForRole(role)          { return LABOR_CATS.filter(c => c.role === role) }
-  function defaultCatForRole(role)    { return ({ engineering: 'eng3', pm: 'pm1', technician: 'tech3' })[role] ?? '' }
+  function laborCatRate(catId)        { return laborCats.find(c => c.id === catId)?.defaultRate ?? 0 }
+  function catsForRole(role)          { return laborCats.filter(c => c.role === role) }
+  function updateLaborCatRate(catId, rate) {
+    const c = laborCats.find(c => c.id === catId)
+    if (c) c.defaultRate = +rate || 0
+  }
+  function updateLaborCatLabel(catId, label) {
+    const c = laborCats.find(c => c.id === catId)
+    if (c) c.label = label
+  }
+  function resetLaborCats() {
+    laborCats.splice(0, laborCats.length, ...deepClone(LABOR_CATS))
+  }
+  function addLaborCat({ label, role, defaultRate }) {
+    const id = `cat-${uuid().slice(0, 8)}`
+    laborCats.push({
+      id,
+      label: label || 'New Category',
+      role: role || 'engineering',
+      defaultRate: +defaultRate || 0,
+    })
+    return id
+  }
+  function removeLaborCat(catId) {
+    const i = laborCats.findIndex(c => c.id === catId)
+    if (i >= 0) laborCats.splice(i, 1)
+  }
+  function updateLaborCatRole(catId, role) {
+    const c = laborCats.find(c => c.id === catId)
+    if (c) c.role = role
+  }
+
+  // ── WBS task CRUD (for the Admin tab) ────────────────────────────
+  function addTask(role, phaseId, task) {
+    if (!wbs[role]) wbs[role] = {}
+    if (!wbs[role][phaseId]) wbs[role][phaseId] = []
+    const id = task.id || `${role}-${phaseId}-${uuid().slice(0, 8)}`
+    wbs[role][phaseId].push({ id, label: task.label || 'New task', subphase: task.subphase || undefined })
+    return id
+  }
+  function removeTask(role, phaseId, taskId) {
+    const arr = wbs[role]?.[phaseId]
+    if (!arr) return
+    const i = arr.findIndex(t => t.id === taskId)
+    if (i >= 0) arr.splice(i, 1)
+  }
+  function updateTask(role, phaseId, taskId, patch) {
+    const t = wbs[role]?.[phaseId]?.find(t => t.id === taskId)
+    if (t) Object.assign(t, patch)
+  }
+  function moveTask(role, phaseId, taskId, direction) {
+    const arr = wbs[role]?.[phaseId]
+    if (!arr) return
+    const i = arr.findIndex(t => t.id === taskId)
+    if (i < 0) return
+    const j = direction === 'up' ? i - 1 : i + 1
+    if (j < 0 || j >= arr.length) return
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  function resetWbs() {
+    Object.keys(wbs).forEach(k => delete wbs[k])
+    Object.assign(wbs, deepClone(DEFAULT_WBS))
+  }
+  function defaultCatForRole(/* role */) { return '' }   // No auto-pick — user must choose a labor category
 
   function lineHours(line) { return (line.days || 0) * (line.hoursPerDay || 0) }
   function lineCost(line)  { return lineHours(line) * (line.rate || 0) }
@@ -712,12 +776,14 @@ export const useRomStore = defineStore('rom', () => {
 
   function addLine(role, phaseId, taskId, opts = {}) {
     const entity   = opts.entity   ?? 'cronos'
-    const laborCat = opts.laborCat ?? defaultCatForRole(role)
+    const laborCat = opts.laborCat ?? ''
+    // Everything starts at zero unless explicitly passed (e.g. by a baseline template).
+    // No TASK_DEFAULTS auto-fill, no rate guess until the user picks a labor category.
     lineItems.push({
       id: uuid(), role, phaseId, taskId: taskId ?? '', entity, laborCat,
-      days:        opts.days        ?? (taskId ? (TASK_DEFAULTS[taskId] ?? 0) : 0),
-      hoursPerDay: opts.hoursPerDay ?? 9,
-      rate:        opts.rate        ?? laborCatRate(laborCat),
+      days:        opts.days        ?? 0,
+      hoursPerDay: opts.hoursPerDay ?? 0,
+      rate:        opts.rate        ?? (laborCat ? laborCatRate(laborCat) : 0),
       sortOrder:   opts.sortOrder   ?? nextSortOrder(entity, phaseId),
     })
   }
@@ -862,26 +928,30 @@ export const useRomStore = defineStore('rom', () => {
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  watch([project, wbs, lineItems, travel, material, overhead, enabledEntities, selectedTabId, gsaRateMap], () => {
+  watch([project, wbs, lineItems, travel, material, overhead, enabledEntities, selectedTabId, gsaRateMap, laborCats], () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         project: { ...project }, wbs: deepClone(wbs), lineItems: deepClone(lineItems),
         travel: deepClone(travel), material: { ...material, items: deepClone(material.items) },
         overhead: { ...overhead }, enabledEntities: enabledEntities.value, selectedTabId: selectedTabId.value,
         gsaRateMap: { ...gsaRateMap },
+        laborCats: deepClone(laborCats),
       }))
     } catch {}
   }, { deep: true })
 
   return {
-    ENTITIES, ROLES, LIFECYCLE_PHASES, TRAVEL_CATEGORIES, TABS, TEMPLATES, LABOR_CATS, TASK_DEFAULTS,
-    project, wbs, lineItems, travel, material, overhead,
+    ENTITIES, ROLES, LIFECYCLE_PHASES, TRAVEL_CATEGORIES, TABS, TEMPLATES, TASK_DEFAULTS,
+    // LABOR_CATS now refers to the reactive editable list (was a const)
+    LABOR_CATS: laborCats,
+    project, wbs, lineItems, travel, material, overhead, laborCats,
     enabledEntities, selectedTabId, visibleEntities,
     engineeringTotal, engineeringHours, travelTotal,
     materialUnloaded, shippingCost, materialTotal, unloadedProjectTotal,
     scpCost, globalCost, govLaborCost, managementReserveCost,
     projectOverheadTotal, projectWithOverhead, scrCost, totalOverhead, totalLoadedCost,
-    laborCatRate, catsForRole,
+    laborCatRate, catsForRole, updateLaborCatRate, updateLaborCatLabel, updateLaborCatRole, addLaborCat, removeLaborCat, resetLaborCats,
+    addTask, removeTask, updateTask, moveTask, resetWbs,
     lineHours, lineCost, tasksFor, linesForPhase, linesForRole,
     phaseHours, phaseCost, roleHours, roleCost, entityHours, entityCost, travelLineCost,
     addLine, removeLine, updateLine, swapLineOrder, reorderLine, enableEntity, disableEntity, applyTemplate, resetAll,

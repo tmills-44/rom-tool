@@ -256,34 +256,48 @@
                 </table>
               </div>
 
-              <!-- Phase footer bar: Add button left · Phase Total right (always visible) -->
+              <!-- Phase footer bar: Add row LEFT · Phase Total RIGHT -->
               <div class="phase-footer-bar">
                 <div class="phase-footer-add">
-                  <template v-if="getActiveRole(entity.id, phase.id) === 'all'">
-                    <template v-if="showingPicker(entity.id, phase.id)">
-                      <div class="role-picker role-picker--inline">
-                        <span class="role-picker-label">Add:</span>
-                        <button
-                          v-for="rf in ROLE_FILTERS.filter(r => r.id !== 'all')"
-                          :key="rf.id"
-                          class="role-pick-btn"
-                          :class="`role-pick-btn--${rf.id}`"
-                          @click="pickRole(entity.id, phase.id, rf.id)"
-                        >
-                          <i class="ti" :class="roleIcon(rf.id)"></i>
-                          {{ rf.label }}
-                        </button>
-                        <button class="role-pick-cancel" @click="hidePicker(entity.id, phase.id)">Cancel</button>
-                      </div>
-                    </template>
-                    <button v-else class="add-line-btn" @click="showPicker(entity.id, phase.id)">
+                  <Transition name="picker-swap" mode="out-in">
+                    <div
+                      v-if="getActiveRole(entity.id, phase.id) === 'all' && showingPicker(entity.id, phase.id)"
+                      key="picker"
+                      class="role-picker role-picker--inline"
+                    >
+                      <span class="role-picker-label">Pick a role:</span>
+                      <button
+                        v-for="rf in ROLE_FILTERS.filter(r => r.id !== 'all')"
+                        :key="rf.id"
+                        class="role-pick-btn"
+                        :class="`role-pick-btn--${rf.id}`"
+                        @click="pickRole(entity.id, phase.id, rf.id)"
+                      >
+                        <i class="ti" :class="roleIcon(rf.id)"></i>
+                        {{ rf.label }}
+                      </button>
+                      <button class="role-pick-cancel" @click="hidePicker(entity.id, phase.id)" aria-label="Cancel">
+                        <i class="ti ti-x" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                    <button
+                      v-else-if="getActiveRole(entity.id, phase.id) === 'all'"
+                      key="add-any"
+                      class="add-line-btn"
+                      @click="showPicker(entity.id, phase.id)"
+                    >
                       <i class="ti ti-plus" aria-hidden="true"></i> Add row
                     </button>
-                  </template>
-                  <button v-else class="add-line-btn" @click="pickRole(entity.id, phase.id, getActiveRole(entity.id, phase.id))">
-                    <i class="ti ti-plus" aria-hidden="true"></i>
-                    Add {{ ROLE_FILTERS.find(r => r.id === getActiveRole(entity.id, phase.id))?.label }} row
-                  </button>
+                    <button
+                      v-else
+                      key="add-specific"
+                      class="add-line-btn"
+                      @click="pickRole(entity.id, phase.id, getActiveRole(entity.id, phase.id))"
+                    >
+                      <i class="ti ti-plus" aria-hidden="true"></i>
+                      Add {{ ROLE_FILTERS.find(r => r.id === getActiveRole(entity.id, phase.id))?.label }} row
+                    </button>
+                  </Transition>
                 </div>
                 <div class="phase-footer-total">
                   <span class="phase-total-label">Phase Total</span>
@@ -322,12 +336,13 @@ const ROLE_STATE_KEY   = 'rom-phase-role-state'
 // ── Role filter options ──────────────────────────────────────────────
 const ROLE_FILTERS = [
   { id: 'all',         label: 'All' },
-  { id: 'engineering', label: 'Engineering' },
   { id: 'pm',          label: 'PM' },
+  { id: 'engineering', label: 'Engineering' },
+  { id: 'programming', label: 'Programming' },
   { id: 'technician',  label: 'Technician' },
 ]
 
-const ROLE_SHORT = { engineering: 'ENG', pm: 'PM', technician: 'TECH' }
+const ROLE_SHORT = { engineering: 'ENG', pm: 'PM', programming: 'PROG', technician: 'TECH' }
 function roleShort(role) { return ROLE_SHORT[role] ?? role.toUpperCase() }
 
 // ── Phase open/close state ───────────────────────────────────────────
@@ -388,7 +403,9 @@ function entityCost(eid) {
 
 // ── Tasks for a line row ─────────────────────────────────────────────
 function tasksForLine(line, phaseId) {
-  return rom.wbs[line.role]?.[phaseId] ?? []
+  // Programming shares the engineering task list (no separate WBS branch)
+  const wbsKey = line.role === 'programming' ? 'engineering' : line.role
+  return rom.wbs[wbsKey]?.[phaseId] ?? []
 }
 
 // ── Role picker ──────────────────────────────────────────────────────
@@ -403,7 +420,12 @@ function pickRole(eid, pid, role) {
 }
 
 function roleIcon(role) {
-  return { engineering: 'ti-cpu', pm: 'ti-clipboard-list', technician: 'ti-tool' }[role] ?? ''
+  return {
+    engineering: 'ti-cpu',
+    pm: 'ti-clipboard-list',
+    programming: 'ti-code',
+    technician: 'ti-tool',
+  }[role] ?? ''
 }
 
 // ── Task change — handle "Custom…" sentinel ──────────────────────────
@@ -433,6 +455,7 @@ function onLaborCatChange(lineId, catId) {
   rom.updateLine(lineId, {
     laborCat: catId,
     role:     cat?.role ?? 'engineering',
+    rate:     cat?.defaultRate ?? 0,
   })
 }
 
@@ -557,8 +580,9 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 }
 .role-chip:hover { border-color: var(--rom-accent); color: var(--rom-accent); }
 .role-chip--all.active         { background: var(--rom-header-bg); border-color: var(--rom-header-bg); color: #fff; }
-.role-chip--engineering.active { background: #1a5fb4; border-color: #1a5fb4; color: #fff; }
 .role-chip--pm.active          { background: #2e7d32; border-color: #2e7d32; color: #fff; }
+.role-chip--engineering.active { background: #1a5fb4; border-color: #1a5fb4; color: #fff; }
+.role-chip--programming.active { background: #6a1b9a; border-color: #6a1b9a; color: #fff; }
 .role-chip--technician.active  { background: #854f0b; border-color: #854f0b; color: #fff; }
 
 /* Lines table */
@@ -693,22 +717,63 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   border-left: 3px solid var(--rom-border);
 }
 
-/* Add row button */
+/* Add row button — solid primary action style */
 .add-line-btn {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 12px; font-size: 12px;
-  border: 1px dashed var(--rom-border); border-radius: var(--rom-radius);
-  background: transparent; color: var(--rom-text-muted); cursor: pointer;
+  padding: 7px 16px;
+  font-size: 12px; font-weight: 600; letter-spacing: .01em;
+  border: 1px solid var(--rom-accent, #1a5fb4);
+  border-radius: var(--rom-radius, 6px);
+  background: var(--rom-accent, #1a5fb4);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  transition: background-color .12s, box-shadow .12s, transform .04s;
+  white-space: nowrap;
 }
-.add-line-btn:hover { border-color: var(--rom-accent); color: var(--rom-accent); background: var(--rom-accent-bg); }
+.add-line-btn:hover {
+  background: var(--rom-accent-dark, #134a91);
+  border-color: var(--rom-accent-dark, #134a91);
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.10);
+}
+.add-line-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 1px rgba(0,0,0,0.10);
+}
+.add-line-btn:focus-visible {
+  outline: 2px solid var(--rom-accent, #1a5fb4);
+  outline-offset: 2px;
+}
+.add-line-btn .ti { font-size: 14px; }
 
 /* Inline role picker (inside footer bar) */
 .role-picker--inline {
-  padding: 2px 4px;
-  border: none; background: transparent; width: auto;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--rom-border);
+  background: var(--rom-surface);
+  border-radius: var(--rom-radius, 6px);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  display: inline-flex; align-items: center; gap: 6px;
+  width: auto;
 }
-.role-picker--inline .role-pick-btn { padding: 3px 10px; font-size: 11px; }
+.role-picker--inline .role-pick-btn { padding: 5px 12px; font-size: 11px; }
 .role-picker--inline .role-picker-label { font-size: 10px; }
+.role-picker--inline .role-pick-cancel {
+  width: 24px; height: 24px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
+
+/* Quick crossfade — just enough to soften the swap, not draw attention */
+.picker-swap-enter-active,
+.picker-swap-leave-active {
+  transition: opacity 90ms ease-out;
+}
+.picker-swap-enter-from,
+.picker-swap-leave-to {
+  opacity: 0;
+}
 
 /* Role picker (shown when Add row is clicked) */
 .role-picker {
@@ -728,10 +793,12 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
   border: 2px solid; cursor: pointer; transition: all .12s;
 }
-.role-pick-btn--engineering { border-color: #1a5fb4; color: #1a5fb4; background: #f0f5ff; }
-.role-pick-btn--engineering:hover { background: #1a5fb4; color: #fff; }
 .role-pick-btn--pm           { border-color: #2e7d32; color: #2e7d32; background: #f0faf0; }
 .role-pick-btn--pm:hover     { background: #2e7d32; color: #fff; }
+.role-pick-btn--engineering  { border-color: #1a5fb4; color: #1a5fb4; background: #f0f5ff; }
+.role-pick-btn--engineering:hover { background: #1a5fb4; color: #fff; }
+.role-pick-btn--programming  { border-color: #6a1b9a; color: #6a1b9a; background: #f7f0ff; }
+.role-pick-btn--programming:hover { background: #6a1b9a; color: #fff; }
 .role-pick-btn--technician   { border-color: #854f0b; color: #854f0b; background: #fff8f0; }
 .role-pick-btn--technician:hover { background: #854f0b; color: #fff; }
 .role-pick-cancel {
