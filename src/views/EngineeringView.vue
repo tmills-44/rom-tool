@@ -213,7 +213,7 @@
                       <td class="col-hrs">
                         <input
                           type="number" min="0" step="0.5"
-                          :value="Math.round(((line.days || 0) * (line.hoursPerDay || 0)) * 10) / 10"
+                          :value="Math.round(((line.days || 0) * (line.hoursPerDay || 0)) * 2) / 2"
                           class="cell-num cell-num--hrs"
                           @change="onTotalHrsChange(line, +$event.target.value)"
                         />
@@ -291,16 +291,7 @@
                 </table>
               </div>
 
-              <!-- Hidden rows hint -->
-              <div
-                v-if="getActiveRole(entity.id, phase.id) !== 'all' && linesForPhase(entity.id, phase.id).length > visibleLines(entity.id, phase.id).length"
-                class="hidden-rows-hint"
-              >
-                {{ linesForPhase(entity.id, phase.id).length - visibleLines(entity.id, phase.id).length }}
-                row(s) hidden by filter — switch to <strong>All</strong> to see them
-              </div>
-
-              <!-- Add row (shown when phase has no lines — table not rendered) -->
+              <!-- Add row (shown when no visible lines — table not rendered) -->
               <div v-if="!visibleLines(entity.id, phase.id).length" class="phase-add-row">
                 <template v-if="getActiveRole(entity.id, phase.id) === 'all'">
                   <template v-if="showingPicker(entity.id, phase.id)">
@@ -327,6 +318,15 @@
                   <i class="ti ti-plus" aria-hidden="true"></i>
                   Add {{ ROLE_FILTERS.find(r => r.id === getActiveRole(entity.id, phase.id))?.label }} row
                 </button>
+              </div>
+
+              <!-- Hidden rows hint (below add button) -->
+              <div
+                v-if="getActiveRole(entity.id, phase.id) !== 'all' && linesForPhase(entity.id, phase.id).length > visibleLines(entity.id, phase.id).length"
+                class="hidden-rows-hint"
+              >
+                {{ linesForPhase(entity.id, phase.id).length - visibleLines(entity.id, phase.id).length }}
+                row(s) hidden by filter — switch to <strong>All</strong> to see them
               </div>
 
             </div>
@@ -468,8 +468,9 @@ function onLaborCatChange(lineId, catId) {
 // ── Total Hours bidirectional ────────────────────────────────────────
 // Editing Total Hrs → back-calculates Days (Hrs/Day stays fixed)
 function onTotalHrsChange(line, totalHrs) {
+  const snapped = Math.round(totalHrs * 2) / 2          // snap input to nearest 0.5
   const hpd = line.hoursPerDay || 8
-  const newDays = hpd > 0 ? Math.round((totalHrs / hpd) * 10) / 10 : 0
+  const newDays = hpd > 0 ? Math.round((snapped / hpd) * 2) / 2 : 0  // snap days to nearest 0.5
   rom.updateLine(line.id, { days: newDays })
 }
 
@@ -611,11 +612,11 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .col-role  { width: 52px; }
 .col-cat   { width: 120px; }
 .col-task  { min-width: 200px; }
-.col-days  { width: 64px; }
-.col-hpd   { width: 72px; }
-.col-hrs   { width: 80px; }
-.col-rate  { width: 80px; }
-.col-total { width: 90px; font-weight: 700; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
+.col-days  { width: 90px; }
+.col-hpd   { width: 90px; }
+.col-hrs   { width: 100px; }
+.col-rate  { width: 100px; }
+.col-total { width: 110px; font-weight: 700; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
 .col-del   { width: 36px; }
 
 /* Total Hrs cell — slightly highlighted to show it's computed but editable */
