@@ -37,14 +37,22 @@
               {{ Math.round(entityHours(entity.id)) }} hrs &nbsp;·&nbsp; {{ fmt(entityCost(entity.id)) }}
             </span>
           </div>
-          <button
-            v-if="!entity.alwaysVisible"
-            class="entity-remove-btn"
-            @click="rom.disableEntity(entity.id)"
-            :title="`Remove ${entity.label}`"
-          >
-            <i class="ti ti-x" aria-hidden="true"></i> Remove {{ entity.label }}
-          </button>
+          <div class="entity-head-right">
+            <button class="expand-btn" @click="openAllPhases(entity.id)" title="Open all phases">
+              <i class="ti ti-chevrons-down"></i> Open all
+            </button>
+            <button class="expand-btn" @click="closeAllPhases(entity.id)" title="Close all phases">
+              <i class="ti ti-chevrons-up"></i> Close all
+            </button>
+            <button
+              v-if="!entity.alwaysVisible"
+              class="entity-remove-btn"
+              @click="rom.disableEntity(entity.id)"
+              :title="`Remove ${entity.label}`"
+            >
+              <i class="ti ti-x" aria-hidden="true"></i> Remove {{ entity.label }}
+            </button>
+          </div>
         </div>
 
         <!-- Phase accordions -->
@@ -299,11 +307,17 @@ const phaseOpenState  = reactive({})  // key: "entityId::phaseId"
 const activeRoleState = reactive({})  // key: "entityId::phaseId"
 const pickerState     = reactive({})  // key: "entityId::phaseId"
 
-function phaseKey(eid, pid)  { return `${eid}::${pid}` }
+function phaseKey(eid, pid)    { return `${eid}::${pid}` }
 function isPhaseOpen(eid, pid) { return !!phaseOpenState[phaseKey(eid, pid)] }
 function togglePhase(eid, pid) {
   const k = phaseKey(eid, pid)
   phaseOpenState[k] = !phaseOpenState[k]
+}
+function openAllPhases(eid) {
+  rom.LIFECYCLE_PHASES.forEach(p => { phaseOpenState[phaseKey(eid, p.id)] = true })
+}
+function closeAllPhases(eid) {
+  rom.LIFECYCLE_PHASES.forEach(p => { phaseOpenState[phaseKey(eid, p.id)] = false })
 }
 function getActiveRole(eid, pid) { return activeRoleState[phaseKey(eid, pid)] ?? 'all' }
 function setActiveRole(eid, pid, role) { activeRoleState[phaseKey(eid, pid)] = role }
@@ -374,7 +388,6 @@ function onLaborCatChange(lineId, catId) {
   rom.updateLine(lineId, {
     laborCat: catId,
     role:     cat?.role ?? 'engineering',
-    taskId:   '',  // clear task when cat changes
   })
 }
 
@@ -417,6 +430,14 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .entity--gov    .entity-pill { background: #185fa5; color: #fff; }
 .entity--sub    .entity-pill { background: #854f0b; color: #fff; }
 .entity-meta { font-size: 12px; font-weight: 500; color: var(--rom-text-muted); }
+.entity-head-right { display: flex; align-items: center; gap: 6px; }
+.expand-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--rom-text-muted);
+  background: none; border: 1px solid var(--rom-border); border-radius: 4px;
+  padding: 3px 8px; cursor: pointer;
+}
+.expand-btn:hover { color: var(--rom-accent); border-color: var(--rom-accent); background: var(--rom-accent-bg); }
 .entity-remove-btn {
   display: flex; align-items: center; gap: 4px;
   font-size: 11px; color: var(--rom-text-faint);
