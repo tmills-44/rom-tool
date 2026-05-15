@@ -349,8 +349,6 @@ function pickRole(eid, pid, role) {
   rom.addLine(role, pid, '', { entity: eid })
   phaseOpenState[phaseKey(eid, pid)] = true
   pickerState[phaseKey(eid, pid)] = false
-  // Also sync the filter chip to match what was just added
-  setActiveRole(eid, pid, role)
 }
 
 function roleIcon(role) {
