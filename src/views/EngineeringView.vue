@@ -94,6 +94,12 @@
                   @click="setActiveRole(entity.id, phase.id, rf.id)"
                 >
                   {{ rf.label }}
+                  <span
+                    v-if="filterStatus(entity.id, phase.id, rf.id) !== 'none'"
+                    class="chip-dot"
+                    :class="`chip-dot--${filterStatus(entity.id, phase.id, rf.id)}`"
+                    :title="filterStatus(entity.id, phase.id, rf.id) === 'complete' ? 'All rows complete' : 'Some rows need to be filled in'"
+                  ></span>
                 </button>
                 <span
                   v-if="getActiveRole(entity.id, phase.id) !== 'all' && linesForPhase(entity.id, phase.id).length > visibleLines(entity.id, phase.id).length"
@@ -429,6 +435,16 @@ function lineStatus(line) {
   return 'partial'
 }
 
+// Aggregate completion state for a given role filter chip
+// Returns 'none' (no rows match), 'complete' (all rows complete), or 'partial' (any row needs work)
+function filterStatus(eid, pid, roleFilterId) {
+  const all = linesForPhase(eid, pid)
+  const matching = roleFilterId === 'all' ? all : all.filter(l => l.role === roleFilterId)
+  if (matching.length === 0) return 'none'
+  const allComplete = matching.every(l => lineStatus(l) === 'complete')
+  return allComplete ? 'complete' : 'partial'
+}
+
 
 // ── Phase hours/cost (sum across all roles) ──────────────────────────
 function phaseHours(eid, pid) {
@@ -577,17 +593,35 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 }
 .entity-remove-btn:hover { color: var(--rom-danger); border-color: var(--rom-danger); }
 
-/* Phase sections */
-.phases-wrap { display: flex; flex-direction: column; }
+/* Phase sections — each phase is its own clearly bordered block */
+.phases-wrap {
+  display: flex; flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  background: var(--rom-bg, #f4f6fb);
+}
 
-.phase-section { border-bottom: 1px solid var(--rom-border); }
-.phase-section:last-child { border-bottom: none; }
-.phase-section--has-lines > .phase-head { background: var(--rom-accent-bg); }
+.phase-section {
+  border: 1px solid var(--rom-border);
+  border-radius: var(--rom-radius, 6px);
+  background: var(--rom-surface);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.phase-section--has-lines {
+  border-color: #b6cff0;
+  box-shadow: 0 1px 3px rgba(26,95,180,0.08);
+}
+.phase-section--has-lines > .phase-head {
+  background: var(--rom-accent-bg);
+  border-left: 4px solid var(--rom-accent, #1a5fb4);
+}
 
 .phase-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px; cursor: pointer; user-select: none;
+  padding: 12px 16px; cursor: pointer; user-select: none;
   transition: background .12s;
+  border-left: 4px solid transparent;
 }
 .phase-head:hover { background: var(--rom-surface-alt); }
 .phase-section--has-lines > .phase-head:hover { background: #dce8fb; }
@@ -641,6 +675,25 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .role-chip--engineering.active { background: #1a5fb4; border-color: #1a5fb4; color: #fff; }
 .role-chip--programming.active { background: #6a1b9a; border-color: #6a1b9a; color: #fff; }
 .role-chip--technician.active  { background: #b8860b; border-color: #b8860b; color: #fff; }
+
+/* Status dot inside filter chips — green = all complete, yellow = some incomplete */
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chip-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.85);
+}
+.chip-dot--complete { background: #2e7d32; }
+.chip-dot--partial  { background: #d97706; }
+/* On active (colored) chips, swap the white ring for a darker one so the dot pops */
+.role-chip.active .chip-dot { box-shadow: 0 0 0 1.5px rgba(0,0,0,0.18); }
 
 /* Lines table */
 .lines-wrap { padding: 0 16px 0; overflow-x: auto; }
