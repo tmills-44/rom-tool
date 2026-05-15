@@ -116,7 +116,8 @@
     </div>
 
     <!-- ── Validation banner ─────────────────────────────────────── -->
-    <div v-if="validationWarnings.length" class="val-banner">
+    <!-- Hidden for now. To re-enable, change v-if to "validationWarnings.length". -->
+    <div v-if="false" class="val-banner">
       <i class="ti ti-alert-triangle" aria-hidden="true"></i>
       <span v-for="(w, i) in validationWarnings" :key="i" class="val-item">{{ w }}</span>
     </div>

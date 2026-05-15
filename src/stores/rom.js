@@ -77,7 +77,7 @@ export const TRAVEL_CATEGORIES = [
 ]
 
 export const TABS = [
-  { id: 'engineering', label: 'Engineering Deliverables', icon: 'ti-tools' },
+  { id: 'engineering', label: 'Labor', icon: 'ti-tools' },
   { id: 'travel',      label: 'Travel',                   icon: 'ti-plane' },
   { id: 'material',    label: 'Material & Shipping',      icon: 'ti-package' },
   { id: 'overhead',    label: 'Overhead',                 icon: 'ti-percentage' },
