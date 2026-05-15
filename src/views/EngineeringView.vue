@@ -156,12 +156,12 @@
                           'line-row--role-change': idx > 0 && visibleLines(entity.id, phase.id)[idx - 1].role !== line.role,
                         }
                       ]"
-                      draggable="true"
+                      :draggable="dragState.armedId === line.id"
                       @dragstart="dragState.dragId = line.id"
-                      @dragend="dragState.dragId = null; dragState.overId = null"
+                      @dragend="dragState.dragId = null; dragState.overId = null; dragState.armedId = null"
                       @dragover.prevent="dragState.overId = line.id"
                       @dragleave="dragState.overId = null"
-                      @drop.prevent="rom.reorderLine(dragState.dragId, line.id); dragState.dragId = null; dragState.overId = null"
+                      @drop.prevent="rom.reorderLine(dragState.dragId, line.id); dragState.dragId = null; dragState.overId = null; dragState.armedId = null"
                     >
                       <!-- Drag handle + status -->
                       <td class="col-move">
@@ -181,7 +181,12 @@
                                                                 'Empty row'
                             "
                           ></i>
-                          <span class="drag-handle" title="Drag to reorder">⠿</span>
+                          <span
+                            class="drag-handle"
+                            title="Drag to reorder"
+                            @mousedown="dragState.armedId = line.id"
+                            @mouseup="dragState.armedId = null"
+                          >⠿</span>
                         </div>
                       </td>
 
@@ -402,7 +407,7 @@ const activeRoleState  = reactive(loadSaved(ROLE_STATE_KEY))
 const defaultHrsState  = reactive(loadSaved(DEFAULT_HRS_KEY))
 const pickerState      = reactive({})
 const customTaskMode   = reactive({})
-const dragState        = reactive({ dragId: null, overId: null })
+const dragState        = reactive({ dragId: null, overId: null, armedId: null })
 
 function getDefaultHrs(eid, pid) {
   const v = defaultHrsState[phaseKey(eid, pid)]
