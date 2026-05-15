@@ -743,7 +743,7 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   background: var(--rom-surface);
   white-space: nowrap;
 }
-.line-row td { padding: 5px 8px; border-bottom: 1px solid var(--rom-border); vertical-align: middle; }
+.line-row td { padding: 2px 8px; border-bottom: 1px solid var(--rom-border); vertical-align: middle; }
 .line-row:last-child td { border-bottom: none; }
 .line-row:hover td { background: var(--rom-surface-alt); }
 
@@ -832,7 +832,7 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 
 /* Cell inputs */
 .cell-select {
-  width: 100%; padding: 4px 6px; font-size: 12px;
+  width: 100%; padding: 2px 6px; font-size: 12px;
   border: 1px solid transparent; border-radius: 4px;
   background: transparent; color: var(--rom-text);
   cursor: pointer;
@@ -844,7 +844,7 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .cell-select--task { min-width: 180px; }
 
 .cell-input {
-  width: 100%; padding: 4px 6px; font-size: 12px;
+  width: 100%; padding: 2px 6px; font-size: 12px;
   border: 1px solid var(--rom-accent); border-radius: 4px;
   background: var(--rom-accent-bg); color: var(--rom-text);
 }
@@ -861,7 +861,7 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .custom-task-back:hover { border-color: var(--rom-accent); color: var(--rom-accent); }
 
 .cell-num {
-  width: 100%; padding: 4px 22px 4px 6px; font-size: 12px; text-align: right;
+  width: 100%; padding: 2px 22px 2px 6px; font-size: 12px; text-align: right;
   border: 1px solid transparent; border-radius: 4px;
   background: transparent; color: var(--rom-text);
 }
