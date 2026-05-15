@@ -286,10 +286,13 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, watch, onMounted } from 'vue'
 import { useRomStore } from '../stores/rom'
 
 const rom = useRomStore()
+
+const PHASE_STATE_KEY  = 'rom-phase-open-state'
+const ROLE_STATE_KEY   = 'rom-phase-role-state'
 
 // ── Role filter options ──────────────────────────────────────────────
 const ROLE_FILTERS = [
@@ -303,9 +306,19 @@ const ROLE_SHORT = { engineering: 'ENG', pm: 'PM', technician: 'TECH' }
 function roleShort(role) { return ROLE_SHORT[role] ?? role.toUpperCase() }
 
 // ── Phase open/close state ───────────────────────────────────────────
-const phaseOpenState  = reactive({})  // key: "entityId::phaseId"
-const activeRoleState = reactive({})  // key: "entityId::phaseId"
-const pickerState     = reactive({})  // key: "entityId::phaseId"
+const phaseOpenState  = reactive(loadSaved(PHASE_STATE_KEY))
+const activeRoleState = reactive(loadSaved(ROLE_STATE_KEY))
+const pickerState     = reactive({})
+
+function loadSaved(key) {
+  try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
+}
+
+onMounted(() => {
+  // Watch and persist both states
+  watch(phaseOpenState,  v => localStorage.setItem(PHASE_STATE_KEY,  JSON.stringify(v)), { deep: true })
+  watch(activeRoleState, v => localStorage.setItem(ROLE_STATE_KEY,   JSON.stringify(v)), { deep: true })
+})
 
 function phaseKey(eid, pid)    { return `${eid}::${pid}` }
 function isPhaseOpen(eid, pid) { return !!phaseOpenState[phaseKey(eid, pid)] }
