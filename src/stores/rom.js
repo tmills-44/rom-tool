@@ -731,6 +731,19 @@ export const useRomStore = defineStore('rom', () => {
     b.sortOrder = tmp
   }
 
+  function reorderLine(dragId, dropId) {
+    const drag = lineItems.find(l => l.id === dragId)
+    const drop = lineItems.find(l => l.id === dropId)
+    if (!drag || !drop || dragId === dropId) return
+    const phaseLines = lineItems
+      .filter(l => l.entity === drag.entity && l.phaseId === drag.phaseId)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    const without = phaseLines.filter(l => l.id !== dragId)
+    const dropIdx = without.findIndex(l => l.id === dropId)
+    without.splice(dropIdx, 0, drag)
+    without.forEach((l, i) => { l.sortOrder = i })
+  }
+
   function removeLine(lineId) {
     const i = lineItems.findIndex(l => l.id === lineId)
     if (i >= 0) lineItems.splice(i, 1)
@@ -871,7 +884,7 @@ export const useRomStore = defineStore('rom', () => {
     laborCatRate, catsForRole,
     lineHours, lineCost, tasksFor, linesForPhase, linesForRole,
     phaseHours, phaseCost, roleHours, roleCost, entityHours, entityCost, travelLineCost,
-    addLine, removeLine, updateLine, swapLineOrder, enableEntity, disableEntity, applyTemplate, resetAll,
+    addLine, removeLine, updateLine, swapLineOrder, reorderLine, enableEntity, disableEntity, applyTemplate, resetAll,
     addMaterialItem, updateMaterialItem, removeMaterialItem,
     addTrip, updateTrip, removeTrip, tripCost,
     gsaRateMap, importGSARates, lookupGSARate, clearGSARates,

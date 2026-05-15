@@ -115,22 +115,23 @@
                   </thead>
                   <tbody>
                     <tr
-                      v-for="(line, idx) in visibleLines(entity.id, phase.id)"
+                      v-for="line in visibleLines(entity.id, phase.id)"
                       :key="line.id"
                       class="line-row"
+                      :class="{
+                        'line-row--dragging':  dragState.dragId  === line.id,
+                        'line-row--drag-over': dragState.overId  === line.id && dragState.dragId !== line.id
+                      }"
+                      draggable="true"
+                      @dragstart="dragState.dragId = line.id"
+                      @dragend="dragState.dragId = null; dragState.overId = null"
+                      @dragover.prevent="dragState.overId = line.id"
+                      @dragleave="dragState.overId = null"
+                      @drop.prevent="rom.reorderLine(dragState.dragId, line.id); dragState.dragId = null; dragState.overId = null"
                     >
-                      <!-- Move up/down -->
+                      <!-- Drag handle -->
                       <td class="col-move">
-                        <div class="move-btns">
-                          <button class="move-btn"
-                            :disabled="idx === 0"
-                            @click="moveLine(entity.id, phase.id, line.id, 'up')"
-                            title="Move up">▲</button>
-                          <button class="move-btn"
-                            :disabled="idx === visibleLines(entity.id, phase.id).length - 1"
-                            @click="moveLine(entity.id, phase.id, line.id, 'down')"
-                            title="Move down">▼</button>
-                        </div>
+                        <span class="drag-handle" title="Drag to reorder">⠿</span>
                       </td>
 
                       <!-- Role badge -->
@@ -315,7 +316,8 @@ function roleShort(role) { return ROLE_SHORT[role] ?? role.toUpperCase() }
 const phaseOpenState  = reactive(loadSaved(PHASE_STATE_KEY))
 const activeRoleState = reactive(loadSaved(ROLE_STATE_KEY))
 const pickerState     = reactive({})
-const customTaskMode  = reactive({})  // lineId → true when in custom text mode
+const customTaskMode  = reactive({})
+const dragState       = reactive({ dragId: null, overId: null })
 
 function loadSaved(key) {
   try { return JSON.parse(localStorage.getItem(key) ?? '{}') } catch { return {} }
@@ -351,14 +353,6 @@ function visibleLines(eid, pid) {
   return all.filter(l => l.role === active)
 }
 
-// ── Move a line up or down within the visible set ────────────────────
-function moveLine(eid, pid, lineId, dir) {
-  const visible = visibleLines(eid, pid)
-  const idx = visible.findIndex(l => l.id === lineId)
-  const swapIdx = dir === 'up' ? idx - 1 : idx + 1
-  if (swapIdx < 0 || swapIdx >= visible.length) return
-  rom.swapLineOrder(lineId, visible[swapIdx].id)
-}
 
 // ── Phase hours/cost (sum across all roles) ──────────────────────────
 function phaseHours(eid, pid) {
@@ -558,17 +552,16 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .col-total { width: 90px; font-weight: 700; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
 .col-del   { width: 36px; }
 
-/* Move buttons */
-.move-btns { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-.move-btn {
-  display: flex; align-items: center; justify-content: center;
-  width: 18px; height: 14px; padding: 0;
-  font-size: 8px; line-height: 1;
-  border: 1px solid var(--rom-border); border-radius: 3px;
-  background: var(--rom-surface); color: var(--rom-text-muted); cursor: pointer;
+/* Drag handle */
+.drag-handle {
+  display: block; text-align: center;
+  font-size: 14px; color: var(--rom-text-faint);
+  cursor: grab; user-select: none; line-height: 1;
+  padding: 2px 0;
 }
-.move-btn:hover:not(:disabled) { background: var(--rom-accent-bg); border-color: var(--rom-accent); color: var(--rom-accent); }
-.move-btn:disabled { opacity: .25; cursor: default; }
+.drag-handle:active { cursor: grabbing; }
+.line-row--dragging  { opacity: .4; }
+.line-row--drag-over td { border-top: 2px solid var(--rom-accent) !important; background: var(--rom-accent-bg); }
 
 /* Role badge */
 .role-badge {
