@@ -719,6 +719,12 @@ export const useRomStore = defineStore('rom', () => {
       car:     t.rentalCar ?? false,
       airfare: t.airfare ?? false,
       misc:    false,
+      // Carry the old single-trip rates into the per-row rate fields so cost math is preserved
+      lodgingRate: t.lodgingRate ?? 0,
+      mieRate:     t.mieRate     ?? 0,
+      carRate:     t.rentalCarRate ?? 75,
+      airfareRate: t.airfareRate ?? 600,
+      miscRate:    50,
     }
     Object.assign(t, {
       tripName:           t.travelerName || '',
@@ -737,7 +743,12 @@ export const useRomStore = defineStore('rom', () => {
   })
 
   // ── Cost calculations ─────────────────────────────────────────────
-  // Per-traveler cost — applies trip defaults when a toggle is on.
+  // Per-traveler cost — uses per-row rates (falling back to trip defaults).
+  function travelerRate(trip, tr, field, tripDefaultField) {
+    // Use the row's value if it's been set (even to 0), else trip default
+    const r = tr?.[field]
+    return r != null ? r : (trip?.[tripDefaultField] ?? 0)
+  }
   function travelerCost(trip, tr) {
     const qty  = Math.max(1, tr.qty || 1)
     const days = Math.max(0, tr.days || 0)
@@ -745,20 +756,27 @@ export const useRomStore = defineStore('rom', () => {
     if (tr.hotel) {
       // Lodging + M&IE per day. Lodging multiplied by nights (days-1) so a 1-day trip is M&IE only.
       const nights = Math.max(0, days - 1)
-      c += (trip.lodgingRate || 0) * nights
-      c += (trip.mieRate     || 0) * days
+      c += travelerRate(trip, tr, 'lodgingRate', 'lodgingRate') * nights
+      c += travelerRate(trip, tr, 'mieRate',     'mieRate')     * days
     }
-    if (tr.car)     c += (trip.defaultCarRate     || 0) * days
-    if (tr.airfare) c += (trip.defaultAirfareRate || 0)
-    if (tr.misc)    c += (trip.defaultMiscRate    || 0)
+    if (tr.car)     c += travelerRate(trip, tr, 'carRate',     'defaultCarRate')     * days
+    if (tr.airfare) c += travelerRate(trip, tr, 'airfareRate', 'defaultAirfareRate')
+    if (tr.misc)    c += travelerRate(trip, tr, 'miscRate',    'defaultMiscRate')
     return c * qty
+  }
+  // Travel-labor: pay-category rate × travel hours × qty. Tracked separately so the
+  // caller can decide whether to roll it into the trip total or report it on its own.
+  function travelLaborCost(tr) {
+    if (!tr?.laborCat) return 0
+    const rate = laborCatRate(tr.laborCat) || 0
+    return rate * (tr.travelHours || 0) * Math.max(1, tr.qty || 1)
   }
 
   function tripCost(trip) {
     if (!trip) return 0
     migrateTrip(trip)
     if (Array.isArray(trip.travelers)) {
-      return trip.travelers.reduce((s, tr) => s + travelerCost(trip, tr), 0)
+      return trip.travelers.reduce((s, tr) => s + travelerCost(trip, tr) + travelLaborCost(tr), 0)
     }
     // Legacy fallthrough — should be unreachable after migration
     const persons = Math.max(1, trip.persons || 1)
@@ -829,10 +847,19 @@ export const useRomStore = defineStore('rom', () => {
     trip.travelers.push({
       id: uuid(),
       name: '',
+      laborCat: '',       // pay category — drives travel-labor cost (hours × rate)
       qty: 1,
       days: 0,
       travelHours: trip.defaultTravelHours ?? 4,
       hotel: false, car: false, airfare: false, misc: false,
+      // Per-row rate overrides — initialized from trip defaults at create time.
+      // Editing these per row sticks for that row; changes to trip defaults
+      // only affect new travelers added after the change (matches Labor pattern).
+      lodgingRate: trip.lodgingRate ?? 0,
+      mieRate:     trip.mieRate     ?? 0,
+      carRate:     trip.defaultCarRate     ?? 75,
+      airfareRate: trip.defaultAirfareRate ?? 600,
+      miscRate:    trip.defaultMiscRate    ?? 50,
     })
   }
   function updateTraveler(entityId, tripId, travelerId, patch) {
@@ -1239,7 +1266,7 @@ export const useRomStore = defineStore('rom', () => {
     addCoa, removeCoa, renameCoa, toggleCoaIncluded, setActiveCoa, duplicateCoa,
     showRates, showRowStatus, undo, redo, canUndo, canRedo,
     addMaterialItem, updateMaterialItem, removeMaterialItem,
-    addTrip, updateTrip, removeTrip, tripCost, travelerCost,
+    addTrip, updateTrip, removeTrip, tripCost, travelerCost, travelerRate, travelLaborCost,
     addTraveler, updateTraveler, removeTraveler,
     travelTotalForQuote,
     gsaRateMap, importGSARates, lookupGSARate, clearGSARates,

@@ -148,15 +148,14 @@
 
               <!-- Row 2: Month + rates (CONUS auto-filled; OCONUS manual) -->
               <div class="trip-row">
-                <div class="trip-field">
-                  <label>Travel Month</label>
-                  <select
-                    :value="trip.travelMonth || currentMonth"
-                    :class="['month-select', { 'month-select--rich': !!trip.gsaMonthlyRates }]"
-                    @change="onMonthChange(entity.id, trip, $event.target.value)"
-                  >
-                    <option v-for="m in MONTHS" :key="m" :value="m">{{ monthLabel(trip, m) }}</option>
-                  </select>
+                <div v-if="(trip.lodgingRate || 0) + (trip.mieRate || 0) > 0" class="trip-field">
+                  <label>Per Diem (peak rate)</label>
+                  <div class="per-diem-chip" :title="`Lodging $${trip.lodgingRate || 0}/night + M&IE $${trip.mieRate || 0}/day · uses ${trip.travelMonth || 'peak'} (most expensive month)`">
+                    <i class="ti ti-coin" aria-hidden="true"></i>
+                    ${{ (trip.lodgingRate || 0) + (trip.mieRate || 0) }}/day
+                    <span class="per-diem-split">${{ trip.lodgingRate || 0 }} lodging + ${{ trip.mieRate || 0 }} M&amp;IE</span>
+                    <span v-if="trip.travelMonth" class="per-diem-peak-tag">{{ trip.travelMonth }} ★</span>
+                  </div>
                 </div>
                 <div class="trip-field trip-field--sm">
                   <label class="rate-label">
@@ -264,6 +263,7 @@
                   <thead>
                     <tr>
                       <th class="t-col-name">Traveler</th>
+                      <th class="t-col-cat">Pay Cat</th>
                       <th class="t-col-qty">Qty</th>
                       <th class="t-col-days">Days</th>
                       <th class="t-col-hrs">Travel hrs</th>
@@ -283,6 +283,19 @@
                           placeholder="e.g. Aaron Mills"
                           @input="rom.updateTraveler(entity.id, trip.id, tr.id, { name: $event.target.value })" />
                       </td>
+                      <td class="t-col-cat">
+                        <select
+                          :value="tr.laborCat || ''"
+                          class="cat-select"
+                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { laborCat: $event.target.value })"
+                          :title="tr.laborCat ? `Travel labor: ${fmt(rom.travelLaborCost(tr))}` : 'Pick a pay category — travel hours × rate get added to the row total'"
+                        >
+                          <option value="">— Pay cat —</option>
+                          <option v-for="cat in rom.LABOR_CATS" :key="cat.id" :value="cat.id">
+                            {{ cat.label }} (${{ cat.defaultRate }}/hr)
+                          </option>
+                        </select>
+                      </td>
                       <td class="t-col-qty">
                         <input type="number" min="1" step="1"
                           :value="tr.qty || 1"
@@ -299,34 +312,78 @@
                           @change="rom.updateTraveler(entity.id, trip.id, tr.id, { travelHours: +$event.target.value || 0 })" />
                       </td>
                       <td class="t-col-svc">
-                        <label class="svc-toggle" :class="{ 'svc-toggle--on': tr.hotel }">
-                          <input type="checkbox" :checked="tr.hotel"
-                            @change="rom.updateTraveler(entity.id, trip.id, tr.id, { hotel: $event.target.checked })" />
-                          <span class="svc-cost">{{ tr.hotel ? fmt(hotelCost(trip, tr)) : '—' }}</span>
-                        </label>
+                        <div class="svc-cell" :class="{ 'svc-cell--on': tr.hotel }">
+                          <label class="svc-row">
+                            <input type="checkbox" :checked="tr.hotel"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { hotel: $event.target.checked })" />
+                            <span class="svc-cost">{{ tr.hotel ? fmt(hotelCost(trip, tr)) : '—' }}</span>
+                          </label>
+                          <div v-if="tr.hotel" class="svc-rate-row">
+                            <input type="number" min="0" step="1"
+                              :value="effLodging(trip, tr)"
+                              class="svc-rate-input"
+                              :class="{ 'svc-rate-input--override': isOverride(tr, 'lodgingRate', 'lodgingRate', trip) }"
+                              :title="`Lodging per night · trip default $${trip.lodgingRate || 0}`"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { lodgingRate: +$event.target.value })" />
+                            <span class="svc-unit">/night</span>
+                          </div>
+                        </div>
                       </td>
                       <td class="t-col-svc">
-                        <label class="svc-toggle" :class="{ 'svc-toggle--on': tr.car }">
-                          <input type="checkbox" :checked="tr.car"
-                            @change="rom.updateTraveler(entity.id, trip.id, tr.id, { car: $event.target.checked })" />
-                          <span class="svc-cost">{{ tr.car ? fmt(carCost(trip, tr)) : '—' }}</span>
-                        </label>
+                        <div class="svc-cell" :class="{ 'svc-cell--on': tr.car }">
+                          <label class="svc-row">
+                            <input type="checkbox" :checked="tr.car"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { car: $event.target.checked })" />
+                            <span class="svc-cost">{{ tr.car ? fmt(carCost(trip, tr)) : '—' }}</span>
+                          </label>
+                          <div v-if="tr.car" class="svc-rate-row">
+                            <input type="number" min="0" step="5"
+                              :value="effCar(trip, tr)"
+                              class="svc-rate-input"
+                              :class="{ 'svc-rate-input--override': isOverride(tr, 'carRate', 'defaultCarRate', trip) }"
+                              :title="`Rental car per day · trip default $${trip.defaultCarRate || 75}`"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { carRate: +$event.target.value })" />
+                            <span class="svc-unit">/day</span>
+                          </div>
+                        </div>
                       </td>
                       <td class="t-col-svc">
-                        <label class="svc-toggle" :class="{ 'svc-toggle--on': tr.airfare }">
-                          <input type="checkbox" :checked="tr.airfare"
-                            @change="rom.updateTraveler(entity.id, trip.id, tr.id, { airfare: $event.target.checked })" />
-                          <span class="svc-cost">{{ tr.airfare ? fmt(airfareCost(trip, tr)) : '—' }}</span>
-                        </label>
+                        <div class="svc-cell" :class="{ 'svc-cell--on': tr.airfare }">
+                          <label class="svc-row">
+                            <input type="checkbox" :checked="tr.airfare"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { airfare: $event.target.checked })" />
+                            <span class="svc-cost">{{ tr.airfare ? fmt(airfareCost(trip, tr)) : '—' }}</span>
+                          </label>
+                          <div v-if="tr.airfare" class="svc-rate-row">
+                            <input type="number" min="0" step="25"
+                              :value="effAirfare(trip, tr)"
+                              class="svc-rate-input"
+                              :class="{ 'svc-rate-input--override': isOverride(tr, 'airfareRate', 'defaultAirfareRate', trip) }"
+                              :title="`Airfare per ticket · trip default $${trip.defaultAirfareRate || 600}`"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { airfareRate: +$event.target.value })" />
+                            <span class="svc-unit">/ticket</span>
+                          </div>
+                        </div>
                       </td>
                       <td class="t-col-svc">
-                        <label class="svc-toggle" :class="{ 'svc-toggle--on': tr.misc }">
-                          <input type="checkbox" :checked="tr.misc"
-                            @change="rom.updateTraveler(entity.id, trip.id, tr.id, { misc: $event.target.checked })" />
-                          <span class="svc-cost">{{ tr.misc ? fmt(miscCost(trip, tr)) : '—' }}</span>
-                        </label>
+                        <div class="svc-cell" :class="{ 'svc-cell--on': tr.misc }">
+                          <label class="svc-row">
+                            <input type="checkbox" :checked="tr.misc"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { misc: $event.target.checked })" />
+                            <span class="svc-cost">{{ tr.misc ? fmt(miscCost(trip, tr)) : '—' }}</span>
+                          </label>
+                          <div v-if="tr.misc" class="svc-rate-row">
+                            <input type="number" min="0" step="5"
+                              :value="effMisc(trip, tr)"
+                              class="svc-rate-input"
+                              :class="{ 'svc-rate-input--override': isOverride(tr, 'miscRate', 'defaultMiscRate', trip) }"
+                              :title="`Misc per person · trip default $${trip.defaultMiscRate || 50}`"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { miscRate: +$event.target.value })" />
+                            <span class="svc-unit">flat</span>
+                          </div>
+                        </div>
                       </td>
-                      <td class="t-col-total">{{ fmt(rom.travelerCost(trip, tr)) }}</td>
+                      <td class="t-col-total">{{ fmt(rom.travelerCost(trip, tr) + rom.travelLaborCost(tr)) }}</td>
                       <td class="t-col-del">
                         <button class="del-btn" @click="rom.removeTraveler(entity.id, trip.id, tr.id)" title="Remove traveler">
                           <i class="ti ti-trash" aria-hidden="true"></i>
@@ -440,23 +497,37 @@ function trips(entityId) {
 function entityTotal(entityId){ return trips(entityId).reduce((s, t) => s + rom.tripCost(t), 0) }
 function fmt(n)               { return '$' + Math.round(n || 0).toLocaleString() }
 
+// Effective rate getters — per-row override falls back to trip default
+function effLodging(trip, tr) { return tr.lodgingRate != null ? tr.lodgingRate : (trip.lodgingRate || 0) }
+function effMie(trip, tr)     { return tr.mieRate     != null ? tr.mieRate     : (trip.mieRate     || 0) }
+function effCar(trip, tr)     { return tr.carRate     != null ? tr.carRate     : (trip.defaultCarRate     || 0) }
+function effAirfare(trip, tr) { return tr.airfareRate != null ? tr.airfareRate : (trip.defaultAirfareRate || 0) }
+function effMisc(trip, tr)    { return tr.miscRate    != null ? tr.miscRate    : (trip.defaultMiscRate    || 0) }
+
 // Per-toggle cost helpers — match what travelerCost() computes in the store
 function hotelCost(trip, tr) {
-  const qty   = Math.max(1, tr.qty || 1)
-  const days  = Math.max(0, tr.days || 0)
+  const qty    = Math.max(1, tr.qty || 1)
+  const days   = Math.max(0, tr.days || 0)
   const nights = Math.max(0, days - 1)
-  return qty * ((trip.lodgingRate || 0) * nights + (trip.mieRate || 0) * days)
+  return qty * (effLodging(trip, tr) * nights + effMie(trip, tr) * days)
 }
 function carCost(trip, tr) {
   const qty  = Math.max(1, tr.qty || 1)
   const days = Math.max(0, tr.days || 0)
-  return qty * (trip.defaultCarRate || 0) * days
+  return qty * effCar(trip, tr) * days
 }
 function airfareCost(trip, tr) {
-  return Math.max(1, tr.qty || 1) * (trip.defaultAirfareRate || 0)
+  return Math.max(1, tr.qty || 1) * effAirfare(trip, tr)
 }
 function miscCost(trip, tr) {
-  return Math.max(1, tr.qty || 1) * (trip.defaultMiscRate || 0)
+  return Math.max(1, tr.qty || 1) * effMisc(trip, tr)
+}
+
+// True when the row's rate differs from the trip default (drives a small visual cue)
+function isOverride(tr, field, tripField, trip) {
+  const r = tr?.[field]
+  if (r == null) return false
+  return r !== (trip?.[tripField] ?? 0)
 }
 
 // ── GSA Fiscal Year ──────────────────────────────────────────────────
@@ -556,21 +627,22 @@ function onCitySelect(entityId, trip, cityName) {
     return
   }
 
-  const month  = trip.travelMonth || currentMonth
-  const lodging = cached.gsaMonthlyRates?.[month] ?? cached.lodging ?? 0
-  const update = {
+  // Always pick the peak (most expensive) month's lodging rate — no user month choice.
+  const monthlyEntries = cached.gsaMonthlyRates
+    ? Object.entries(cached.gsaMonthlyRates).sort((a, b) => b[1] - a[1])
+    : []
+  const [peakName, peakRate] = monthlyEntries[0] ?? [null, cached.lodging ?? 0]
+
+  rom.updateTrip(entityId, trip.id, {
     destination:     cityName,
-    lodgingRate:     lodging,
+    lodgingRate:     peakRate || 0,
     mieRate:         cached.mie ?? 0,
     gsaMonthlyRates: cached.gsaMonthlyRates ?? null,
-  }
-  rom.updateTrip(entityId, trip.id, update)
+    travelMonth:     peakName,   // kept only as a label so we can show which month is peak
+  })
 
-  const peak     = cached.gsaMonthlyRates
-    ? Object.entries(cached.gsaMonthlyRates).sort((a,b)=>b[1]-a[1])[0]?.[0]
-    : null
-  const peakNote = peak && peak !== month ? ` · peak: ${peak} $${cached.gsaMonthlyRates[peak]}` : peak === month ? ' ★ peak month' : ''
-  gsaError[trip.id] = `✓ GSA FY${gsaFiscalYear()} · $${lodging}/night · $${cached.mie ?? 0}/day${peakNote}`
+  const peakNote = peakName ? ` · peak: ${peakName} ★` : ''
+  gsaError[trip.id] = `✓ GSA FY${gsaFiscalYear()} · $${peakRate}/night · $${cached.mie ?? 0}/day${peakNote}`
 }
 
 function onOconusLocationSelect(entityId, trip, location) {
@@ -623,17 +695,24 @@ async function lookupGSA(entityId, trip) {
       ? Object.fromEntries(monthlyArr.map(m => [m.short, m.value]))
       : null
 
-    const monthShort = trip.travelMonth || currentMonth
-    const monthEntry = monthlyArr.find(m => m.short === monthShort) ?? monthlyArr[0]
-    const lodging    = monthEntry?.value ?? 0
-    const mie        = entry.meals ?? 0
+    // Always pick the peak (highest-lodging) month — single value, no user month choice
+    const monthlyEntries = gsaMonthlyRates
+      ? Object.entries(gsaMonthlyRates).sort((a, b) => b[1] - a[1])
+      : []
+    const [peakName, peakRate] = monthlyEntries[0] ?? [null, monthlyArr[0]?.value ?? 0]
+    const lodging = peakRate || 0
+    const mie     = entry.meals ?? 0
 
-    rom.updateTrip(entityId, trip.id, { lodgingRate: lodging, mieRate: mie, gsaMonthlyRates })
+    rom.updateTrip(entityId, trip.id, {
+      lodgingRate: lodging,
+      mieRate:     mie,
+      gsaMonthlyRates,
+      travelMonth: peakName,
+    })
 
     const matched  = entry.city?.trim() ?? ''
     const queried  = trip.destination.trim()
-    const peak     = gsaMonthlyRates ? Object.entries(gsaMonthlyRates).sort((a,b)=>b[1]-a[1])[0]?.[0] : null
-    const peakNote = peak && peak !== monthShort ? ` · peak: ${peak} $${gsaMonthlyRates[peak]}` : peak === monthShort ? ' ★ peak month' : ''
+    const peakNote = peakName ? ` · peak: ${peakName} ★` : ''
     gsaError[trip.id] = matched.toLowerCase() !== queried.toLowerCase()
       ? `✓ Matched: ${matched} · $${lodging}/night · $${mie}/day${peakNote}`
       : `✓ GSA FY${year} · $${lodging}/night · $${mie}/day${peakNote}`
@@ -660,35 +739,8 @@ function findBestMatch(query, entries) {
   return entries.find(e => e.standardRate === 'true' || e.city === 'Standard Rate') ?? null
 }
 
-// ── Month change ─────────────────────────────────────────────────────
-function onMonthChange(entityId, trip, newMonth) {
-  if (trip.gsaMonthlyRates?.[newMonth] !== undefined) {
-    const lodging = trip.gsaMonthlyRates[newMonth]
-    rom.updateTrip(entityId, trip.id, { travelMonth: newMonth, lodgingRate: lodging })
-    const peak = peakMonth(trip)
-    gsaError[trip.id] = `✓ $${lodging}/night · $${trip.mieRate ?? 0}/day${peak === newMonth ? ' ★ peak month' : ''}`
-  } else {
-    rom.updateTrip(entityId, trip.id, { travelMonth: newMonth })
-    if (trip.destination?.trim() && trip.state?.trim().length === 2) {
-      lookupGSA(entityId, { ...trip, travelMonth: newMonth })
-    }
-  }
-}
-
-// Returns the month abbreviation with the highest lodging rate
-function peakMonth(trip) {
-  if (!trip.gsaMonthlyRates) return null
-  return Object.entries(trip.gsaMonthlyRates).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
-}
-
-// Option label: "Jun  $237 ★" or just "Jun"
-function monthLabel(trip, m) {
-  if (!trip.gsaMonthlyRates) return m
-  const rate = trip.gsaMonthlyRates[m]
-  if (rate === undefined) return m
-  const peak = peakMonth(trip)
-  return `${m}  $${rate}${m === peak ? ' ★' : ''}`
-}
+// Travel month is no longer user-selectable — the app always uses the peak (most expensive)
+// month's lodging rate so quotes are conservative. peakMonth/monthLabel/onMonthChange removed.
 
 // ── On mount: pre-fetch city lists for states already on trips ────────
 onMounted(() => {
@@ -976,12 +1028,24 @@ onMounted(() => {
   white-space: nowrap;
 }
 .t-col-name  { min-width: 160px; }
+.t-col-cat   { width: 150px; }
 .t-col-qty   { width: 60px;  text-align: center !important; }
 .t-col-days  { width: 70px;  text-align: center !important; }
 .t-col-hrs   { width: 80px;  text-align: center !important; }
-.t-col-svc   { width: 105px; text-align: center !important; }
+.t-col-svc   { width: 140px; text-align: center !important; }
 .t-col-total { width: 90px;  text-align: right !important; }
 .t-col-del   { width: 36px; }
+
+.cat-select {
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 12px;
+  border: 1px solid var(--rom-border);
+  border-radius: 4px;
+  background: var(--rom-surface);
+  color: var(--rom-text);
+}
+.cat-select:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: var(--rom-accent); }
 
 .traveler-row td { padding: 4px 8px; border-bottom: 1px solid var(--rom-border); vertical-align: middle; }
 .traveler-row td input[type="text"],
@@ -995,18 +1059,77 @@ onMounted(() => {
 .traveler-row .t-col-hrs input { text-align: right; }
 .traveler-row .t-col-total { font-weight: 700; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
 
-.svc-toggle {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 8px; border-radius: 4px;
-  background: var(--rom-surface-alt); cursor: pointer;
+.svc-cell {
+  display: inline-flex; flex-direction: column; align-items: stretch;
+  padding: 3px 8px; border-radius: 4px; gap: 4px;
+  background: var(--rom-surface-alt);
   border: 1px solid transparent;
   transition: background .12s;
+  min-width: 130px;
 }
-.svc-toggle:hover { background: #dfe7f5; }
-.svc-toggle input[type="checkbox"] { margin: 0; width: 12px; height: 12px; cursor: pointer; }
-.svc-toggle .svc-cost { font-size: 11px; font-weight: 600; color: var(--rom-text-faint); }
-.svc-toggle--on { background: var(--rom-accent-bg); border-color: var(--rom-accent); }
-.svc-toggle--on .svc-cost { color: var(--rom-accent-dark); }
+.svc-cell:hover { background: #dfe7f5; }
+.svc-cell--on { background: var(--rom-accent-bg); border-color: var(--rom-accent); }
+
+.svc-row {
+  display: inline-flex; align-items: center; gap: 5px;
+  cursor: pointer;
+}
+.svc-row input[type="checkbox"] { margin: 0; width: 12px; height: 12px; cursor: pointer; }
+.svc-row .svc-cost { font-size: 11px; font-weight: 600; color: var(--rom-text-faint); }
+.svc-cell--on .svc-cost { color: var(--rom-accent-dark); }
+
+.svc-rate-row {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding-left: 18px;   /* aligns with the checkbox label above */
+  font-size: 10px;
+}
+.svc-rate-input {
+  width: 64px;
+  padding: 2px 5px;
+  font-size: 11px;
+  text-align: right;
+  border: 1px solid var(--rom-border);
+  border-radius: 3px;
+  background: var(--rom-surface);
+  color: var(--rom-text);
+}
+.svc-rate-input:focus {
+  outline: 1px solid var(--rom-accent);
+  outline-offset: -1px;
+  border-color: var(--rom-accent);
+}
+.svc-rate-input--override {
+  font-weight: 700;
+  color: var(--rom-accent-dark);
+  border-color: var(--rom-accent);
+  background: #fff;
+}
+.svc-unit {
+  font-size: 9px; color: var(--rom-text-muted); opacity: .8;
+}
+
+/* ─── Per-diem chip (always shows the peak-month rate) ────────── */
+.per-diem-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: #fdf6e3;
+  border: 1px solid #b8860b;
+  border-radius: 10px;
+  font-size: 12px; font-weight: 700;
+  color: #8a6508;
+  width: fit-content;
+}
+.per-diem-chip i { font-size: 13px; }
+.per-diem-split {
+  font-size: 10px; opacity: .75; font-weight: 500;
+  margin-left: 2px;
+}
+.per-diem-peak-tag {
+  font-size: 9px; font-weight: 700;
+  padding: 1px 6px; border-radius: 3px;
+  background: #b8860b; color: #fff;
+  letter-spacing: .04em; margin-left: 4px;
+}
 
 /* ─── Trip footer (Add traveler + Trip total) ─────────────────── */
 .trip-footer-bar {
