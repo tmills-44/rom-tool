@@ -620,10 +620,75 @@ export const useRomStore = defineStore('rom', () => {
   const oconusMap       = reactive({})   // "Country|Location" → { lodging, mie }
   const oconusCountries = ref([])        // sorted country names
   const oconusByCountry = reactive({})   // { "Japan": [{ location, lodging, mie }] }
-  const material  = reactive(saved?.material  ?? { items: [], shippingPct: 0.03 })
-  // ── Migration: tag every existing material item with the default COA
+  // ── TEMP-MATERIAL-TAB ──────────────────────────────────────────────
+  // Everything in this block (defaultMaterialCategories, the extended
+  // material reactive shape, the migration, the per-template qty model,
+  // and the addMaterialCategory / updateMaterialCategory /
+  // removeMaterialCategory / reorderMaterialCategory mutations below)
+  // belongs to the temporary Material & Shipping tab.
+  // When the real workflow lands, search for "TEMP-MATERIAL-TAB" to find
+  // every related piece across the codebase and delete them together.
+  // ───────────────────────────────────────────────────────────────────
+
+  // Templates (tiers / room-size variants) — each material item carries a
+  // quantity per template, and the active template drives all extended /
+  // subtotal calculations.
+  const MATERIAL_TEMPLATES = ['A', 'B', 'C', 'D']
+
+  function blankQtyByTemplate() {
+    return MATERIAL_TEMPLATES.reduce((acc, k) => { acc[k] = 0; return acc }, {})
+  }
+
+  // Default seed list for material categories — user-editable in Admin.
+  function defaultMaterialCategories() {
+    return [
+      { id: 'cat-displays',  label: 'Displays'   },
+      { id: 'cat-cabling',   label: 'Cabling'    },
+      { id: 'cat-audio',     label: 'Audio'      },
+      { id: 'cat-mounts',    label: 'Mounts'     },
+      { id: 'cat-power',     label: 'Power'      },
+      { id: 'cat-control',   label: 'Control'    },
+      { id: 'cat-computing', label: 'Computing'  },
+      { id: 'cat-misc',      label: 'Misc'       },
+    ]
+  }
+  const material  = reactive(saved?.material  ?? {
+    items: [], shippingPct: 0.03,
+    categories: defaultMaterialCategories(),
+    activeTemplate: 'A',
+  })
+  // ── Migration: ensure categories list, active template, and per-item shape.
+  if (!Array.isArray(material.categories) || material.categories.length === 0) {
+    material.categories = defaultMaterialCategories()
+  }
+  if (!MATERIAL_TEMPLATES.includes(material.activeTemplate)) {
+    material.activeTemplate = 'A'
+  }
   if (Array.isArray(material.items)) {
-    material.items.forEach(it => { if (!it.coaId) it.coaId = coas[0].id })
+    const firstCatId = material.categories[0].id
+    material.items.forEach(it => {
+      if (!it.coaId)        it.coaId = coas[0].id
+      if (!it.categoryId)   it.categoryId = firstCatId
+      if (typeof it.partNumber !== 'string') it.partNumber = ''
+      if (typeof it.vendor     !== 'string') it.vendor     = ''
+      if (typeof it.model      !== 'string') it.model      = ''
+      if (typeof it.unit       !== 'string') it.unit       = 'ea'
+      // Sub-component bundle list — parents with components ignore the flat unitCost
+      // and compute their unit cost as sum(qtyPerUnit * unitPrice). Empty array
+      // means "flat-priced parent" (uses item.unitCost as before).
+      if (!Array.isArray(it.components)) it.components = []
+      // Convert legacy single-qty into per-template map (old qty becomes the A column)
+      if (!it.qtyByTemplate || typeof it.qtyByTemplate !== 'object') {
+        const legacy = typeof it.qty === 'number' ? it.qty : 0
+        it.qtyByTemplate = blankQtyByTemplate()
+        it.qtyByTemplate.A = legacy
+      } else {
+        // Make sure every template column exists, even if we add new ones later
+        MATERIAL_TEMPLATES.forEach(k => {
+          if (typeof it.qtyByTemplate[k] !== 'number') it.qtyByTemplate[k] = 0
+        })
+      }
+    })
   }
   // Each COA carries its own overhead — flexible list of items. Each item has
   // { id, label, pct, enabled, base }. base is either 'unloaded' (pct of the
@@ -1107,26 +1172,305 @@ export const useRomStore = defineStore('rom', () => {
   function updateTravelLine() {}
   function removeTravelLine() {}
 
-  function addMaterialItem() {
-    material.items.push({ id: uuid(), description: '', qty: 1, unitCost: 0, coaId: activeCoaId.value })
+  function addMaterialItem(categoryId = null) {
+    const catId = categoryId || material.categories[0]?.id || 'cat-misc'
+    const qbt = blankQtyByTemplate()
+    // Default the active template to qty=1 so the row counts as "added"
+    qbt[material.activeTemplate] = 1
+    material.items.push({
+      id: uuid(),
+      description: '',
+      partNumber: '',
+      vendor: '',
+      model: '',
+      unit: 'ea',
+      qtyByTemplate: qbt,
+      unitCost: 0,
+      components: [],
+      coaId: activeCoaId.value,
+      categoryId: catId,
+    })
+  }
+
+  // ── TEMP-MATERIAL-TAB: Component (sub-item) mutations
+  function addMaterialComponent(itemId, seed = {}) {
+    const item = material.items.find(i => i.id === itemId)
+    if (!item) return
+    if (!Array.isArray(item.components)) item.components = []
+    item.components.push({
+      id: 'cp-' + uuid().slice(0, 8),
+      partNumber:   seed.partNumber   ?? '',
+      description:  seed.description  ?? '',
+      manufacturer: seed.manufacturer ?? '',
+      qtyPerUnit:   seed.qtyPerUnit   ?? 1,
+      unitPrice:    seed.unitPrice    ?? 0,
+    })
+  }
+  function updateMaterialComponent(itemId, componentId, patch) {
+    const item = material.items.find(i => i.id === itemId)
+    if (!item || !Array.isArray(item.components)) return
+    const cp = item.components.find(c => c.id === componentId)
+    if (cp) Object.assign(cp, patch)
+  }
+  function removeMaterialComponent(itemId, componentId) {
+    const item = material.items.find(i => i.id === itemId)
+    if (!item || !Array.isArray(item.components)) return
+    const idx = item.components.findIndex(c => c.id === componentId)
+    if (idx >= 0) item.components.splice(idx, 1)
+  }
+  // Bundle unit cost — sum of (qtyPerUnit * unitPrice) for all components.
+  // Returns item.unitCost as fallback for parents with no components yet.
+  function bundleUnitCost(item) {
+    if (!item) return 0
+    const cps = item.components || []
+    if (cps.length === 0) return item.unitCost || 0
+    return cps.reduce((s, c) => s + (c.qtyPerUnit || 0) * (c.unitPrice || 0), 0)
   }
   function updateMaterialItem(id, patch) {
     const item = material.items.find(i => i.id === id)
     if (item) Object.assign(item, patch)
   }
+  // Update a single template column's quantity for one item
+  function updateMaterialItemQty(id, template, value) {
+    const item = material.items.find(i => i.id === id)
+    if (!item) return
+    if (!item.qtyByTemplate) item.qtyByTemplate = blankQtyByTemplate()
+    item.qtyByTemplate[template] = parseFloat(value) || 0
+  }
+  function setActiveMaterialTemplate(template) {
+    if (!MATERIAL_TEMPLATES.includes(template)) return
+    // Auto-load the standard MEL the first time a class is picked on an
+    // empty scope. After items exist, switching classes just changes the
+    // active template (totals recompute through itemActiveQty / bundleUnitCost).
+    const scopeIsEmpty = !material.items.some(
+      it => (it.coaId ?? coas[0].id) === activeCoaId.value
+    )
+    if (scopeIsEmpty) appendMELSeedItems(MEL_SEED)
+    material.activeTemplate = template
+  }
   function removeMaterialItem(id) {
     const idx = material.items.findIndex(i => i.id === id)
     if (idx >= 0) material.items.splice(idx, 1)
   }
+  // Helper: read an item's qty for the active template (for view / totals)
+  function itemActiveQty(item) {
+    return (item?.qtyByTemplate?.[material.activeTemplate]) || 0
+  }
 
-  // Material totals scoped to the active COA
+  // ── TEMP-MATERIAL-TAB: Standard MEL seed (full bundle hierarchy)
+  // Each MEL line is a parent "bundle" with one or more sub-components.
+  // qtyByTemplate sets the parent quantity per template (A/B/C/D); each
+  // component carries qtyPerUnit and unitPrice, so the bundle's unit cost
+  // and the row's extended cost both compute automatically.
+  const MEL_SEED = [
+    { description: "2-Bay Credenza", categoryId: 'cat-mounts', qtyByTemplate: { A: 1, B: 0, C: 0, D: 0 }, components: [
+      { partNumber: 'C5-FF27-2', description: '2 Bay C5 Credenza Frame,  27 Inches Deep', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 1037.81 },
+      { partNumber: 'C5-VENT2-SM', description: 'C5-VENT2-SM', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 0 },
+      { partNumber: 'C5K2A1SSHE0ZP001', description: 'Wood Kit', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 2500 },
+      { partNumber: 'C5-EXT-3', description: 'C5 Credenza Rear Door Bay Extender', manufacturer: 'Middle Atlantic', qtyPerUnit: 2, unitPrice: 125 },
+      { partNumber: 'C5-ARB27', description: 'C5 Credenza Adjustable Rail Brackets, 27 Inches Deep', manufacturer: 'Middle Atlantic', qtyPerUnit: 2, unitPrice: 98 },
+      { partNumber: 'AP7900B', description: '8 Outlet 1RU Mounted IP/RS232 PDU', manufacturer: 'APC', qtyPerUnit: 2, unitPrice: 547.5 },
+      { partNumber: 'UPS-2200R-8', description: '2200VA RM 2U Individual Controlled Outlets', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 1200 },
+    ] },
+    { description: "3-Bay Credenza", categoryId: 'cat-mounts', qtyByTemplate: { A: 0, B: 0, C: 1, D: 0 }, components: [
+      { partNumber: 'C5-FF27-3', description: '3 Bay C5 Credenza Frame,  27 Inches Deep', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 1265 },
+      { partNumber: 'C5-VENT3-SM', description: 'C5-VENT3-SM', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 0 },
+      { partNumber: 'C5K3A1SSHE0ZP001', description: 'Wood Kit', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 3150 },
+      { partNumber: 'C5-EXT-3', description: 'C5 Credenza Rear Door Bay Extender', manufacturer: 'Middle Atlantic', qtyPerUnit: 3, unitPrice: 125 },
+      { partNumber: 'C5-ARB27', description: 'C5 Credenza Adjustable Rail Brackets, 27 Inches Deep', manufacturer: 'Middle Atlantic', qtyPerUnit: 3, unitPrice: 98 },
+      { partNumber: 'AP7900B', description: '8 Outlet 1RU Mounted IP/RS232 PDU', manufacturer: 'APC', qtyPerUnit: 3, unitPrice: 547.5 },
+      { partNumber: 'UPS-2200R-8', description: '2200VA RM 2U Individual Controlled Outlets', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 1200 },
+    ] },
+    { description: "19 RU Rack", categoryId: 'cat-mounts', qtyByTemplate: { A: 0, B: 0, C: 0, D: 0 }, components: [
+      { partNumber: 'BGR-1927LRD', description: '19 RU BGR Equipment rack - 27" Deep', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 540 },
+      { partNumber: 'BSPN-19-27', description: '19 RU BGR Side Panels - 27" Deep', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 237 },
+      { partNumber: 'PFD-19A', description: '19 RU BGR Curved Plexiglass Front Door', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 251 },
+      { partNumber: 'BGR-RDC19', description: '19 RU BGR Cable Entry Rear Door', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 122 },
+      { partNumber: 'CBS-BGR', description: 'BGR Caster Kit (19/25/38/45RU)', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 128.26 },
+      { partNumber: 'LL-MP21', description: 'Lever Lock Cable system (7 Pieces)', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 56.63 },
+      { partNumber: 'FAN2-DC-FC', description: 'DC Fan Kit for Rear Door (19/25RU)', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 143.07 },
+      { partNumber: 'AP7900B', description: '8 Outlet 1RU Mounted IP/RS232 PDU', manufacturer: 'APC', qtyPerUnit: 2, unitPrice: 547.5 },
+      { partNumber: 'UPS-2200R-8', description: '2200VA RM 2U Individual Controlled Outlets', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 1200 },
+    ] },
+    { description: "38RU Rack", categoryId: 'cat-mounts', qtyByTemplate: { A: 0, B: 0, C: 0, D: 1 }, components: [
+      { partNumber: 'BGR-3832LRD', description: '38 RU BGR Equipment Rack - 32" Deep', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 723.49 },
+      { partNumber: 'BSPN-38-32', description: '38 RU BGR Side Panels - 32" Deep', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 398.5 },
+      { partNumber: 'PFD-38A', description: '38 RU BGR Curved Plexiglass Front Door', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 394.28 },
+      { partNumber: 'BGR-RDC38', description: '38 RU BGR Cable Entry Rear Door', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 151.2 },
+      { partNumber: 'CBS-BGR', description: 'BGR Caster Kit (19/25/38/45RU)', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 128.26 },
+      { partNumber: 'LL-MP21', description: 'Lever Lock Cable system (7 Pieces)', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 56.63 },
+      { partNumber: 'BGR-276FT-FC', description: 'BGR Fan Top w/ temp Controller (38/45RU)', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 353.29 },
+      { partNumber: 'AP7900B', description: '8 Outlet 1RU Mounted IP/RS232 PDU', manufacturer: 'APC', qtyPerUnit: 3, unitPrice: 547.5 },
+      { partNumber: 'UPS-2200R-8', description: '2200VA RM 2U Individual Controlled Outlets', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 1200 },
+    ] },
+    { description: "Podium", categoryId: 'cat-mounts', qtyByTemplate: { A: 0, B: 1, C: 0, D: 0 }, components: [
+      { partNumber: 'L5-FLATFR-43LDW', description: 'L5 Series Flat Frame 43 Inches Wide, 2 Bays', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 1600 },
+      { partNumber: 'L5KCB2SFHE013139', description: 'Wood Kit', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 1000 },
+      { partNumber: 'LL-VC21-4', description: 'Lever Lock 17.1 (4 PK)', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 40 },
+      { partNumber: 'AP7900B', description: '8 Outlet 1RU Mounted IP/RS232 PDU', manufacturer: 'APC', qtyPerUnit: 2, unitPrice: 547.5 },
+      { partNumber: 'UPS-2200R-8', description: '2200VA RM 2U Individual Controlled Outlets', manufacturer: 'Middle Atlantic', qtyPerUnit: 1, unitPrice: 1200 },
+    ] },
+    { description: "Exterior Room Signage", categoryId: 'cat-misc', qtyByTemplate: { A: 1, B: 1, C: 1, D: 1 }, components: [
+      { partNumber: 'PA28H', description: '28" Panoramic Display w/RS232', manufacturer: 'GPO Display', qtyPerUnit: 1, unitPrice: 1662.47 },
+      { partNumber: 'IPOE-173S', description: 'UPOE Power Splitter', manufacturer: 'Planet Tech', qtyPerUnit: 1, unitPrice: 245.02 },
+      { partNumber: 'POE-171A-95', description: 'UPOE Power Injector', manufacturer: 'Planet Tech', qtyPerUnit: 1, unitPrice: 195.21 },
+      { partNumber: '6507101', description: 'DGE-100', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1100 },
+    ] },
+    { description: "World Clock", categoryId: 'cat-misc', qtyByTemplate: { A: 1, B: 1, C: 1, D: 1 }, components: [
+      { partNumber: 'PA48H', description: '48" Panoramic Display w/RS232', manufacturer: 'GPO Display', qtyPerUnit: 1, unitPrice: 3712.85 },
+      { partNumber: '6507101', description: 'DGE-100', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1100 },
+    ] },
+    { description: "Splash Screen", categoryId: 'cat-displays', qtyByTemplate: { A: 0, B: 1, C: 1, D: 1 }, components: [
+      { partNumber: '6511006', description: 'DM-NVX-360 - 4K Network AV Enc/Dec', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1139 },
+      { partNumber: '6507101', description: 'DGE-100', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1100 },
+    ] },
+    { description: "55\" Display", categoryId: 'cat-displays', qtyByTemplate: { A: 0, B: 0, C: 0, D: 0 }, components: [
+      { partNumber: 'QB55R-N', description: '55" 4K Display Commercial Series', manufacturer: 'Samsung', qtyPerUnit: 1, unitPrice: 1089.37 },
+      { partNumber: '6511006', description: 'DM-NVX-360 - 4K Network AV Enc/Dec', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1139 },
+      { partNumber: 'XSM1U', description: 'Fixed  Wall Mount X-Large 55" & up (250lbs)', manufacturer: 'CHIEF', qtyPerUnit: 1, unitPrice: 223.43 },
+    ] },
+    { description: "65\" Display", categoryId: 'cat-displays', qtyByTemplate: { A: 0, B: 0, C: 0, D: 0 }, components: [
+      { partNumber: 'QB65R-N', description: '65" 4K Display Commercial Series', manufacturer: 'Samsung', qtyPerUnit: 1, unitPrice: 1406.23 },
+      { partNumber: '6511006', description: 'DM-NVX-360 - 4K Network AV Enc/Dec', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1139 },
+      { partNumber: 'XSM1U', description: 'Fixed  Wall Mount X-Large 55" & up (250lbs)', manufacturer: 'CHIEF', qtyPerUnit: 1, unitPrice: 223.43 },
+    ] },
+    { description: "75\" Display", categoryId: 'cat-displays', qtyByTemplate: { A: 0, B: 0, C: 2, D: 0 }, components: [
+      { partNumber: 'QB75R-N', description: '75" 4K Display Commercial Series', manufacturer: 'Samsung', qtyPerUnit: 1, unitPrice: 2009.37 },
+      { partNumber: '6511006', description: 'DM-NVX-360 - 4K Network AV Enc/Dec', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1139 },
+      { partNumber: 'XSM1U', description: 'Fixed  Wall Mount X-Large 55" & up (250lbs)', manufacturer: 'CHIEF', qtyPerUnit: 1, unitPrice: 223.43 },
+    ] },
+    { description: "85\" Display", categoryId: 'cat-displays', qtyByTemplate: { A: 1, B: 2, C: 0, D: 0 }, components: [
+      { partNumber: 'QB85R-N', description: '85" 4K Display Commercial Series', manufacturer: 'Samsung', qtyPerUnit: 1, unitPrice: 3821.34 },
+      { partNumber: '6511006', description: 'DM-NVX-360 - 4K Network AV Enc/Dec', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1139 },
+      { partNumber: 'XSM1U', description: 'Fixed  Wall Mount X-Large 55" & up (250lbs)', manufacturer: 'CHIEF', qtyPerUnit: 1, unitPrice: 223.43 },
+    ] },
+    { description: "98\" Display", categoryId: 'cat-displays', qtyByTemplate: { A: 0, B: 0, C: 0, D: 4 }, components: [
+      { partNumber: 'FHQ981-L', description: '98" 4K Display', manufacturer: 'Christie', qtyPerUnit: 1, unitPrice: 12310 },
+      { partNumber: '6511006', description: 'DM-NVX-360 - 4K Network AV Enc/Dec', manufacturer: 'Crestron', qtyPerUnit: 4, unitPrice: 1139 },
+      { partNumber: 'XSM1U', description: 'Fixed  Wall Mount X-Large 55" & up (250lbs)', manufacturer: 'CHIEF', qtyPerUnit: 1, unitPrice: 223.43 },
+    ] },
+    { description: "PC Sources", categoryId: 'cat-computing', qtyByTemplate: { A: 2, B: 4, C: 4, D: 10 }, components: [
+      { partNumber: '6511006', description: 'DM-NVX-360 - 4K Network AV Enc/Dec', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1139 },
+    ] },
+    { description: "Cameras", categoryId: 'cat-audio', qtyByTemplate: { A: 1, B: 2, C: 1, D: 2 }, components: [
+      { partNumber: 'CAM570', description: '4K Dual Lens Audio Tracking Camera', manufacturer: 'AVER', qtyPerUnit: 1, unitPrice: 1977.37 },
+      { partNumber: '6511006', description: 'DM-NVX-360 - 4K Network AV Enc/Dec', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1139 },
+    ] },
+    { description: "Speakers", categoryId: 'cat-audio', qtyByTemplate: { A: 2, B: 6, C: 4, D: 8 }, components: [
+      { partNumber: '42-141-23', description: 'FF 220T (Pair)', manufacturer: 'Extron', qtyPerUnit: 0.5, unitPrice: 330 },
+      { partNumber: '60-1501-01', description: 'NetPA 1001-70V AT', manufacturer: 'Extron', qtyPerUnit: 0.5, unitPrice: 638 },
+    ] },
+    { description: "Ceiling Mics", categoryId: 'cat-audio', qtyByTemplate: { A: 1, B: 1, C: 1, D: 0 }, components: [
+      { partNumber: 'MXA920W-S', description: '24" Ceiling Array Dante - White', manufacturer: 'Shure', qtyPerUnit: 1, unitPrice: 3467 },
+    ] },
+    { description: "Gooseneck Mics", categoryId: 'cat-audio', qtyByTemplate: { A: 0, B: 1, C: 0, D: 10 }, components: [
+      { partNumber: 'MX400DP', description: 'Shure Gooseneck Desktop Base', manufacturer: 'Shure', qtyPerUnit: 1, unitPrice: 282.72 },
+      { partNumber: 'MX415LP/C', description: '15" Gooseneck', manufacturer: 'Shure', qtyPerUnit: 1, unitPrice: 218 },
+      { partNumber: '60-1628-11', description: 'AXI 44 AT, 4 Input, 4 Output Dante Audio Interface', manufacturer: 'Extron', qtyPerUnit: 1, unitPrice: 677 },
+    ] },
+    { description: "Touch Panels", categoryId: 'cat-control', qtyByTemplate: { A: 1, B: 1, C: 1, D: 1 }, components: [
+      { partNumber: '6510832', description: 'TS-770-GV-B-S - 7" Touch Screen - Black - GV - Table Mount', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1101 },
+    ] },
+    { description: "VTC Codecs", categoryId: 'cat-audio', qtyByTemplate: { A: 0, B: 1, C: 1, D: 1 }, components: [
+      { partNumber: 'CS-CODEC-EQ-NRK9++', description: 'Cisco Codec EQ Standalone – Non- Radio for TAA', manufacturer: 'Cisco', qtyPerUnit: 1, unitPrice: 8500 },
+      { partNumber: '6511006', description: 'DM-NVX-360 - 4K Network AV Enc/Dec', manufacturer: 'Crestron', qtyPerUnit: 4, unitPrice: 1139 },
+    ] },
+    { description: "24 Port Switch", categoryId: 'cat-computing', qtyByTemplate: { A: 1, B: 1, C: 1, D: 0 }, components: [
+      { partNumber: 'C9300-24U-A', description: 'Catalyst 9300 24-port UPOE Network Advantage', manufacturer: 'Cisco', qtyPerUnit: 1, unitPrice: 7495 },
+      { partNumber: 'PWR-C1-1100WAC-P/2', description: '1100W AC 80+ platinum Config 1 Secondary Power Supply', manufacturer: 'Cisco', qtyPerUnit: 1, unitPrice: 1105.86 },
+    ] },
+    { description: "48 Port Switch", categoryId: 'cat-computing', qtyByTemplate: { A: 0, B: 0, C: 0, D: 1 }, components: [
+      { partNumber: 'C9300-48U-A', description: 'Catalyst 9300 48-port UPOE Network Advantage', manufacturer: 'Cisco', qtyPerUnit: 1, unitPrice: 9816 },
+      { partNumber: 'PWR-C1-1100WAC-P/2', description: '1100W AC 80+ platinum Config 1 Secondary Power Supply', manufacturer: 'Cisco', qtyPerUnit: 1, unitPrice: 1105.86 },
+    ] },
+    { description: "Control Processor & DSP", categoryId: 'cat-control', qtyByTemplate: { A: 1, B: 1, C: 1, D: 1 }, components: [
+      { partNumber: '6511816', description: 'CP4', manufacturer: 'Crestron', qtyPerUnit: 1, unitPrice: 1100 },
+      { partNumber: '911.0093.900', description: 'TesiraFORTE X 1600', manufacturer: 'Biamp', qtyPerUnit: 1, unitPrice: 3576 },
+    ] },
+  ]
+
+  // Append the MEL_SEED items into the active scope. Returns the number added.
+  function seedDefaultMELItems() {
+    return appendMELSeedItems(MEL_SEED)
+  }
+
+  // Generic append: takes an array of seed objects shaped like MEL_SEED
+  // (description, categoryId, qtyByTemplate, components) and pushes them
+  // into the active scope. Used by both the hardcoded seed loader and the
+  // Excel importer.
+  function appendMELSeedItems(seeds) {
+    let added = 0
+    ;(seeds || []).forEach(seed => {
+      const qbt = blankQtyByTemplate()
+      Object.keys(seed.qtyByTemplate || {}).forEach(k => {
+        if (k in qbt) qbt[k] = Number(seed.qtyByTemplate[k]) || 0
+      })
+      const components = (seed.components || []).map(c => ({
+        id: 'cp-' + uuid().slice(0, 8),
+        partNumber:   c.partNumber   || '',
+        description:  c.description  || '',
+        manufacturer: c.manufacturer || '',
+        qtyPerUnit:   Number(c.qtyPerUnit) || 0,
+        unitPrice:    Number(c.unitPrice)  || 0,
+      }))
+      material.items.push({
+        id: uuid(),
+        description: seed.description || 'Untitled',
+        partNumber: '',
+        vendor: '',
+        model: '',
+        unit: 'ea',
+        qtyByTemplate: qbt,
+        unitCost: 0,      // ignored when components.length > 0
+        components,
+        coaId: activeCoaId.value,
+        categoryId: seed.categoryId || material.categories[0]?.id || 'cat-misc',
+      })
+      added++
+    })
+    return added
+  }
+
+  // ── TEMP-MATERIAL-TAB: Material category mutations (user-editable in Admin)
+  function addMaterialCategory(label = 'New Category') {
+    const id = 'cat-' + uuid().slice(0, 8)
+    material.categories.push({ id, label })
+    return id
+  }
+  function updateMaterialCategory(id, patch) {
+    const cat = material.categories.find(c => c.id === id)
+    if (cat) Object.assign(cat, patch)
+  }
+  function removeMaterialCategory(id) {
+    if (material.categories.length <= 1) return  // never let the list be empty
+    const idx = material.categories.findIndex(c => c.id === id)
+    if (idx < 0) return
+    material.categories.splice(idx, 1)
+    // Reassign any items that pointed at the removed category to the first remaining one
+    const fallback = material.categories[0].id
+    material.items.forEach(it => {
+      if (it.categoryId === id) it.categoryId = fallback
+    })
+  }
+  function reorderMaterialCategory(fromIdx, toIdx) {
+    if (fromIdx === toIdx) return
+    const arr = material.categories
+    if (fromIdx < 0 || fromIdx >= arr.length || toIdx < 0 || toIdx >= arr.length) return
+    const [moved] = arr.splice(fromIdx, 1)
+    arr.splice(toIdx, 0, moved)
+  }
+
+  // Material totals scoped to the active COA. Quantities live in
+  // item.qtyByTemplate[activeTemplate], and unit cost comes from the
+  // component bundle (with a flat unitCost fallback for parents with no
+  // components yet).
   const activeMaterialItems = computed(() => material.items.filter(i => (i.coaId ?? coas[0].id) === activeCoaId.value))
-  const materialUnloaded    = computed(() => activeMaterialItems.value.reduce((s, i) => s + (i.qty || 0) * (i.unitCost || 0), 0))
+  const materialUnloaded    = computed(() => activeMaterialItems.value.reduce((s, i) => s + itemActiveQty(i) * bundleUnitCost(i), 0))
   const shippingCost        = computed(() => materialUnloaded.value * material.shippingPct)
   const materialTotal       = computed(() => materialUnloaded.value + shippingCost.value)
   // Helpers that compute material totals for any specific COA — used by Summary + exports
   function materialUnloadedFor(coaId) {
-    return material.items.filter(i => (i.coaId ?? coas[0].id) === coaId).reduce((s, i) => s + (i.qty || 0) * (i.unitCost || 0), 0)
+    return material.items.filter(i => (i.coaId ?? coas[0].id) === coaId).reduce((s, i) => s + itemActiveQty(i) * bundleUnitCost(i), 0)
   }
   function materialTotalFor(coaId) {
     const u = materialUnloadedFor(coaId)
@@ -1469,7 +1813,15 @@ export const useRomStore = defineStore('rom', () => {
       }
     })
     material.items.filter(it => it.coaId === id).forEach(it => {
-      material.items.push({ ...it, id: uuid(), coaId: newId })
+      // Deep-clone qtyByTemplate and components so the duplicate's edits
+      // don't mutate the source scope.
+      material.items.push({
+        ...it,
+        id: uuid(),
+        coaId: newId,
+        qtyByTemplate: { ...(it.qtyByTemplate || {}) },
+        components: (it.components || []).map(c => ({ ...c, id: 'cp-' + uuid().slice(0, 8) })),
+      })
     })
     overheadByCoa[newId] = { ...(overheadByCoa[id] ?? defaultOverhead()) }
     activeCoaId.value = newId
@@ -1697,7 +2049,11 @@ export const useRomStore = defineStore('rom', () => {
     addCoa, removeCoa, renameCoa, toggleCoaIncluded, setActiveCoa, duplicateCoa,
     exportStateForBackup, importStateFromBackup,
     showRates, showRowStatus, undo, redo, canUndo, canRedo,
-    addMaterialItem, updateMaterialItem, removeMaterialItem,
+    addMaterialItem, updateMaterialItem, updateMaterialItemQty, removeMaterialItem,
+    addMaterialCategory, updateMaterialCategory, removeMaterialCategory, reorderMaterialCategory,
+    setActiveMaterialTemplate, MATERIAL_TEMPLATES, itemActiveQty,
+    addMaterialComponent, updateMaterialComponent, removeMaterialComponent, bundleUnitCost,
+    seedDefaultMELItems, appendMELSeedItems,
     addTrip, updateTrip, removeTrip, tripCost, travelerCost, travelerRate, travelLaborCost,
     addTraveler, updateTraveler, removeTraveler,
     travelTotalForQuote,

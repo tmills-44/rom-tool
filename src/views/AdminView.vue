@@ -323,6 +323,80 @@
             </button>
           </div>
         </section>
+
+        <!-- ── TEMP-MATERIAL-TAB: Material Categories editor ─────────
+             Delete this whole <section>...</section> (plus the matching
+             script state + styles below) when the temp Material tab is
+             removed. Search "TEMP-MATERIAL-TAB" for every related piece. -->
+        <section class="admin-section">
+          <div class="admin-section-head">
+            <h3>Material Categories</h3>
+          </div>
+          <p class="admin-section-desc">
+            These are the buckets used to group line items in the Material &amp; Shipping tab.
+            Add, rename, reorder, or remove them. Removing a category re-assigns its items to
+            the first remaining category.
+          </p>
+
+          <div class="mat-cat-list">
+            <div
+              v-for="(cat, i) in rom.material.categories"
+              :key="cat.id"
+              class="mat-cat-row"
+              :class="{
+                'mat-cat-row--dragging':  dragMatCat.dragId === cat.id,
+                'mat-cat-row--drag-over': dragMatCat.overId === cat.id && dragMatCat.dragId !== cat.id,
+              }"
+              draggable="true"
+              @dragstart="dragMatCat.dragId = cat.id"
+              @dragend="dragMatCat.dragId = null; dragMatCat.overId = null"
+              @dragover.prevent="dragMatCat.overId = cat.id"
+              @dragleave="dragMatCat.overId = null"
+              @drop.prevent="onMatCatDrop(cat.id)"
+            >
+              <div class="mat-cat-reorder">
+                <span class="drag-handle" title="Drag to reorder">⠿</span>
+                <button :disabled="i === 0" @click="rom.reorderMaterialCategory(i, i - 1)" title="Move up">
+                  <i class="ti ti-chevron-up"></i>
+                </button>
+                <button :disabled="i === rom.material.categories.length - 1" @click="rom.reorderMaterialCategory(i, i + 1)" title="Move down">
+                  <i class="ti ti-chevron-down"></i>
+                </button>
+              </div>
+              <input
+                class="cell-input mat-cat-name"
+                type="text"
+                :value="cat.label"
+                @input="rom.updateMaterialCategory(cat.id, { label: $event.target.value })"
+              />
+              <span class="mat-cat-count">
+                {{ matCatItemCount(cat.id) }}
+                {{ matCatItemCount(cat.id) === 1 ? 'item' : 'items' }}
+              </span>
+              <button
+                class="mat-cat-del"
+                :disabled="rom.material.categories.length <= 1"
+                @click="confirmRemoveCategory(cat)"
+                :title="rom.material.categories.length <= 1 ? 'Cannot delete the last category' : 'Delete category'"
+              >
+                <i class="ti ti-trash"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="mat-cat-add">
+            <input
+              class="cell-input cell-input--task"
+              type="text"
+              placeholder="New category name…"
+              v-model="newCatLabel"
+              @keydown.enter="addNewCategory"
+            />
+            <button class="add-task-btn" @click="addNewCategory" :disabled="!newCatLabel.trim()">
+              <i class="ti ti-plus"></i> Add category
+            </button>
+          </div>
+        </section>
       </div>
     </template>
   </div>
@@ -442,6 +516,39 @@ function onTaskDrop(dropId) {
   rom.reorderTask(selectedRole.value, selectedPhase.value, dragTask.dragId, dropId)
   dragTask.dragId = null
   dragTask.overId = null
+}
+
+// ── TEMP-MATERIAL-TAB: Material Categories editor state ───────────
+const newCatLabel = ref('')
+const dragMatCat = reactive({ dragId: null, overId: null })
+
+function addNewCategory() {
+  const label = newCatLabel.value.trim()
+  if (!label) return
+  rom.addMaterialCategory(label)
+  newCatLabel.value = ''
+}
+
+function confirmRemoveCategory(cat) {
+  const count = matCatItemCount(cat.id)
+  const itemText = count === 0
+    ? ''
+    : `\n\nThe ${count} item${count === 1 ? '' : 's'} currently in this category will be re-assigned to "${rom.material.categories[0]?.label || 'the first remaining category'}".`
+  if (!confirm(`Delete category "${cat.label}"?${itemText}`)) return
+  rom.removeMaterialCategory(cat.id)
+}
+
+function matCatItemCount(catId) {
+  return rom.material.items.filter(it => (it.categoryId || rom.material.categories[0]?.id) === catId).length
+}
+
+function onMatCatDrop(dropId) {
+  if (!dragMatCat.dragId || dragMatCat.dragId === dropId) return
+  const fromIdx = rom.material.categories.findIndex(c => c.id === dragMatCat.dragId)
+  const toIdx   = rom.material.categories.findIndex(c => c.id === dropId)
+  if (fromIdx >= 0 && toIdx >= 0) rom.reorderMaterialCategory(fromIdx, toIdx)
+  dragMatCat.dragId = null
+  dragMatCat.overId = null
 }
 
 // New labor-category form state
@@ -790,4 +897,79 @@ function resetWbs() {
 }
 .add-task-btn:hover:not(:disabled) { background: var(--rom-accent-dark, #134a91); }
 .add-task-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── TEMP-MATERIAL-TAB: Material Categories editor styles ──────────── */
+.mat-cat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.mat-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--rom-surface);
+  border: 1px solid var(--rom-border);
+  border-radius: 6px;
+  transition: background .1s ease, box-shadow .1s ease;
+}
+.mat-cat-row--dragging  { opacity: 0.4; }
+.mat-cat-row--drag-over { box-shadow: inset 0 2px 0 0 var(--rom-accent); }
+.mat-cat-reorder {
+  display: inline-flex; align-items: center; gap: 2px;
+  color: var(--rom-text-muted);
+}
+.mat-cat-reorder button {
+  width: 22px; height: 22px;
+  background: transparent;
+  border: none;
+  color: var(--rom-text-muted);
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
+.mat-cat-reorder button:hover:not(:disabled) { background: var(--rom-surface-alt); color: var(--rom-text); }
+.mat-cat-reorder button:disabled { opacity: 0.3; cursor: not-allowed; }
+.mat-cat-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+}
+.mat-cat-count {
+  font-size: 11px;
+  color: var(--rom-text-muted);
+  background: var(--rom-bg);
+  padding: 2px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.mat-cat-del {
+  width: 28px; height: 26px;
+  background: transparent;
+  border: 1px solid var(--rom-border);
+  border-radius: 4px;
+  color: var(--rom-text-muted);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  transition: color .1s, border-color .1s, background .1s;
+}
+.mat-cat-del:hover:not(:disabled) {
+  color: #c44a4a;
+  border-color: #c44a4a;
+  background: rgba(196, 74, 74, 0.08);
+}
+.mat-cat-del:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.mat-cat-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mat-cat-add .cell-input--task {
+  flex: 1;
+}
 </style>

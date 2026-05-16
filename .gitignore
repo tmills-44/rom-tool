@@ -38,3 +38,8 @@ src/assets/vite.svg
 src/assets/vue.svg
 src/components/HelloWorld.vue
 src/components/SidebarTree.vue
+
+# TEMP-MATERIAL-TAB: keep internal pricing spreadsheets out of the public
+# Netlify build. The MEL importer reads files the user picks at runtime —
+# nothing needs to be bundled in the repo.
+public/mel-templates/
