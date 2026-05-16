@@ -630,13 +630,24 @@ export const useRomStore = defineStore('rom', () => {
   // every related piece across the codebase and delete them together.
   // ───────────────────────────────────────────────────────────────────
 
-  // Templates (tiers / room-size variants) — each material item carries a
-  // quantity per template, and the active template drives all extended /
-  // subtotal calculations.
-  const MATERIAL_TEMPLATES = ['A', 'B', 'C', 'D']
-
-  function blankQtyByTemplate() {
-    return MATERIAL_TEMPLATES.reduce((acc, k) => { acc[k] = 0; return acc }, {})
+  // Templates (room-type classes). Picking one loads that class's MEL into
+  // the active scope, replacing any existing items. 'X' = empty/custom.
+  // Labels match the Proposal sheet "Baseline → Type" mapping in
+  // temp-pro.xlsx so the UI can show a category when you pick a class.
+  const MATERIAL_TEMPLATES = [
+    { id: 'A', label: 'Huddle Room' },
+    { id: 'B', label: 'Classroom' },
+    { id: 'C', label: 'Conference Room' },
+    { id: 'D', label: 'Operations Center' },
+    { id: 'X', label: 'Custom (empty)' },
+  ]
+  const TEMPLATE_IDS = MATERIAL_TEMPLATES.map(t => t.id)
+  // The seed still carries qtyByTemplate so the four built-in class MELs
+  // can be derived from it. Helper to read a single class's qty out of a
+  // seed entry, supporting both the new shape and any legacy single-qty seed.
+  function seedQtyForClass(seed, classId) {
+    if (seed?.qtyByTemplate && classId in seed.qtyByTemplate) return Number(seed.qtyByTemplate[classId]) || 0
+    return Number(seed?.qty) || 0
   }
 
   // Default seed list for material categories — user-editable in Admin.
@@ -655,14 +666,14 @@ export const useRomStore = defineStore('rom', () => {
   const material  = reactive(saved?.material  ?? {
     items: [], shippingPct: 0.03,
     categories: defaultMaterialCategories(),
-    activeTemplate: 'A',
+    activeTemplate: 'X',
   })
   // ── Migration: ensure categories list, active template, and per-item shape.
   if (!Array.isArray(material.categories) || material.categories.length === 0) {
     material.categories = defaultMaterialCategories()
   }
-  if (!MATERIAL_TEMPLATES.includes(material.activeTemplate)) {
-    material.activeTemplate = 'A'
+  if (!TEMPLATE_IDS.includes(material.activeTemplate)) {
+    material.activeTemplate = 'X'
   }
   if (Array.isArray(material.items)) {
     const firstCatId = material.categories[0].id
@@ -673,21 +684,17 @@ export const useRomStore = defineStore('rom', () => {
       if (typeof it.vendor     !== 'string') it.vendor     = ''
       if (typeof it.model      !== 'string') it.model      = ''
       if (typeof it.unit       !== 'string') it.unit       = 'ea'
-      // Sub-component bundle list — parents with components ignore the flat unitCost
-      // and compute their unit cost as sum(qtyPerUnit * unitPrice). Empty array
-      // means "flat-priced parent" (uses item.unitCost as before).
       if (!Array.isArray(it.components)) it.components = []
-      // Convert legacy single-qty into per-template map (old qty becomes the A column)
-      if (!it.qtyByTemplate || typeof it.qtyByTemplate !== 'object') {
-        const legacy = typeof it.qty === 'number' ? it.qty : 0
-        it.qtyByTemplate = blankQtyByTemplate()
-        it.qtyByTemplate.A = legacy
-      } else {
-        // Make sure every template column exists, even if we add new ones later
-        MATERIAL_TEMPLATES.forEach(k => {
-          if (typeof it.qtyByTemplate[k] !== 'number') it.qtyByTemplate[k] = 0
-        })
+      // Migrate legacy qtyByTemplate items to single qty using the
+      // currently-active template's value, then drop the per-template map.
+      if (typeof it.qty !== 'number') {
+        if (it.qtyByTemplate && typeof it.qtyByTemplate === 'object') {
+          it.qty = Number(it.qtyByTemplate[material.activeTemplate]) || 0
+        } else {
+          it.qty = 0
+        }
       }
+      if (it.qtyByTemplate) delete it.qtyByTemplate
     })
   }
   // Each COA carries its own overhead — flexible list of items. Each item has
@@ -1174,9 +1181,6 @@ export const useRomStore = defineStore('rom', () => {
 
   function addMaterialItem(categoryId = null) {
     const catId = categoryId || material.categories[0]?.id || 'cat-misc'
-    const qbt = blankQtyByTemplate()
-    // Default the active template to qty=1 so the row counts as "added"
-    qbt[material.activeTemplate] = 1
     material.items.push({
       id: uuid(),
       description: '',
@@ -1184,7 +1188,7 @@ export const useRomStore = defineStore('rom', () => {
       vendor: '',
       model: '',
       unit: 'ea',
-      qtyByTemplate: qbt,
+      qty: 1,
       unitCost: 0,
       components: [],
       coaId: activeCoaId.value,
@@ -1230,31 +1234,43 @@ export const useRomStore = defineStore('rom', () => {
     const item = material.items.find(i => i.id === id)
     if (item) Object.assign(item, patch)
   }
-  // Update a single template column's quantity for one item
-  function updateMaterialItemQty(id, template, value) {
-    const item = material.items.find(i => i.id === id)
-    if (!item) return
-    if (!item.qtyByTemplate) item.qtyByTemplate = blankQtyByTemplate()
-    item.qtyByTemplate[template] = parseFloat(value) || 0
-  }
+  // Plain template setter — does NOT touch items. Use loadMELForClass when
+  // the user picks a class pill (that's the replace-on-pick behavior).
   function setActiveMaterialTemplate(template) {
-    if (!MATERIAL_TEMPLATES.includes(template)) return
-    // Auto-load the standard MEL the first time a class is picked on an
-    // empty scope. After items exist, switching classes just changes the
-    // active template (totals recompute through itemActiveQty / bundleUnitCost).
-    const scopeIsEmpty = !material.items.some(
-      it => (it.coaId ?? coas[0].id) === activeCoaId.value
-    )
-    if (scopeIsEmpty) appendMELSeedItems(MEL_SEED)
+    if (!TEMPLATE_IDS.includes(template)) return
     material.activeTemplate = template
+  }
+  // Load the MEL for a given class into the active scope, replacing any
+  // existing items. 'X' just clears the scope. Single source of truth for
+  // picking a class pill.
+  function loadMELForClass(classId) {
+    if (!TEMPLATE_IDS.includes(classId)) return
+    for (let i = material.items.length - 1; i >= 0; i--) {
+      if (material.items[i].coaId === activeCoaId.value) {
+        material.items.splice(i, 1)
+      }
+    }
+    material.activeTemplate = classId
+    if (classId === 'X') return  // empty scope
+    // Derive this class's MEL from MEL_SEED: keep bundles where qty[class] > 0,
+    // collapse the per-template map down to a single qty for this class.
+    const seeds = MEL_SEED
+      .map(seed => ({
+        description: seed.description,
+        categoryId:  seed.categoryId,
+        qty:         seedQtyForClass(seed, classId),
+        components:  seed.components,
+      }))
+      .filter(seed => seed.qty > 0)
+    appendMELSeedItems(seeds)
   }
   function removeMaterialItem(id) {
     const idx = material.items.findIndex(i => i.id === id)
     if (idx >= 0) material.items.splice(idx, 1)
   }
-  // Helper: read an item's qty for the active template (for view / totals)
+  // Convenience used by computeds — single-qty model
   function itemActiveQty(item) {
-    return (item?.qtyByTemplate?.[material.activeTemplate]) || 0
+    return Number(item?.qty) || 0
   }
 
   // ── TEMP-MATERIAL-TAB: Standard MEL seed (full bundle hierarchy)
@@ -1389,22 +1405,16 @@ export const useRomStore = defineStore('rom', () => {
     ] },
   ]
 
-  // Append the MEL_SEED items into the active scope. Returns the number added.
-  function seedDefaultMELItems() {
-    return appendMELSeedItems(MEL_SEED)
-  }
-
-  // Generic append: takes an array of seed objects shaped like MEL_SEED
-  // (description, categoryId, qtyByTemplate, components) and pushes them
-  // into the active scope. Used by both the hardcoded seed loader and the
-  // Excel importer.
+  // Generic append: takes an array of seed objects (description, categoryId,
+  // qty OR qtyByTemplate, components) and pushes them into the active scope.
+  // Used internally by loadMELForClass to populate a scope after picking a
+  // baseline template.
   function appendMELSeedItems(seeds) {
     let added = 0
     ;(seeds || []).forEach(seed => {
-      const qbt = blankQtyByTemplate()
-      Object.keys(seed.qtyByTemplate || {}).forEach(k => {
-        if (k in qbt) qbt[k] = Number(seed.qtyByTemplate[k]) || 0
-      })
+      const qty = (typeof seed.qty === 'number')
+        ? Number(seed.qty)
+        : seedQtyForClass(seed, material.activeTemplate)
       const components = (seed.components || []).map(c => ({
         id: 'cp-' + uuid().slice(0, 8),
         partNumber:   c.partNumber   || '',
@@ -1420,8 +1430,8 @@ export const useRomStore = defineStore('rom', () => {
         vendor: '',
         model: '',
         unit: 'ea',
-        qtyByTemplate: qbt,
-        unitCost: 0,      // ignored when components.length > 0
+        qty:       Number(qty) || 0,
+        unitCost:  0,      // ignored when components.length > 0
         components,
         coaId: activeCoaId.value,
         categoryId: seed.categoryId || material.categories[0]?.id || 'cat-misc',
@@ -1460,10 +1470,9 @@ export const useRomStore = defineStore('rom', () => {
     arr.splice(toIdx, 0, moved)
   }
 
-  // Material totals scoped to the active COA. Quantities live in
-  // item.qtyByTemplate[activeTemplate], and unit cost comes from the
-  // component bundle (with a flat unitCost fallback for parents with no
-  // components yet).
+  // Material totals scoped to the active COA. With the single-qty model
+  // each item has one qty; unit cost comes from the component bundle
+  // (with a flat unitCost fallback for parents with no components yet).
   const activeMaterialItems = computed(() => material.items.filter(i => (i.coaId ?? coas[0].id) === activeCoaId.value))
   const materialUnloaded    = computed(() => activeMaterialItems.value.reduce((s, i) => s + itemActiveQty(i) * bundleUnitCost(i), 0))
   const shippingCost        = computed(() => materialUnloaded.value * material.shippingPct)
@@ -1813,13 +1822,12 @@ export const useRomStore = defineStore('rom', () => {
       }
     })
     material.items.filter(it => it.coaId === id).forEach(it => {
-      // Deep-clone qtyByTemplate and components so the duplicate's edits
+      // Deep-clone the components array so the duplicate's edits
       // don't mutate the source scope.
       material.items.push({
         ...it,
         id: uuid(),
         coaId: newId,
-        qtyByTemplate: { ...(it.qtyByTemplate || {}) },
         components: (it.components || []).map(c => ({ ...c, id: 'cp-' + uuid().slice(0, 8) })),
       })
     })
@@ -1999,8 +2007,11 @@ export const useRomStore = defineStore('rom', () => {
     lineItems.splice(0, lineItems.length)
     Object.keys(wbs).forEach(k => delete wbs[k]); Object.assign(wbs, deepClone(DEFAULT_WBS))
     Object.keys(travel).forEach(k => delete travel[k]); Object.assign(travel, emptyTravelData())
-    Object.assign(material, { items: [], shippingPct: 0.03 })
-    // Reset overhead for every scope
+    Object.assign(material, { items: [], shippingPct: 0.03, activeTemplate: 'X' })
+    // Wipe scopes (coas) back to the factory default: one primary scope only.
+    coas.splice(0, coas.length, { id: 'coa-primary', name: 'Scope 1 — Primary', description: '', includeInQuote: true })
+    activeCoaId.value = coas[0].id
+    // Reset overhead — only the new default scope keeps a fresh entry
     Object.keys(overheadByCoa).forEach(k => delete overheadByCoa[k])
     coas.forEach(c => { overheadByCoa[c.id] = defaultOverhead() })
     enabledEntities.value = ['cronos']
@@ -2049,11 +2060,11 @@ export const useRomStore = defineStore('rom', () => {
     addCoa, removeCoa, renameCoa, toggleCoaIncluded, setActiveCoa, duplicateCoa,
     exportStateForBackup, importStateFromBackup,
     showRates, showRowStatus, undo, redo, canUndo, canRedo,
-    addMaterialItem, updateMaterialItem, updateMaterialItemQty, removeMaterialItem,
+    addMaterialItem, updateMaterialItem, removeMaterialItem,
     addMaterialCategory, updateMaterialCategory, removeMaterialCategory, reorderMaterialCategory,
     setActiveMaterialTemplate, MATERIAL_TEMPLATES, itemActiveQty,
+    loadMELForClass,
     addMaterialComponent, updateMaterialComponent, removeMaterialComponent, bundleUnitCost,
-    seedDefaultMELItems, appendMELSeedItems,
     addTrip, updateTrip, removeTrip, tripCost, travelerCost, travelerRate, travelLaborCost,
     addTraveler, updateTraveler, removeTraveler,
     travelTotalForQuote,

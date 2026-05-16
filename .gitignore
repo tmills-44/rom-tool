@@ -43,3 +43,6 @@ src/components/SidebarTree.vue
 # Netlify build. The MEL importer reads files the user picks at runtime —
 # nothing needs to be bundled in the repo.
 public/mel-templates/
+
+# Stray profile exports (from other tools / local-only). Not part of the app.
+mel-profile-*.json

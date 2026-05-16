@@ -24,22 +24,20 @@
       </div>
     </div>
 
-    <!-- Active-template picker pills (drives all extended / subtotal math) -->
-    <div class="template-bar">
-      <div class="template-bar-label">Active template (drives quote totals):</div>
-      <div class="template-pills" role="tablist">
-        <button
-          v-for="t in rom.MATERIAL_TEMPLATES"
-          :key="t"
-          class="template-pill"
-          :class="{ 'template-pill--active': rom.material.activeTemplate === t }"
-          @click="rom.setActiveMaterialTemplate(t)"
-          role="tab"
-          :aria-selected="rom.material.activeTemplate === t"
-        >
-          {{ t }}
-        </button>
-      </div>
+    <!-- Baseline template picker — single dropdown at the top of the tab.
+         Picking a baseline loads that template's MEL into the active scope.
+         "Custom (empty)" wipes the whole tool to start from scratch. -->
+    <div class="baseline-picker">
+      <label class="baseline-picker-label" for="baseline-template-select">Baseline template:</label>
+      <select
+        id="baseline-template-select"
+        class="baseline-picker-select"
+        v-model="baselineDropdownValue"
+      >
+        <option v-for="t in rom.MATERIAL_TEMPLATES" :key="t.id" :value="t.id">
+          {{ t.label }}
+        </option>
+      </select>
     </div>
 
     <!-- Summary strip -->
@@ -49,7 +47,7 @@
         <div class="sc-value">{{ rom.activeMaterialItems.length }}</div>
       </div>
       <div class="summary-card">
-        <div class="sc-label">Hardware Subtotal · {{ rom.material.activeTemplate }}</div>
+        <div class="sc-label">Hardware Subtotal</div>
         <div class="sc-value">{{ fmt(hardwareSubtotal) }}</div>
       </div>
       <div class="summary-card">
@@ -57,7 +55,7 @@
         <div class="sc-value">{{ fmt(shippingAmount) }}</div>
       </div>
       <div class="summary-card highlight">
-        <div class="sc-label">Material Total · {{ rom.material.activeTemplate }}</div>
+        <div class="sc-label">Material Total</div>
         <div class="sc-value">{{ fmt(rom.materialTotal) }}</div>
       </div>
     </div>
@@ -66,22 +64,8 @@
     <div class="section-card">
       <div class="section-header">
         <h3>Bill of Materials</h3>
-        <div class="section-header-actions">
-          <button class="btn-load-mel" @click="loadMEL"
-            title="Add the 23 standard MEL items (built-in seed) to this scope">
-            <i class="ti ti-list-details" aria-hidden="true"></i>
-            Load standard MEL
-          </button>
-          <button class="btn-load-mel btn-import-mel" @click="triggerImportMEL"
-            title="Import bundles from a MEL Excel file (.xlsx)">
-            <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
-            Import from Excel…
-          </button>
-          <input ref="melFileInput" type="file" accept=".xlsx,.xls"
-            style="display:none" @change="onMELFilePicked" />
-          <div class="section-header-hint">
-            Categories are managed in <strong>Admin → Material Categories</strong>
-          </div>
+        <div class="section-header-hint">
+          Categories are managed in <strong>Admin → Material Categories</strong>
         </div>
       </div>
 
@@ -91,19 +75,10 @@
             <tr>
               <th class="col-expand"></th>
               <th class="col-desc">Description</th>
-              <th
-                v-for="t in rom.MATERIAL_TEMPLATES"
-                :key="'h-' + t"
-                class="col-qty col-qty-tpl"
-                :class="{ 'col-qty-tpl--active': rom.material.activeTemplate === t }"
-                @click="rom.setActiveMaterialTemplate(t)"
-                :title="`Click to set ${t} as active`"
-              >
-                {{ t }}
-              </th>
+              <th class="col-qty">Qty</th>
               <th class="col-unitmeas">Unit</th>
               <th class="col-unit">Unit Cost</th>
-              <th class="col-ext">Extended ({{ rom.material.activeTemplate }})</th>
+              <th class="col-ext">Extended</th>
               <th class="col-del"></th>
             </tr>
           </thead>
@@ -164,18 +139,13 @@
                       {{ item.components.length }} {{ item.components.length === 1 ? 'part' : 'parts' }}
                     </span>
                   </td>
-                  <td
-                    v-for="t in rom.MATERIAL_TEMPLATES"
-                    :key="'q-' + item.id + '-' + t"
-                    class="col-qty col-qty-tpl"
-                    :class="{ 'col-qty-tpl--active': rom.material.activeTemplate === t }"
-                  >
+                  <td class="col-qty">
                     <input
                       class="cell-input num-input"
                       type="number"
                       min="0"
-                      :value="item.qtyByTemplate?.[t] ?? 0"
-                      @input="rom.updateMaterialItemQty(item.id, t, $event.target.value)"
+                      :value="item.qty ?? 0"
+                      @input="rom.updateMaterialItem(item.id, { qty: parseFloat($event.target.value) || 0 })"
                     />
                   </td>
                   <td class="col-unitmeas">
@@ -288,24 +258,18 @@
               <td :colspan="totalColumns" class="empty-row">
                 <div class="empty-cta">
                   <div>No items in this scope yet.</div>
-                  <div class="empty-cta-buttons">
-                    <button class="btn-load-mel btn-load-mel--cta" @click="loadMEL">
-                      <i class="ti ti-list-details" aria-hidden="true"></i>
-                      Load standard MEL ({{ rom.MATERIAL_TEMPLATES.length }} templates · built-in)
-                    </button>
-                    <button class="btn-load-mel btn-import-mel btn-load-mel--cta" @click="triggerImportMEL">
-                      <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
-                      Import from Excel…
-                    </button>
+                  <div class="empty-hint">
+                    Pick a class above (<strong>A · Huddle</strong>, <strong>B · Classroom</strong>,
+                    <strong>C · Conference</strong>, <strong>D · Operations</strong>) to load a MEL,
+                    or click <strong>+ Add Item</strong> in any category to start manually.
                   </div>
-                  <div class="empty-hint">…or pick a category above and add items manually.</div>
                 </div>
               </td>
             </tr>
           </tbody>
           <tfoot v-if="rom.activeMaterialItems.length > 0">
             <tr class="subtotal-row">
-              <td :colspan="totalColumns - 2">Hardware Subtotal ({{ rom.material.activeTemplate }})</td>
+              <td :colspan="totalColumns - 2">Hardware Subtotal</td>
               <td>{{ fmt(hardwareSubtotal) }}</td>
               <td></td>
             </tr>
@@ -352,9 +316,8 @@ const rom = useRomStore()
 const UNIT_OPTIONS = ['ea', 'ft', 'm', 'ft²', 'm²', 'lot', 'set', 'kit', 'pkg', 'hr']
 
 // Total column count for colspan use in category-header / empty / subtotal rows.
-// 1 expand chevron + 1 description + 1 per template (qty cols)
-// + 3 fixed columns (unit, unit cost, extended) + 1 delete column.
-const totalColumns = computed(() => 1 + 1 + rom.MATERIAL_TEMPLATES.length + 3 + 1)
+// 1 expand chevron + 1 description + 1 qty + 3 (unit/unit-cost/extended) + 1 delete.
+const totalColumns = computed(() => 7)
 
 // Track which parent rows have their sub-component table expanded.
 const expandedItemIds = ref(new Set())
@@ -392,53 +355,44 @@ function fmt(n) {
   return '$' + Math.round(n || 0).toLocaleString()
 }
 
-// Bulk-load the standard MEL into the active scope. Confirms before adding
-// when there are already items in the scope so we don't silently double up.
-function loadMEL() {
-  if (rom.activeMaterialItems.length > 0) {
+// v-model binding for the baseline-template dropdown. Getter returns the
+// store's active template id; setter routes through pickClass which gates
+// destructive actions behind confirm() dialogs. If the user cancels, the
+// setter doesn't update the store, so the next render syncs the <select>
+// back to the previous value automatically.
+const baselineDropdownValue = computed({
+  get: () => rom.material.activeTemplate,
+  set: (newId) => {
+    const t = rom.MATERIAL_TEMPLATES.find(t => t.id === newId)
+    pickClass(t)
+  },
+})
+
+// Handler invoked by the dropdown setter. Picking a class (A-D) loads
+// that class's MEL into the active scope. Picking "Custom (empty)" wipes
+// the WHOLE TOOL (every scope's BOM, engineering, travel, project info,
+// overhead) — effectively a "start from scratch" button.
+function pickClass(t) {
+  if (!t || t.id === rom.material.activeTemplate) return  // no-op
+  if (t.id === 'X') {
     if (!confirm(
-      `This scope already has ${rom.activeMaterialItems.length} item${rom.activeMaterialItems.length === 1 ? '' : 's'}.\n\n` +
-      `Loading the standard MEL will ADD 23 more items (it won't replace what's here).\n\nContinue?`
+      "START FROM SCRATCH?\n\n" +
+      "This RESETS THE ENTIRE TOOL — all Project info, ALL Engineering line items, ALL Travel trips, ALL Material BOMs, Overhead settings, AND wipes all custom scopes (resets to a single 'Scope 1 — Primary').\n\n" +
+      "Configuration (rates, WBS templates, material categories) is preserved.\n\n" +
+      "This cannot be undone. Continue?"
+    )) return  // computed setter no-ops → dropdown reverts on next render
+    rom.resetAll()
+    rom.setActiveMaterialTemplate('X')
+    return
+  }
+  // Class A-D: replace the current scope's MEL with that class's bundles
+  const cnt = rom.activeMaterialItems.length
+  if (cnt > 0) {
+    if (!confirm(
+      `REPLACE the ${cnt} item${cnt === 1 ? '' : 's'} in this scope with the "${t.label}" MEL?`
     )) return
   }
-  rom.seedDefaultMELItems()
-}
-
-// ── Import from a real MEL Excel spreadsheet ───────────────────────
-// Triggers the hidden <input type="file">, then parses the picked file
-// via melImport.js, confirms with the user, and appends the bundles.
-const melFileInput = ref(null)
-function triggerImportMEL() {
-  melFileInput.value?.click()
-}
-async function onMELFilePicked(ev) {
-  const file = ev.target.files?.[0]
-  ev.target.value = ''  // reset so the same file can be re-picked
-  if (!file) return
-  let seeds
-  try {
-    const { parseMELWorkbook } = await import('../utils/melImport.js')
-    seeds = await parseMELWorkbook(file)
-  } catch (err) {
-    alert('Could not read that file:\n\n' + (err?.message || String(err)) +
-          '\n\nMake sure it has both a "MELs" sheet and a "Refrence Tables" sheet in the same format as the working proposal spreadsheet.')
-    return
-  }
-  if (!seeds.length) {
-    alert('No MEL bundles found in that file. Double-check the sheet names and layout.')
-    return
-  }
-  const componentCount = seeds.reduce((s, b) => s + (b.components?.length || 0), 0)
-  const prefix = rom.activeMaterialItems.length > 0
-    ? `This scope already has ${rom.activeMaterialItems.length} item${rom.activeMaterialItems.length === 1 ? '' : 's'}. `
-    : ''
-  if (!confirm(
-    prefix +
-    `Import ${seeds.length} bundle${seeds.length === 1 ? '' : 's'} (${componentCount} component${componentCount === 1 ? '' : 's'} total) ` +
-    `from "${file.name}" into the active scope?`
-  )) return
-  const added = rom.appendMELSeedItems(seeds)
-  alert(`Imported ${added} bundles successfully.`)
+  rom.loadMELForClass(t.id)
 }
 </script>
 
@@ -539,12 +493,40 @@ async function onMELFilePicked(ev) {
   color: var(--rom-accent);
 }
 
-/* Section header right side — bundles Load-MEL button + hint */
+/* Baseline picker — slim dropdown row at the top of the tab */
+.baseline-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.baseline-picker-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rom-text-muted);
+  letter-spacing: 0.02em;
+}
+.baseline-picker-select {
+  min-width: 220px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rom-text);
+  background: var(--rom-surface);
+  border: 1px solid var(--rom-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color .12s, box-shadow .12s;
+}
+.baseline-picker-select:hover  { border-color: var(--rom-accent); }
+.baseline-picker-select:focus  { outline: none; border-color: var(--rom-accent); box-shadow: 0 0 0 2px var(--rom-accent-bg); }
+
+/* Section header right side — categories hint */
 .section-header-actions {
   display: flex;
   align-items: center;
   gap: 14px;
 }
+
 .section-header-hint {
   font-size: 12px;
   color: var(--rom-text-muted);
@@ -554,47 +536,6 @@ async function onMELFilePicked(ev) {
   font-weight: 600;
 }
 
-/* Load standard MEL button */
-.btn-load-mel {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--rom-accent-bg);
-  color: var(--rom-accent);
-  border: 1px solid var(--rom-accent);
-  border-radius: 6px;
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background .12s, color .12s;
-}
-.btn-load-mel:hover {
-  background: var(--rom-accent);
-  color: #fff;
-}
-.btn-load-mel .ti { font-size: 14px; }
-
-/* Import variant — same shape, different accent so it reads as the
-   "live source of truth" path next to the static seed loader */
-.btn-import-mel {
-  background: transparent;
-  color: var(--rom-text);
-  border-color: var(--rom-border);
-}
-.btn-import-mel:hover {
-  background: var(--rom-text);
-  color: var(--rom-surface);
-  border-color: var(--rom-text);
-}
-
-/* Larger variant used in the empty-state CTA */
-.btn-load-mel--cta {
-  padding: 10px 22px;
-  font-size: 14px;
-  border-radius: 8px;
-}
-
 /* Empty-state CTA wrapper */
 .empty-cta {
   display: flex;
@@ -602,12 +543,6 @@ async function onMELFilePicked(ev) {
   align-items: center;
   gap: 10px;
   padding: 16px 0;
-}
-.empty-cta-buttons {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
 }
 .empty-cta > div:first-child {
   font-size: 14px;
@@ -740,65 +675,11 @@ async function onMELFilePicked(ev) {
 /* Column widths */
 .col-expand   { width: 28px; text-align: center; }
 .col-desc     { width: auto; min-width: 240px; }
-.col-qty      { width: 64px; text-align: center; }
-.col-qty-tpl  { cursor: pointer; user-select: none; }
-.col-qty-tpl:hover { background: var(--rom-surface-alt); }
-.col-qty-tpl--active {
-  background: var(--rom-accent-bg);
-  color: var(--rom-accent);
-  font-weight: 700;
-}
-.bom-table th.col-qty-tpl--active { color: var(--rom-accent); }
-.col-qty-tpl--active .cell-input  {
-  border-color: var(--rom-accent);
-  background: var(--rom-surface);
-}
+.col-qty      { width: 80px; text-align: center; }
 .col-unitmeas { width: 70px; }
 .col-unit     { width: 130px; }
 .col-ext      { width: 130px; font-weight: 600; }
 .col-del      { width: 36px; text-align: center; }
-
-/* Active-template picker (top of tab) */
-.template-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  background: var(--rom-surface);
-  border: 1px solid var(--rom-border);
-  border-radius: 8px;
-}
-.template-bar-label {
-  font-size: 12px;
-  color: var(--rom-text-muted);
-  font-weight: 500;
-}
-.template-pills {
-  display: inline-flex;
-  gap: 4px;
-  background: var(--rom-bg);
-  padding: 3px;
-  border-radius: 8px;
-}
-.template-pill {
-  padding: 5px 14px;
-  background: transparent;
-  border: none;
-  border-radius: 5px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--rom-text-muted);
-  cursor: pointer;
-  letter-spacing: 0.04em;
-  transition: background .12s, color .12s;
-}
-.template-pill:hover { color: var(--rom-text); }
-.template-pill--active {
-  background: var(--rom-accent);
-  color: #fff;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
-}
-.template-pill--active:hover { color: #fff; }
 
 /* Inputs */
 .cell-input {
