@@ -20,6 +20,16 @@ const TEXT   = [26,  33,  51]
 function fmt(n) { return n ? '$' + Math.round(n).toLocaleString() : '$0' }
 function pct(v) { return ((v || 0) * 100).toFixed(0) + '%' }
 
+// Helpers — only show a project info value if its include flag is on (or unset)
+function includeProjectField(project, key) {
+  return project?.includeFields?.[key] !== false
+}
+function pf(project, key, fallback = '—') {
+  if (!includeProjectField(project, key)) return ''
+  const v = String(project?.[key] ?? '').trim()
+  return v || fallback
+}
+
 // Build the overhead breakdown rows for the PDF breakdown table.
 // When showLineItems is false, collapse to a single "Contract Fee" row.
 function buildOverheadRows(oh, t) {
@@ -97,17 +107,25 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
   // ── Two-column project info, side-by-side ───────────────────────────
   // Computed hours per traveler trip etc. only matters for labor; project
   // info here is just key/value pairs.
-  const leftRows  = [
-    ['Date',                    rom.project.date           || ''],
-    ['Cronos Project Lead',     rom.project.projectEngineer || ''],
-    ['Government Project Lead', rom.project.govLead         || ''],
+  // Project-info pairs — drop any field the user has un-ticked
+  const leftCandidates  = [
+    ['date',            'Date'],
+    ['projectEngineer', 'Cronos Project Lead'],
+    ['govLead',         'Government Project Lead'],
+    ['pmSupportLead',   'PM Support Lead'],
   ]
-  const rightRows = [
-    ['Sponsor',     rom.project.sponsor  || ''],
-    ['Building',    rom.project.building || ''],
-    ['Room',        rom.project.roomName || ''],
-    ['City / Base', rom.project.cityBase || ''],
+  const rightCandidates = [
+    ['sponsor',  'Sponsor'],
+    ['building', 'Building'],
+    ['roomName', 'Room'],
+    ['cityBase', 'City / Base'],
   ]
+  const leftRows  = leftCandidates
+    .filter(([k]) => includeProjectField(rom.project, k))
+    .map(([k, label]) => [label, pf(rom.project, k, '')])
+  const rightRows = rightCandidates
+    .filter(([k]) => includeProjectField(rom.project, k))
+    .map(([k, label]) => [label, pf(rom.project, k, '')])
   const colW    = inner / 2 - 10
   // Left column starts under the title; right column starts at the title row
   const leftY  = table({
@@ -294,12 +312,23 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
   doc.rect(margin, y, inner, 2, 'F')
   y += 12
 
-  // Project info
-  const infoRows = [
-    ['Customer / Sponsor', rom.project.sponsor         || '—', 'Project / Room', rom.project.roomName             || '—'],
-    ['Project Lead',       rom.project.projectEngineer || '—', 'Date',           rom.project.date                 || '—'],
-    ['Scope',              scope.name,                          '',                ''],
-  ]
+  // Project info — only include the fields the user has ticked on
+  const pairs = []
+  if (includeProjectField(rom.project, 'sponsor'))         pairs.push(['Customer / Sponsor', pf(rom.project, 'sponsor')])
+  if (includeProjectField(rom.project, 'roomName'))        pairs.push(['Project / Room',     pf(rom.project, 'roomName')])
+  if (includeProjectField(rom.project, 'building'))        pairs.push(['Building',           pf(rom.project, 'building')])
+  if (includeProjectField(rom.project, 'cityBase'))        pairs.push(['City / Base',        pf(rom.project, 'cityBase')])
+  if (includeProjectField(rom.project, 'projectEngineer')) pairs.push(['Cronos Project Lead', pf(rom.project, 'projectEngineer')])
+  if (includeProjectField(rom.project, 'govLead'))         pairs.push(['Government Lead',    pf(rom.project, 'govLead')])
+  if (includeProjectField(rom.project, 'pmSupportLead'))   pairs.push(['PM Support Lead',    pf(rom.project, 'pmSupportLead')])
+  if (includeProjectField(rom.project, 'date'))            pairs.push(['Date',               pf(rom.project, 'date')])
+  pairs.push(['Scope', scope.name])
+  // Lay out as 2-pair rows: [k1, v1, k2, v2]
+  const infoRows = []
+  for (let i = 0; i < pairs.length; i += 2) {
+    const a = pairs[i], b = pairs[i + 1] ?? ['', '']
+    infoRows.push([a[0], a[1], b[0], b[1]])
+  }
   y = table({
     startY: y, body: infoRows,
     margin: { left: margin, right: margin }, tableWidth: inner,

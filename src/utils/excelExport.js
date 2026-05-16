@@ -19,6 +19,29 @@ function fmt(n)    { return Math.round(n || 0) }
 function pct(v)    { return ((v || 0) * 100).toFixed(2) + '%' }
 function dollar(n) { return '$' + Math.round(n || 0).toLocaleString() }
 
+// Push project-info pair rows into the sheet, respecting the per-field
+// "include" flags set in the Project Info drawer.
+function pushProjectInfoRows(rows, rom) {
+  const includes = rom.project?.includeFields || {}
+  const ON = (k) => includes[k] !== false
+  const candidates = [
+    ['sponsor',         'Customer / Sponsor'],
+    ['roomName',        'Project / Room'],
+    ['building',        'Building'],
+    ['cityBase',        'City / Base'],
+    ['projectEngineer', 'Cronos Project Lead'],
+    ['govLead',         'Government Project Lead'],
+    ['pmSupportLead',   'PM Support Lead'],
+    ['date',            'Date'],
+  ].filter(([k]) => ON(k))
+   .map(([k, label]) => [label, rom.project?.[k] || ''])
+  for (let i = 0; i < candidates.length; i += 2) {
+    const a = candidates[i]
+    const b = candidates[i + 1] ?? ['', '']
+    rows.push([a[0], a[1], '', b[0], b[1]])
+  }
+}
+
 function safeSheetName(name, used) {
   const stripped = (name || 'Scope').replace(/[\\/?*[\]]/g, '').slice(0, 31)
   let candidate = stripped
@@ -80,8 +103,7 @@ function buildScopeSheet(XLSX, rom, scope) {
   rows.push(['Cost Estimate'])
   rows.push([scope.name])
   rows.push([])
-  rows.push(['Customer / Sponsor', rom.project.sponsor         || '', '', 'Project / Room', rom.project.roomName       || ''])
-  rows.push(['Project Lead',       rom.project.projectEngineer || '', '', 'Date',           rom.project.date           || ''])
+  pushProjectInfoRows(rows, rom)
   rows.push(['Scope',              scope.name,                            '', '',               ''])
   rows.push([])
   rows.push(['LOADED TOTAL', t.totalLoaded])
@@ -278,8 +300,7 @@ function buildSummarySheet(XLSX, rom, included) {
   rows.push(['Cost Estimate — Quote Summary'])
   rows.push([`Generated ${new Date().toLocaleDateString()}`])
   rows.push([])
-  rows.push(['Customer / Sponsor',  rom.project.sponsor         || '', '', 'Project / Room', rom.project.roomName       || ''])
-  rows.push(['Project Lead',        rom.project.projectEngineer || '', '', 'Date',           rom.project.date           || ''])
+  pushProjectInfoRows(rows, rom)
   rows.push(['Scopes included',     `${included.length} of ${rom.coas.length}`, '', '', ''])
   rows.push([])
   rows.push(['QUOTE GRAND TOTAL (LOADED)', rom.totalLoadedForQuote])

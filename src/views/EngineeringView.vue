@@ -521,10 +521,10 @@ function entityCost(eid) {
 }
 
 // ── Tasks for a line row ─────────────────────────────────────────────
+// Each role has its own WBS branch — programming now stands on its own,
+// no longer sharing engineering's task catalog.
 function tasksForLine(line, phaseId) {
-  // Programming shares the engineering task list (no separate WBS branch)
-  const wbsKey = line.role === 'programming' ? 'engineering' : line.role
-  return rom.wbs[wbsKey]?.[phaseId] ?? []
+  return rom.wbs[line.role]?.[phaseId] ?? []
 }
 
 // ── Role picker ──────────────────────────────────────────────────────

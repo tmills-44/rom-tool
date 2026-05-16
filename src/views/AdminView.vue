@@ -249,7 +249,14 @@
           <!-- Task list -->
           <div class="wbs-task-list">
             <div v-if="!currentTasks.length" class="wbs-empty">
-              No tasks defined for this role / phase. Add one below.
+              <i class="ti ti-clipboard-plus" aria-hidden="true"></i>
+              <div class="wbs-empty-text">
+                <strong>No tasks for this role / phase yet</strong>
+                <span>Type a name below and click <em>Add task</em>, or hit Enter, to create the first one.</span>
+              </div>
+              <button class="wbs-empty-btn" type="button" @click="focusNewTaskInput">
+                <i class="ti ti-plus" aria-hidden="true"></i> Add the first task
+              </button>
             </div>
             <div
               v-for="(task, i) in currentTasks"
@@ -304,6 +311,7 @@
               class="cell-input cell-input--subphase"
             />
             <input
+              ref="newTaskInputRef"
               type="text"
               v-model="newTaskLabel"
               placeholder="New task name"
@@ -471,6 +479,11 @@ function addNewTask() {
   })
   newTaskLabel.value = ''
   // keep subphase so user can add multiple tasks to the same sub-phase
+}
+
+const newTaskInputRef = ref(null)
+function focusNewTaskInput() {
+  nextTick(() => { newTaskInputRef.value?.focus() })
 }
 
 function resetRates() {
@@ -718,10 +731,27 @@ function resetWbs() {
   gap: 6px; align-items: center;
 }
 .wbs-empty {
-  font-size: 12px; color: var(--rom-text-muted); font-style: italic;
-  padding: 12px; background: var(--rom-surface-alt); border-radius: 4px;
-  text-align: center;
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  background: var(--rom-accent-bg);
+  border: 1px dashed var(--rom-accent);
+  border-radius: 6px;
 }
+.wbs-empty > i { font-size: 22px; color: var(--rom-accent-dark); flex-shrink: 0; }
+.wbs-empty-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.wbs-empty-text strong { font-size: 13px; color: var(--rom-accent-dark); }
+.wbs-empty-text span   { font-size: 12px; color: var(--rom-text-muted); }
+.wbs-empty-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  font-size: 12px; font-weight: 600;
+  background: var(--rom-accent); border: 1px solid var(--rom-accent);
+  color: #fff; border-radius: 6px;
+  cursor: pointer; font-family: inherit;
+  white-space: nowrap;
+}
+.wbs-empty-btn:hover { background: var(--rom-accent-dark); border-color: var(--rom-accent-dark); }
+.wbs-empty-btn .ti { font-size: 14px; }
 
 .wbs-reorder { display: inline-flex; gap: 2px; }
 .wbs-reorder button {

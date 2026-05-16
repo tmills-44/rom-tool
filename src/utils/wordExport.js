@@ -32,6 +32,36 @@ function buildOverheadRowsHTML(oh, t) {
     }).join('')
 }
 
+function includeProjectField(project, key) {
+  return project?.includeFields?.[key] !== false
+}
+function projInfoRowsHTML(rom, scope) {
+  // Returns rows of <tr> for the kv table, only including ticked fields
+  const candidates = [
+    ['sponsor',         'Customer / Sponsor'],
+    ['roomName',        'Project / Room'],
+    ['building',        'Building'],
+    ['cityBase',        'City / Base'],
+    ['projectEngineer', 'Cronos Project Lead'],
+    ['govLead',         'Government Project Lead'],
+    ['pmSupportLead',   'PM Support Lead'],
+    ['date',            'Date'],
+  ].filter(([k]) => includeProjectField(rom.project, k))
+   .map(([k, label]) => [label, esc(rom.project?.[k] || '—')])
+  if (scope?.name) candidates.push(['Scope', esc(scope.name)])
+  // Two pairs per row
+  const rows = []
+  for (let i = 0; i < candidates.length; i += 2) {
+    const a = candidates[i]
+    const b = candidates[i + 1] ?? ['', '']
+    rows.push(`<tr>
+      <td class="kv-l">${a[0]}</td><td class="kv-v">${a[1]}</td>
+      <td class="kv-l">${b[0]}</td><td class="kv-v">${b[1]}</td>
+    </tr>`)
+  }
+  return rows.join('')
+}
+
 function esc(s)    {
   return String(s ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -72,20 +102,7 @@ function headerBand(logo, leftTitle, rightTitle) {
 
 // ── Project-info 4-column table ─────────────────────────────────────────
 function projectInfoTable(rom, scope) {
-  return `
-  <table class="kv" cellspacing="0" cellpadding="0">
-    <tr>
-      <td class="kv-l">Customer / Sponsor</td><td class="kv-v">${esc(rom.project.sponsor || '—')}</td>
-      <td class="kv-l">Project / Room</td>   <td class="kv-v">${esc(rom.project.roomName || '—')}</td>
-    </tr>
-    <tr>
-      <td class="kv-l">Project Lead</td>     <td class="kv-v">${esc(rom.project.projectEngineer || '—')}</td>
-      <td class="kv-l">Date</td>              <td class="kv-v">${esc(rom.project.date || '—')}</td>
-    </tr>
-    <tr>
-      <td class="kv-l">Scope</td>             <td class="kv-v" colspan="3">${esc(scope?.name || '—')}</td>
-    </tr>
-  </table>`
+  return `<table class="kv" cellspacing="0" cellpadding="0">${projInfoRowsHTML(rom, scope)}</table>`
 }
 
 // ── Hero loaded-total panel ────────────────────────────────────────────
@@ -308,16 +325,9 @@ function buildSummaryHTML(rom, included, logo) {
   return `
     ${headerBand(logo, 'COST ESTIMATE', 'Quote Summary')}
     <table class="kv" cellspacing="0" cellpadding="0">
+      ${projInfoRowsHTML(rom, null)}
       <tr>
-        <td class="kv-l">Customer / Sponsor</td><td class="kv-v">${esc(rom.project.sponsor || '—')}</td>
-        <td class="kv-l">Project / Room</td>   <td class="kv-v">${esc(rom.project.roomName || '—')}</td>
-      </tr>
-      <tr>
-        <td class="kv-l">Project Lead</td>     <td class="kv-v">${esc(rom.project.projectEngineer || '—')}</td>
-        <td class="kv-l">Date</td>              <td class="kv-v">${esc(rom.project.date || '—')}</td>
-      </tr>
-      <tr>
-        <td class="kv-l">Scopes included</td>   <td class="kv-v" colspan="3">${included.length} of ${rom.coas.length}</td>
+        <td class="kv-l">Scopes included</td><td class="kv-v" colspan="3">${included.length} of ${rom.coas.length}</td>
       </tr>
     </table>
 

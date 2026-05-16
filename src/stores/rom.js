@@ -11,6 +11,7 @@ export const ENTITIES = [
 
 export const ROLES = [
   { id: 'engineering', label: 'Engineering Tasks',        icon: 'ti-cpu' },
+  { id: 'programming', label: 'Programming Tasks',        icon: 'ti-code' },
   { id: 'pm',          label: 'Project Management Tasks', icon: 'ti-clipboard-list' },
   { id: 'technician',  label: 'Technician Tasks',         icon: 'ti-tool' },
 ]
@@ -138,6 +139,31 @@ const DEFAULT_WBS = {
       { id: 'eng-pc-asbuilt',   label: 'Complete As-Built Drawings' },
       { id: 'eng-pc-training',  label: 'Finalize Training Manuals' },
       { id: 'eng-pc-artifacts', label: 'Deliverable Artifacts' },
+    ],
+  },
+  programming: {
+    'cost-estimate': [
+      { id: 'prog-ce-rom',         label: 'ROM Hours Estimate' },
+      { id: 'prog-ce-meetings',    label: 'Meetings / Telecons' },
+    ],
+    'system-design': [
+      { id: 'prog-sd-control',     label: 'Control System Design' },
+      { id: 'prog-sd-touch-panel', label: 'Touch Panel Layout / GUI Design' },
+      { id: 'prog-sd-dsp-design',  label: 'DSP Design / Signal Flow' },
+    ],
+    'equip-procure': [],
+    'pre-delivery': [
+      { id: 'prog-pd-user-guide',   label: 'Create User Guide' },
+      { id: 'prog-pd-control-code', label: 'Control Code Development' },
+      { id: 'prog-pd-dsp',          label: 'DSP Programming' },
+      { id: 'prog-pd-config-test',  label: 'Equipment Configuration and Testing in Lab' },
+    ],
+    'system-delivery': [
+      { id: 'prog-sd2-onsite-prog', label: 'On-Site Programming Adjustments' },
+      { id: 'prog-sd2-acceptance',  label: 'Acceptance Test Support' },
+    ],
+    'project-closeout': [
+      { id: 'prog-pc-code-archive', label: 'Archive Final Code / Documentation' },
     ],
   },
   pm: {
@@ -504,6 +530,17 @@ export const useRomStore = defineStore('rom', () => {
   if (!('building' in project))      project.building      = ''
   if (!('cityBase' in project))      project.cityBase      = ''
   if (!('pmSupportLead' in project)) project.pmSupportLead = ''
+  // Per-field include flags — control whether each project info field is
+  // required at export time AND whether it appears on the printed document.
+  // Default everything to true so older saved state still works the same way.
+  if (!project.includeFields || typeof project.includeFields !== 'object') {
+    project.includeFields = {}
+  }
+  ;['sponsor', 'projectEngineer', 'govLead', 'roomName', 'cityBase',
+    'building', 'pmSupportLead', 'date'
+  ].forEach(k => {
+    if (typeof project.includeFields[k] !== 'boolean') project.includeFields[k] = true
+  })
 
   // ── Courses of Action ──────────────────────────────────────────────
   // Each COA is a self-contained scenario the user can flip between.

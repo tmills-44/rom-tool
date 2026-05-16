@@ -55,35 +55,21 @@
     <!-- ── Right column: light topbar + main + status ─────────────── -->
     <div class="main-col">
 
-      <!-- Light topbar: hamburger · scope chip · project info pills · actions -->
+      <!-- Light topbar: two stacked rows
+           Row 1 — hamburger · scope chip · action buttons
+           Row 2 — project info pills · Edit button -->
       <header class="topbar topbar--light">
-        <button class="sidebar-toggle sidebar-toggle--top"
-          type="button"
-          @click="sidebarCollapsed = !sidebarCollapsed"
-          :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-          :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
-          <i class="ti ti-menu-2" aria-hidden="true"></i>
-        </button>
-        <CoaSelector />
-
-        <div class="info-pills">
-          <span v-for="(item, i) in projectSynopsis" :key="i"
-            class="info-pill"
-            :class="{ 'info-pill--scope': item.label === 'Scope' }">
-            <span class="info-pill-key">{{ item.label }}</span>
-            <span class="info-pill-value">{{ item.value }}</span>
-          </span>
-          <span v-if="!projectSynopsis.length" class="info-pill-empty">
-            No project info yet — click Edit to fill in
-          </span>
-          <button class="info-edit" @click="projInfoOpen = !projInfoOpen"
-            :title="projInfoOpen ? 'Hide project info editor' : 'Edit project info'">
-            <i class="ti" :class="projInfoOpen ? 'ti-x' : 'ti-edit'" aria-hidden="true"></i>
-            {{ projInfoOpen ? 'Close' : 'Edit' }}
+        <div class="topbar-row topbar-row--main">
+          <button class="sidebar-toggle sidebar-toggle--top"
+            type="button"
+            @click="sidebarCollapsed = !sidebarCollapsed"
+            :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+            :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+            <i class="ti ti-menu-2" aria-hidden="true"></i>
           </button>
-        </div>
+          <CoaSelector />
 
-        <div class="topbar-actions">
+          <div class="topbar-actions">
           <button class="btn btn-icon" @click="toggleTheme"
             :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
             :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
@@ -189,47 +175,115 @@
             <i class="ti ti-trash" aria-hidden="true"></i>
           </button>
         </div>
+        </div><!-- /.topbar-row--main -->
+
+        <div class="topbar-row topbar-row--info">
+          <div class="info-pills">
+            <span v-for="(item, i) in projectSynopsis" :key="i"
+              class="info-pill"
+              :class="{ 'info-pill--scope': item.label === 'Scope' }">
+              <span class="info-pill-key">{{ item.label }}</span>
+              <span class="info-pill-value">{{ item.value }}</span>
+            </span>
+            <span v-if="!projectSynopsis.length" class="info-pill-empty">
+              No project info yet — click Edit to fill in
+            </span>
+          </div>
+          <button class="info-edit" @click="projInfoOpen = !projInfoOpen"
+            :title="projInfoOpen ? 'Hide project info editor' : 'Edit project info'">
+            <i class="ti" :class="projInfoOpen ? 'ti-x' : 'ti-edit'" aria-hidden="true"></i>
+            {{ projInfoOpen ? 'Close' : 'Edit' }}
+          </button>
+        </div>
       </header>
 
       <!-- Project Info editor — slides down from the light topbar when Edit is clicked -->
       <div v-show="projInfoOpen" class="proj-drawer-body proj-drawer-body--inline">
-        <div class="proj-field">
-          <label>Sponsor</label>
+        <div class="proj-field" :class="{ 'proj-field--off': rom.project.includeFields.sponsor === false }">
+          <label>
+            <span>Sponsor</span>
+            <input type="checkbox" class="proj-include"
+              :checked="rom.project.includeFields.sponsor"
+              @change="rom.project.includeFields.sponsor = $event.target.checked"
+              title="Include this field on the printed quote" />
+          </label>
           <input type="text" :value="rom.project.sponsor"
             @input="rom.project.sponsor = $event.target.value" />
         </div>
-        <div class="proj-field">
-          <label>Room / Project Name</label>
+        <div class="proj-field" :class="{ 'proj-field--off': rom.project.includeFields.roomName === false }">
+          <label>
+            <span>Room / Project Name</span>
+            <input type="checkbox" class="proj-include"
+              :checked="rom.project.includeFields.roomName"
+              @change="rom.project.includeFields.roomName = $event.target.checked"
+              title="Include this field on the printed quote" />
+          </label>
           <input type="text" :value="rom.project.roomName"
             @input="rom.project.roomName = $event.target.value" />
         </div>
-        <div class="proj-field">
-          <label>City / Base</label>
+        <div class="proj-field" :class="{ 'proj-field--off': rom.project.includeFields.cityBase === false }">
+          <label>
+            <span>City / Base</span>
+            <input type="checkbox" class="proj-include"
+              :checked="rom.project.includeFields.cityBase"
+              @change="rom.project.includeFields.cityBase = $event.target.checked"
+              title="Include this field on the printed quote" />
+          </label>
           <input type="text" :value="rom.project.cityBase"
             @input="rom.project.cityBase = $event.target.value" />
         </div>
-        <div class="proj-field">
-          <label>Building</label>
+        <div class="proj-field" :class="{ 'proj-field--off': rom.project.includeFields.building === false }">
+          <label>
+            <span>Building</span>
+            <input type="checkbox" class="proj-include"
+              :checked="rom.project.includeFields.building"
+              @change="rom.project.includeFields.building = $event.target.checked"
+              title="Include this field on the printed quote" />
+          </label>
           <input type="text" :value="rom.project.building"
             @input="rom.project.building = $event.target.value" />
         </div>
-        <div class="proj-field">
-          <label>Cronos Project Lead</label>
+        <div class="proj-field" :class="{ 'proj-field--off': rom.project.includeFields.projectEngineer === false }">
+          <label>
+            <span>Cronos Project Lead</span>
+            <input type="checkbox" class="proj-include"
+              :checked="rom.project.includeFields.projectEngineer"
+              @change="rom.project.includeFields.projectEngineer = $event.target.checked"
+              title="Include this field on the printed quote" />
+          </label>
           <input type="text" :value="rom.project.projectEngineer"
             @input="rom.project.projectEngineer = $event.target.value" />
         </div>
-        <div class="proj-field">
-          <label>Government Project Lead</label>
+        <div class="proj-field" :class="{ 'proj-field--off': rom.project.includeFields.govLead === false }">
+          <label>
+            <span>Government Project Lead</span>
+            <input type="checkbox" class="proj-include"
+              :checked="rom.project.includeFields.govLead"
+              @change="rom.project.includeFields.govLead = $event.target.checked"
+              title="Include this field on the printed quote" />
+          </label>
           <input type="text" :value="rom.project.govLead"
             @input="rom.project.govLead = $event.target.value" />
         </div>
-        <div class="proj-field">
-          <label>PM Support Lead</label>
+        <div class="proj-field" :class="{ 'proj-field--off': rom.project.includeFields.pmSupportLead === false }">
+          <label>
+            <span>PM Support Lead</span>
+            <input type="checkbox" class="proj-include"
+              :checked="rom.project.includeFields.pmSupportLead"
+              @change="rom.project.includeFields.pmSupportLead = $event.target.checked"
+              title="Include this field on the printed quote" />
+          </label>
           <input type="text" :value="rom.project.pmSupportLead"
             @input="rom.project.pmSupportLead = $event.target.value" />
         </div>
-        <div class="proj-field proj-field--date">
-          <label>Date</label>
+        <div class="proj-field proj-field--date" :class="{ 'proj-field--off': rom.project.includeFields.date === false }">
+          <label>
+            <span>Date</span>
+            <input type="checkbox" class="proj-include"
+              :checked="rom.project.includeFields.date"
+              @change="rom.project.includeFields.date = $event.target.checked"
+              title="Include this field on the printed quote" />
+          </label>
           <input type="date" :value="rom.project.date"
             @input="rom.project.date = $event.target.value" />
         </div>
@@ -498,7 +552,11 @@ const REQUIRED_PROJECT_FIELDS = [
   { key: 'date',            label: 'Date' },
 ]
 function missingProjectFields() {
-  return REQUIRED_PROJECT_FIELDS.filter(f => !String(rom.project?.[f.key] ?? '').trim())
+  const includes = rom.project?.includeFields || {}
+  // Only check fields the user has ticked as "include in printout"
+  return REQUIRED_PROJECT_FIELDS.filter(f =>
+    includes[f.key] !== false && !String(rom.project?.[f.key] ?? '').trim()
+  )
 }
 
 // Missing-info modal state
@@ -708,7 +766,19 @@ function doReset() {
 
 /* Hover surfaces with hardcoded near-white */
 :root[data-theme="dark"] .del-btn:hover,
-:root[data-theme="dark"] .oh-row-del:hover { background: #4a1e1e; }
+:root[data-theme="dark"] .oh-row-del:hover,
+:root[data-theme="dark"] .btn-del:hover,
+:root[data-theme="dark"] .cat-delete:hover,
+:root[data-theme="dark"] .wbs-delete:hover { background: #4a1e1e; }
+
+/* Phase header hover on populated rows — was bright blue, made white text vanish */
+:root[data-theme="dark"] .phase-section--has-lines > .phase-head:hover { background: #243049; }
+
+/* Material BOM row hover — its custom --row-hover fell back to #f8fafc */
+:root[data-theme="dark"] .bom-row:hover td { background: #243049; }
+
+/* Travel service cell hover */
+:root[data-theme="dark"] .svc-cell:hover { background: #243049; }
 
 /* ═══ Reset ════════════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -875,12 +945,9 @@ body {
 }
 .proj-drawer-body--inline { flex-shrink: 0; }
 
-/* ─── Light topbar (above main content) ────────────────────────── */
+/* ─── Light topbar (above main content) — two stacked rows ─────── */
 .topbar {
-  padding: 9px 18px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
+  display: flex; flex-direction: column;
   flex-shrink: 0;
   z-index: 10;
 }
@@ -889,16 +956,35 @@ body {
   border-bottom: 1px solid var(--rom-border);
   color: var(--rom-text);
 }
-.topbar-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
+.topbar-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 18px;
+  min-height: 36px;
+  width: 100%;
+}
+.topbar-row--main {
+  border-bottom: 2px solid var(--rom-accent);
+}
+.topbar-row--info {
+  background: var(--rom-accent-bg);
+  font-size: 12px;
+}
+/* Scope chip stays its natural compact size; actions anchor to the right */
+.topbar-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
+.topbar-actions .btn { padding: 5px 10px; font-size: 12px; }
+.topbar-actions .btn-icon { padding: 5px 7px; }
+/* Info row — pills fill the row width, Edit button anchors right */
+.topbar-row--info .info-pills { flex: 1; min-width: 0; }
+.topbar-row--info .info-edit  { flex-shrink: 0; }
 
 /* Project info pills row in the light topbar */
 .info-pills {
-  display: flex; align-items: center; gap: 14px; flex-wrap: nowrap;
+  display: flex; align-items: center;
+  gap: 8px 14px;            /* row-gap · column-gap */
+  flex-wrap: wrap;           /* allow pills to flow onto a second visual line */
   flex: 1; min-width: 0;
-  overflow-x: auto;
   padding: 2px 4px;
 }
-.info-pills::-webkit-scrollbar { display: none; }
 .info-pill {
   display: inline-flex; align-items: baseline; gap: 5px;
   flex-shrink: 0;
@@ -1171,9 +1257,22 @@ body {
 }
 .proj-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .proj-field label {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
   font-size: 10px; font-weight: 600;
   color: var(--rom-text-muted, #4a5a78);
   text-transform: uppercase; letter-spacing: .05em;
+}
+.proj-include {
+  width: 14px; height: 14px; margin: 0; cursor: pointer;
+  flex-shrink: 0;
+  accent-color: var(--rom-accent);
+}
+/* When a field is excluded from the printout, dim it so the state is visible at a glance */
+.proj-field--off label > span { text-decoration: line-through; opacity: 0.55; }
+.proj-field--off input[type="text"],
+.proj-field--off input[type="date"] {
+  opacity: 0.5;
+  background: var(--rom-surface-alt);
 }
 .proj-field input {
   height: 32px; font-size: 13px; padding: 0 10px;
@@ -1245,6 +1344,36 @@ body {
 .confirm-actions  { display: flex; gap: 10px; justify-content: flex-end; }
 .confirm-actions .btn { border: 1px solid var(--rom-border); background: var(--rom-surface); color: var(--rom-text); }
 .confirm-actions .btn.btn-danger { background: var(--rom-danger); border-color: var(--rom-danger); color: #fff; }
+
+/* Missing-project-info export warning modal */
+.missing-modal { width: 420px; }
+.missing-modal h3 {
+  font-size: 16px; margin: 0 0 10px;
+  display: flex; align-items: center;
+}
+.missing-sub {
+  font-size: 13px; color: var(--rom-text-muted);
+  margin: 0 0 10px;
+}
+.missing-list {
+  list-style: none; padding: 0; margin: 0 0 14px;
+  background: var(--rom-surface-alt);
+  border-radius: 6px;
+  border: 1px solid var(--rom-border);
+  max-height: 200px; overflow-y: auto;
+}
+.missing-list li {
+  padding: 6px 12px;
+  font-size: 13px; color: var(--rom-text);
+  border-bottom: 1px solid var(--rom-border);
+  display: flex; align-items: center; gap: 6px;
+}
+.missing-list li:last-child { border-bottom: none; }
+.missing-list li i { color: #d97706; font-size: 13px; }
+.missing-q {
+  font-size: 13px; color: var(--rom-text); font-weight: 500;
+  margin: 0 0 16px;
+}
 
 /* ─── Shared form elements (used across views) ───────────────────── */
 select, input[type="number"], input[type="text"] {

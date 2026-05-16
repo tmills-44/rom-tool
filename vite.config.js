@@ -6,6 +6,10 @@ export default defineConfig({
   // Cloudflare Pages serves at the root URL (rom-tool.pages.dev/) so base = '/'.
   // GitHub Pages serves under /rom-tool/, so we override there using the CI env var.
   base: process.env.GITHUB_ACTIONS ? '/rom-tool/' : '/',
+  server: {
+    // Allow any ngrok tunnel host so coworkers can preview the live dev server.
+    allowedHosts: ['.ngrok-free.app', '.ngrok-free.dev', '.ngrok.app', '.ngrok.io'],
+  },
   plugins: [
     vue(),
     VitePWA({
