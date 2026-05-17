@@ -328,7 +328,6 @@
                               :class="{ 'svc-rate-input--override': isOverride(tr, 'lodgingRate', 'lodgingRate', trip) }"
                               :title="`Lodging per night · trip default $${trip.lodgingRate || 0}`"
                               @change="rom.updateTraveler(entity.id, trip.id, tr.id, { lodgingRate: +$event.target.value })" />
-                            <span class="svc-unit">/night</span>
                           </div>
                         </div>
                       </td>
@@ -346,7 +345,6 @@
                               :class="{ 'svc-rate-input--override': isOverride(tr, 'carRate', 'defaultCarRate', trip) }"
                               :title="`Rental car per day · trip default $${trip.defaultCarRate || 75}`"
                               @change="rom.updateTraveler(entity.id, trip.id, tr.id, { carRate: +$event.target.value })" />
-                            <span class="svc-unit">/day</span>
                           </div>
                         </div>
                       </td>
@@ -364,7 +362,6 @@
                               :class="{ 'svc-rate-input--override': isOverride(tr, 'airfareRate', 'defaultAirfareRate', trip) }"
                               :title="`Airfare per ticket · trip default $${trip.defaultAirfareRate || 600}`"
                               @change="rom.updateTraveler(entity.id, trip.id, tr.id, { airfareRate: +$event.target.value })" />
-                            <span class="svc-unit">/ticket</span>
                           </div>
                         </div>
                       </td>
@@ -382,7 +379,6 @@
                               :class="{ 'svc-rate-input--override': isOverride(tr, 'miscRate', 'defaultMiscRate', trip) }"
                               :title="`Misc per person · trip default $${trip.defaultMiscRate || 50}`"
                               @change="rom.updateTraveler(entity.id, trip.id, tr.id, { miscRate: +$event.target.value })" />
-                            <span class="svc-unit">flat</span>
                           </div>
                         </div>
                       </td>
@@ -1052,7 +1048,7 @@ onMounted(() => {
   background: var(--rom-surface);
   white-space: nowrap;
 }
-.t-col-name  { min-width: 130px; }
+.t-col-name  { width: 100px; }
 .t-col-cat   { width: 145px; }
 .t-col-qty   { width: 66px;  text-align: center !important; }
 .t-col-days  { width: 66px;  text-align: center !important; }
