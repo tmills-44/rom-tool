@@ -52,7 +52,7 @@
             </div>
           </button>
           <button class="coa-row-icon" @click.stop="startEdit(coa.id)" type="button" title="Rename"><i class="ti ti-edit" aria-hidden="true"></i></button>
-          <button class="coa-row-icon" @click.stop="rom.duplicateCoa(coa.id); open = false" type="button" title="Duplicate this scope"><i class="ti ti-copy" aria-hidden="true"></i></button>
+          <button class="coa-row-icon" @click.stop="rom.duplicateCoa(coa.id)" type="button" title="Duplicate this scope"><i class="ti ti-copy" aria-hidden="true"></i></button>
           <button
             class="coa-row-icon coa-row-icon--danger"
             :class="{ 'coa-row-icon--arm': armedDeleteId === coa.id }"
@@ -67,7 +67,21 @@
         </div>
       </div>
 
-      <button class="coa-add" @click="rom.addCoa(); open = false" type="button">
+      <div class="coa-notes">
+        <label class="coa-notes-label">
+          <i class="ti ti-notes" aria-hidden="true"></i>
+          Assumptions &amp; notes — {{ rom.activeCoa.name }}
+        </label>
+        <textarea
+          class="coa-notes-input"
+          :value="rom.activeCoa.description"
+          @input="rom.renameCoa(rom.activeCoaId, undefined, $event.target.value)"
+          placeholder="Assumptions, exclusions, scope details…"
+          rows="3"
+        />
+      </div>
+
+      <button class="coa-add" @click="rom.addCoa()" type="button">
         <i class="ti ti-plus" aria-hidden="true"></i>
         Add another scope
       </button>
@@ -93,7 +107,6 @@ const includedCount = computed(() => rom.coas.filter(c => c.includeInQuote).leng
 
 function pick(id) {
   rom.setActiveCoa(id)
-  open.value = false
 }
 function startEdit(id) {
   editingId.value = id
@@ -261,6 +274,32 @@ const vClickOutside = {
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.5); }
   50%      { box-shadow: 0 0 0 6px rgba(192,57,43,0); }
+}
+
+.coa-notes {
+  padding: 10px 12px;
+  border-top: 1px solid var(--rom-border, #c4cede);
+  background: var(--rom-surface, #fff);
+}
+.coa-notes-label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--rom-text-muted, #4a5a78);
+  margin-bottom: 6px;
+}
+.coa-notes-label .ti { font-size: 12px; }
+.coa-notes-input {
+  width: 100%; resize: vertical;
+  font-size: 12px; font-family: inherit; line-height: 1.45;
+  padding: 6px 8px;
+  border: 1px solid var(--rom-border, #c4cede); border-radius: 5px;
+  background: var(--rom-surface-alt, #eaf0fb);
+  color: var(--rom-text, #1a2133);
+}
+.coa-notes-input:focus {
+  outline: 2px solid var(--rom-accent, #1a5fb4); outline-offset: -1px;
+  border-color: transparent;
 }
 
 .coa-add {

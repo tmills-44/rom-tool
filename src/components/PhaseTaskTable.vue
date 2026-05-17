@@ -25,7 +25,7 @@
           <div>Total Hrs</div>
           <div>Rate</div>
           <div>Cost</div>
-          <div></div>
+          <div></div><div></div><div></div>
         </div>
 
         <template v-for="task in group.tasks" :key="task.id">
@@ -53,10 +53,59 @@
             <input type="number" min="0" step="1" :value="line.rate"
               @input="rom.updateLine(line.id, { rate: +$event.target.value })" />
             <span class="cost">{{ fmt(rom.lineCost(line)) }}</span>
+
+            <!-- Copy to scope -->
+            <div class="line-action-wrap" v-if="otherScopes.length">
+              <button
+                class="line-action line-action--copy"
+                :class="{ 'line-action--open': copyMenuId === line.id }"
+                @click.stop="toggleCopyMenu(line.id)"
+                :title="otherScopes.length === 1 ? `Copy to ${otherScopes[0].name}` : 'Copy to another scope'"
+              >
+                <i class="ti ti-copy"></i>
+              </button>
+              <div v-if="copyMenuId === line.id && otherScopes.length > 1" class="copy-menu">
+                <button
+                  v-for="s in otherScopes"
+                  :key="s.id"
+                  class="copy-menu-item"
+                  @click="doCopy(line.id, s.id)"
+                >
+                  <i class="ti ti-arrow-right"></i> {{ s.name }}
+                </button>
+              </div>
+            </div>
+            <span v-else></span>
+
+            <!-- Notes toggle -->
+            <button
+              class="line-action"
+              :class="{ 'line-action--has-notes': line.notes }"
+              @click="toggleNotes(line.id)"
+              :title="line.notes ? 'Edit note' : 'Add note'"
+            >
+              <i class="ti" :class="line.notes ? 'ti-notes' : 'ti-notes'"></i>
+            </button>
+
+            <!-- Remove -->
             <button class="remove" @click="rom.removeLine(line.id)" title="Remove this line">
               <i class="ti ti-x"></i>
             </button>
           </div>
+
+          <!-- Notes row — expands inline below the line it belongs to -->
+          <template v-for="line in linesFor(task.id)" :key="`notes-${line.id}`">
+            <div v-if="notesOpenIds.has(line.id)" class="notes-row">
+              <textarea
+                class="line-notes-input"
+                :value="line.notes || ''"
+                @input="rom.updateLine(line.id, { notes: $event.target.value })"
+                placeholder="Assumptions or notes for this line…"
+                rows="2"
+                :ref="el => { if (el) el.focus() }"
+              />
+            </div>
+          </template>
 
           <!-- Below each task's line(s): a tiny button to add a second entity -->
           <div class="task-row add-second" v-if="canAddAnother(task.id)">
@@ -109,6 +158,36 @@ const props = defineProps({
 
 const rom = useRomStore()
 const newTaskId = ref('')
+
+// Notes expand/collapse — track which line IDs have their notes row open
+const notesOpenIds = ref(new Set())
+function toggleNotes(lineId) {
+  const s = new Set(notesOpenIds.value)
+  if (s.has(lineId)) s.delete(lineId)
+  else s.add(lineId)
+  notesOpenIds.value = s
+}
+
+// Copy-to-scope menu
+const copyMenuId = ref(null)
+const otherScopes = computed(() =>
+  rom.coas.filter(c => c.id !== rom.activeCoaId)
+)
+function toggleCopyMenu(lineId) {
+  if (otherScopes.value.length === 1) {
+    rom.copyLineToScope(lineId, otherScopes.value[0].id)
+    return
+  }
+  copyMenuId.value = copyMenuId.value === lineId ? null : lineId
+}
+function doCopy(lineId, targetCoaId) {
+  rom.copyLineToScope(lineId, targetCoaId)
+  copyMenuId.value = null
+}
+// Close copy menu on outside click
+if (typeof document !== 'undefined') {
+  document.addEventListener('mousedown', () => { copyMenuId.value = null }, true)
+}
 
 const wbsTasks = computed(() => rom.tasksFor(props.role, props.phaseId))
 
@@ -227,7 +306,7 @@ function fmt(n) {
 
 .task-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1.8fr) 110px 70px 70px 70px 80px 90px 90px 28px;
+  grid-template-columns: minmax(180px, 1.8fr) 110px 70px 70px 70px 80px 90px 90px 28px 28px 28px;
   gap: 8px;
   align-items: center;
   padding: 5px 4px;
@@ -275,6 +354,53 @@ function fmt(n) {
   font-variant-numeric: tabular-nums;
   padding-right: 4px;
 }
+.line-action {
+  background: transparent; border: none; cursor: pointer;
+  padding: 4px; border-radius: 4px;
+  color: var(--rom-text-faint, #8a9ab8);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; width: 28px; height: 28px;
+}
+.line-action:hover { background: var(--rom-surface-alt, #eaf0fb); color: var(--rom-accent, #1a5fb4); }
+.line-action--has-notes { color: var(--rom-accent, #1a5fb4); }
+.line-action--open { background: var(--rom-accent-bg, #e8f0fe); color: var(--rom-accent, #1a5fb4); }
+
+.line-action-wrap { position: relative; }
+.copy-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 50;
+  min-width: 220px;
+  background: var(--rom-surface, #fff);
+  border: 1px solid var(--rom-border, #c4cede);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+.copy-menu-item {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; padding: 8px 12px;
+  background: transparent; border: none; border-bottom: 1px solid var(--rom-border, #c4cede);
+  font-size: 12px; font-family: inherit; text-align: left; cursor: pointer;
+  color: var(--rom-text, #1a2133);
+}
+.copy-menu-item:last-child { border-bottom: none; }
+.copy-menu-item:hover { background: var(--rom-accent-bg, #e8f0fe); }
+.copy-menu-item .ti { font-size: 11px; color: var(--rom-accent, #1a5fb4); }
+
+.notes-row {
+  padding: 2px 4px 6px 4px;
+}
+.line-notes-input {
+  width: 100%; resize: vertical;
+  font-size: 12px; font-family: inherit; line-height: 1.4;
+  padding: 5px 8px;
+  border: 1px solid var(--rom-accent, #1a5fb4); border-radius: 5px;
+  background: var(--rom-accent-bg, #e8f0fe);
+  color: var(--rom-text, #1a2133);
+}
+.line-notes-input:focus {
+  outline: 2px solid var(--rom-accent, #1a5fb4); outline-offset: -1px;
+}
+
 .remove {
   background: transparent;
   border: none;

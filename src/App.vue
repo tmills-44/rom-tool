@@ -45,11 +45,6 @@
       </nav>
 
       <div class="sidebar-spacer"></div>
-
-      <div class="sidebar-total">
-        <div class="sidebar-total-label">Quote Total</div>
-        <div class="sidebar-total-value">{{ fmt(rom.totalLoadedCost) }}</div>
-      </div>
     </aside>
 
     <!-- ── Right column: light topbar + main + status ─────────────── -->
@@ -63,7 +58,7 @@
           <button class="sidebar-toggle sidebar-toggle--top"
             type="button"
             @click="sidebarCollapsed = !sidebarCollapsed"
-            :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+            :data-tooltip="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
             :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
             <i class="ti ti-menu-2" aria-hidden="true"></i>
           </button>
@@ -71,18 +66,18 @@
 
           <div class="topbar-actions">
           <button class="btn btn-icon" @click="toggleTheme"
-            :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+            :data-tooltip="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
             :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
             <i class="ti" :class="theme === 'dark' ? 'ti-sun' : 'ti-moon'" aria-hidden="true"></i>
           </button>
-          <button class="btn btn-icon" :disabled="!rom.canUndo" @click="rom.undo" title="Undo">
+          <button class="btn btn-icon" :disabled="!rom.canUndo" @click="rom.undo" data-tooltip="Undo">
             <i class="ti ti-arrow-back-up" aria-hidden="true"></i>
           </button>
-          <button class="btn btn-icon" :disabled="!rom.canRedo" @click="rom.redo" title="Redo">
+          <button class="btn btn-icon" :disabled="!rom.canRedo" @click="rom.redo" data-tooltip="Redo">
             <i class="ti ti-arrow-forward-up" aria-hidden="true"></i>
           </button>
           <div class="save-split" v-click-outside="() => saveMenuOpen = false">
-            <button class="btn btn-save btn-save--main" @click="downloadQuoteFile" title="Download this quote as a .rom.json file">
+            <button class="btn btn-save btn-save--main" @click="downloadQuoteFile" data-tooltip="Save quote to file">
               <i class="ti ti-device-floppy" aria-hidden="true"></i> Save
             </button>
             <button class="btn btn-save btn-save--caret" @click="saveMenuOpen = !saveMenuOpen" title="Save / load options" :aria-expanded="saveMenuOpen">
@@ -118,13 +113,6 @@
                 <div>
                   <div class="export-menu-title">Excel</div>
                   <div class="export-menu-sub">Workbook with a Summary tab + one tab per scope</div>
-                </div>
-              </button>
-              <button class="export-menu-item" @click="exportPDF('summary'); exportMenuOpen = false">
-                <i class="ti ti-clipboard-list" aria-hidden="true"></i>
-                <div>
-                  <div class="export-menu-title">PDF — cost summary (1 page)</div>
-                  <div class="export-menu-sub">One-page roundup per scope (legacy format)</div>
                 </div>
               </button>
               <button class="export-menu-item" @click="exportPDF('separate'); exportMenuOpen = false">
@@ -166,12 +154,32 @@
                   <div class="export-menu-sub">Editable .doc you can open in Word</div>
                 </div>
               </button>
+              <div class="summary-section">
+                <div class="export-menu-item export-menu-item--label">
+                  <i class="ti ti-clipboard-list" aria-hidden="true"></i>
+                  <div>
+                    <div class="export-menu-title">Cost summary (1 page)</div>
+                    <div class="export-menu-sub">One-page roundup per scope — pick a format:</div>
+                  </div>
+                </div>
+                <div class="summary-chips" @click.stop>
+                  <button class="summary-chip" @click="exportPDF('summary'); exportMenuOpen = false" title="Download as PDF">
+                    <i class="ti ti-file-type-pdf" aria-hidden="true"></i> PDF
+                  </button>
+                  <button class="summary-chip" @click="exportWordSummary(); exportMenuOpen = false" title="Download as Word document">
+                    <i class="ti ti-file-description" aria-hidden="true"></i> Word
+                  </button>
+                  <button class="summary-chip" @click="exportExcelSummary(); exportMenuOpen = false" title="Download as Excel (.xlsx)">
+                    <i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Excel
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-          <button class="btn btn-secondary" @click="showPicker = true" title="New quote">
+          <button class="btn btn-secondary" @click="showPicker = true" data-tooltip="Start a Quote">
             <i class="ti ti-file-plus" aria-hidden="true"></i>
           </button>
-          <button class="btn btn-danger" @click="confirmReset" title="Reset all data">
+          <button class="btn btn-danger" @click="confirmReset" data-tooltip="Reset all data">
             <i class="ti ti-trash" aria-hidden="true"></i>
           </button>
         </div>
@@ -308,7 +316,7 @@
 
     <!-- ── Status bar ──────────────────────────────────────────── -->
     <footer class="statusbar">
-      <span class="stat">Engineering <strong>{{ fmtCompact(rom.engineeringTotal) }}</strong></span>
+      <span class="stat">Engineering <strong>{{ fmtCompact(rom.engineeringTotal) }}</strong><span class="stat-hrs">{{ Math.round(rom.engineeringHours) }} hrs</span></span>
       <span class="stat">Travel <strong>{{ fmtCompact(rom.travelTotal) }}</strong></span>
       <span class="stat">Material <strong>{{ fmtCompact(rom.materialTotal) }}</strong></span>
       <span class="stat">Overhead <strong>{{ fmtCompact(rom.totalOverhead) }}</strong></span>
@@ -323,6 +331,7 @@
       v-if="showPicker"
       :can-dismiss="!!rom.project.templateId"
       @close="showPicker = false"
+      @upload-backup="showPicker = false; pickQuoteFile()"
     />
 
     <!-- ── Missing project-info warning before export ──────────── -->
@@ -354,10 +363,34 @@
     <div v-if="showReset" class="modal-backdrop" @click.self="showReset = false">
       <div class="confirm-modal">
         <h3>Reset everything?</h3>
-        <p>Clears all engineering, travel, material, and overhead entries. Cannot be undone.</p>
+        <p>Clears all scopes, project info, labor, travel, material, and overhead — a full quote reset. Cannot be undone.</p>
         <div class="confirm-actions">
           <button class="btn btn-secondary" @click="showReset = false">Cancel</button>
           <button class="btn btn-danger" @click="doReset">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Load JSON confirm modal ───────────────────────────────── -->
+    <div v-if="showLoadConfirm" class="modal-backdrop" @click.self="cancelLoad">
+      <div class="confirm-modal">
+        <h3>
+          <i class="ti ti-file-import" aria-hidden="true" style="color: var(--rom-accent); vertical-align: -2px; margin-right: 6px;"></i>
+          Load quote file?
+        </h3>
+        <p>
+          This will replace your current quote with the contents of:<br>
+          <strong class="load-filename">{{ pendingLoadFile?.name }}</strong>
+        </p>
+        <p class="load-sub">Any unsaved changes will be lost.</p>
+        <p v-if="loadError" class="load-error">
+          <i class="ti ti-alert-triangle" aria-hidden="true"></i> {{ loadError }}
+        </p>
+        <div class="confirm-actions">
+          <button class="btn btn-secondary" @click="cancelLoad">Cancel</button>
+          <button class="btn btn-save" @click="doLoad">
+            <i class="ti ti-file-import" aria-hidden="true"></i> Load file
+          </button>
         </div>
       </div>
     </div>
@@ -369,8 +402,8 @@
 import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { useRomStore } from './stores/rom'
 import { generatePDF }   from './utils/pdfExport'
-import { generateExcel } from './utils/excelExport'
-import { generateWord }  from './utils/wordExport'
+import { generateExcel, generateExcelSummary } from './utils/excelExport'
+import { generateWord, generateWordSummary }  from './utils/wordExport'
 import { loadAllRates }  from './utils/ratesLoader'
 import TemplatePicker from './components/TemplatePicker.vue'
 import CoaSelector from './components/CoaSelector.vue'
@@ -383,8 +416,11 @@ import AdminView from './views/AdminView.vue'
 
 const rom = useRomStore()
 
-const showPicker    = ref(false)
-const showReset     = ref(false)
+const showPicker      = ref(false)
+const showReset       = ref(false)
+const showLoadConfirm = ref(false)
+const pendingLoadFile = ref(null)
+const loadError       = ref('')
 const ratesStatus   = reactive({ conus: '', oconus: '', errors: [] })
 const ratesLoadedAt   = ref('')   // e.g. "May 15 · 2:34 PM"
 const ratesChipDetail = ref('')   // tooltip detail
@@ -476,7 +512,9 @@ const travelTabStatus = computed(() => {
 })
 const materialTabStatus = computed(() => {
   const items = rom.activeMaterialItems
-  if (items.length === 0) return 'empty'
+  const manualAmt = rom.material.manualAmounts?.[rom.activeCoaId] || 0
+  if (items.length === 0 && manualAmt === 0) return 'empty'
+  if (items.length === 0) return 'partial'
   const allComplete = items.every(i =>
     !!i.description && (i.qty || 0) > 0 && (i.unitCost || 0) > 0
   )
@@ -606,6 +644,18 @@ function exportWord() {
     catch (e) { alert('Word export error: ' + e.message) }
   })
 }
+function exportWordSummary() {
+  runExportWithCheck(async () => {
+    try { await generateWordSummary(rom) }
+    catch (e) { alert('Word export error: ' + e.message) }
+  })
+}
+function exportExcelSummary() {
+  runExportWithCheck(async () => {
+    try { await generateExcelSummary(rom) }
+    catch (e) { alert('Excel export error: ' + e.message) }
+  })
+}
 
 // ── Quote backup file: download + load ─────────────────────────────────
 function downloadQuoteFile() {
@@ -631,19 +681,29 @@ function pickQuoteFile() {
 function onQuoteFilePicked(ev) {
   const file = ev.target.files?.[0]
   if (!file) return
-  if (!window.confirm(`Loading "${file.name}" will replace the current quote. Continue?`)) {
-    ev.target.value = ''
-    return
-  }
+  pendingLoadFile.value = file
+  loadError.value = ''
+  showLoadConfirm.value = true
+  ev.target.value = ''
+}
+function cancelLoad() {
+  showLoadConfirm.value = false
+  pendingLoadFile.value = null
+  loadError.value = ''
+}
+function doLoad() {
+  const file = pendingLoadFile.value
+  if (!file) return
   const reader = new FileReader()
   reader.onload = () => {
     try {
       const payload = JSON.parse(reader.result)
       rom.importStateFromBackup(payload)
+      showLoadConfirm.value = false
+      pendingLoadFile.value = null
+      loadError.value = ''
     } catch (e) {
-      alert('Could not load quote file: ' + e.message)
-    } finally {
-      ev.target.value = ''
+      loadError.value = 'Could not load quote file: ' + e.message
     }
   }
   reader.readAsText(file)
@@ -666,6 +726,32 @@ function doReset() {
 </script>
 
 <style>
+/* ═══ Tooltip ══════════════════════════════════════════════════════ */
+[data-tooltip] { position: relative; }
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #1a2133;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 5px 9px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s, transform .15s;
+  z-index: 9999;
+}
+[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 /* ═══ Design tokens ════════════════════════════════════════════════ */
 :root {
   --rom-bg:           #f0f4fb;
@@ -1118,6 +1204,31 @@ body {
 .export-menu-title { font-size: 13px; font-weight: 600; color: var(--rom-text, #1a2133); }
 .export-menu-sub   { font-size: 11px; color: var(--rom-text-muted, #4a5a78); margin-top: 1px; }
 
+/* Cost-summary section: label row + 3 format chips */
+.summary-section { border-top: 1px solid var(--rom-border, #c4cede); }
+.summary-section .export-menu-item--label { border-bottom: none; cursor: default; }
+.summary-section .export-menu-item--label:hover { background: transparent; }
+.summary-chips {
+  display: flex; gap: 6px;
+  padding: 0 14px 10px 42px;
+}
+.summary-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 12px;
+  font-size: 11px; font-weight: 600;
+  border: 1px solid var(--rom-border, #c4cede);
+  border-radius: 10px;
+  background: var(--rom-surface, #fff);
+  color: var(--rom-accent, #1a5fb4);
+  cursor: pointer;
+  font-family: inherit;
+}
+.summary-chip i { font-size: 13px; }
+.summary-chip:hover {
+  background: var(--rom-accent-bg, #e8f0fe);
+  border-color: var(--rom-accent, #1a5fb4);
+}
+
 /* Combined-PDF section: row + inline scope chips you can toggle without closing the menu */
 .combine-section { border-bottom: 1px solid var(--rom-border, #c4cede); }
 .combine-section .export-menu-item { border-bottom: none; }
@@ -1322,6 +1433,7 @@ body {
 .stat { }
 .stat:last-child { margin-left: auto; }
 .stat strong { color: #fff; }
+.stat-hrs { margin-left: 6px; font-size: 10px; color: rgba(255,255,255,.45); font-weight: 400; }
 .stat-loaded { font-size: 12px; font-weight: 500; }
 .stat-loaded strong { color: #7dd3fc; font-size: 13px; }
 .stat-saved { opacity: .5; font-size: 10px; }
@@ -1344,6 +1456,23 @@ body {
 .confirm-actions  { display: flex; gap: 10px; justify-content: flex-end; }
 .confirm-actions .btn { border: 1px solid var(--rom-border); background: var(--rom-surface); color: var(--rom-text); }
 .confirm-actions .btn.btn-danger { background: var(--rom-danger); border-color: var(--rom-danger); color: #fff; }
+
+/* Load JSON modal */
+.load-filename {
+  display: inline-block; margin-top: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--rom-accent);
+  word-break: break-all;
+}
+.load-sub { font-size: 12px !important; margin-top: -12px !important; }
+.load-error {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border-radius: 6px;
+  background: rgba(192, 57, 43, 0.08);
+  border: 1px solid rgba(192, 57, 43, 0.25);
+  color: var(--rom-danger); font-size: 12px;
+  margin-bottom: 16px;
+}
 
 /* Missing-project-info export warning modal */
 .missing-modal { width: 420px; }

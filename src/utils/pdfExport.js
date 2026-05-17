@@ -169,6 +169,10 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
   y = Math.max(leftY, rightY) + 24
 
   // ── Labor section ────────────────────────────────────────────────────
+  // colR = shared right edge for ALL value columns in this page (table + manual rows)
+  const labelIndent = margin + 14
+  const colR        = margin + inner / 2   // everything right-aligns here
+
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
   doc.setTextColor(...TEXT)
@@ -188,34 +192,35 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
   })
   const totalHrs = titleRows.reduce((s, r) => s + r[1], 0)
 
+  const tableW = colR - labelIndent
   y = table({
     startY: y,
     head: [['Title', 'Hours']],
     body: titleRows,
-    margin: { left: margin + 14, right: margin + 14 + (inner / 2) },
-    tableWidth: inner / 2 - 14,
+    margin: { left: labelIndent, right: W - colR },
+    tableWidth: tableW,
     headStyles:   { textColor: TEXT, fontStyle: 'bold', fillColor: false, lineColor: TEXT, lineWidth: { bottom: 0.8 } },
     bodyStyles:   { textColor: TEXT, fontSize: 10 },
-    columnStyles: { 0: { cellWidth: (inner / 2 - 14) * 0.65 }, 1: { halign: 'right', fontStyle: 'normal' } },
-    styles:       { cellPadding: { top: 2, bottom: 2, left: 6, right: 6 } },
+    columnStyles: { 0: { cellWidth: tableW * 0.65 }, 1: { halign: 'right', fontStyle: 'normal', cellPadding: { top: 2, bottom: 2, left: 6, right: 0 } } },
+    styles:       { cellPadding: { top: 2, bottom: 2, left: 6, right: 0 } },
     theme: 'plain',
   })
 
-  // Total Hours + Labor Subtotal rows (right of the label table, with rules)
+  // Total Hours + Labor Subtotal rows — values aligned to colR
   y += 10
   function rowWithRule(label, value, bold = false) {
     doc.setFont('helvetica', bold ? 'bold' : 'normal')
     doc.setFontSize(10)
     doc.setTextColor(...TEXT)
-    doc.text(label, margin + 14, y)
-    doc.text(value, margin + (inner / 2) - 14, y, { align: 'right' })
+    doc.text(label, labelIndent, y)
+    doc.text(value, colR, y, { align: 'right' })
     doc.setDrawColor(...TEXT).setLineWidth(0.6)
-    doc.line(margin + 14, y + 4, margin + (inner / 2) - 14, y + 4)
+    doc.line(labelIndent, y + 4, colR, y + 4)
     y += 18
   }
-  rowWithRule('Total Hours',     String(totalHrs), true)
+  rowWithRule('Total Hours',    String(totalHrs), true)
   y += 4
-  rowWithRule('Labor Subtotal',  dollarLong(t.labor), true)
+  rowWithRule('Labor Subtotal', dollarLong(t.labor), true)
   y += 10
 
   // ── ODC section ──────────────────────────────────────────────────────
@@ -235,15 +240,15 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
     ['Shipping',          dollarLong(shipping)],
   ].forEach(([label, value]) => {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...TEXT)
-    doc.text(label, margin + 14, y)
+    doc.text(label, labelIndent, y)
     doc.setFont('helvetica', 'normal')
-    doc.text(value, margin + (inner / 2) - 14, y, { align: 'right' })
+    doc.text(value, colR, y, { align: 'right' })
     y += 14
   })
-  doc.setFont('helvetica', 'bold'); doc.text('Total ODC', margin + 14, y)
-  doc.text(dollarLong(odcTotal), margin + (inner / 2) - 14, y, { align: 'right' })
+  doc.setFont('helvetica', 'bold'); doc.text('Total ODC', labelIndent, y)
+  doc.text(dollarLong(odcTotal), colR, y, { align: 'right' })
   doc.setDrawColor(...TEXT).setLineWidth(0.6)
-  doc.line(margin + 14, y + 4, margin + (inner / 2) - 14, y + 4)
+  doc.line(labelIndent, y + 4, colR, y + 4)
   y += 20
 
   // ── Total Estimate / Contract Fee / Grand Total ─────────────────────
@@ -251,9 +256,9 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
   function bigRule(label, value) {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...TEXT)
     doc.text(label, margin, y)
-    doc.text(value, margin + (inner / 2) - 14, y, { align: 'right' })
+    doc.text(value, colR, y, { align: 'right' })
     doc.setDrawColor(...TEXT).setLineWidth(0.6)
-    doc.line(margin, y + 4, margin + (inner / 2) - 14, y + 4)
+    doc.line(margin, y + 4, colR, y + 4)
     y += 22
   }
   bigRule('Total Estimate', dollarLong(t.unloaded))
@@ -261,13 +266,13 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
   // Grand total — boxed
   doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...TEXT)
   doc.text('Grand Total', margin, y)
-  // Box around the value
-  const boxX = margin + (inner / 2) - 14 - 90
+  const boxW = 90
+  const boxX = colR - boxW
   const boxY = y - 12
   doc.setDrawColor(...ACCENT).setLineWidth(1.2)
-  doc.roundedRect(boxX, boxY, 90, 18, 2, 2, 'S')
+  doc.roundedRect(boxX, boxY, boxW, 18, 2, 2, 'S')
   doc.setTextColor(...ACCENT)
-  doc.text(dollarLong(t.totalLoaded), margin + (inner / 2) - 14 - 6, y, { align: 'right' })
+  doc.text(dollarLong(t.totalLoaded), colR - 4, y, { align: 'right' })
 }
 
 // Helper formatter for the summary (uses comma'd dollars, no rounding to thousands)
@@ -341,6 +346,18 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
     },
     theme: 'plain',
   }) + 14
+
+  // Scope notes / assumptions — render only when the engineer typed something
+  const scopeNotes = String(scope.description ?? '').trim()
+  if (scopeNotes) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...MUTED)
+    doc.text('ASSUMPTIONS & NOTES', margin, y)
+    y += 10
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...TEXT)
+    const lines = doc.splitTextToSize(scopeNotes, inner)
+    doc.text(lines, margin, y)
+    y += lines.length * 5 + 14
+  }
 
   // Hero box — loaded total
   const boxH = 48
@@ -446,7 +463,7 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
     .filter(Boolean)
 
   if (phaseRows.length) {
-    table({
+    y = table({
       startY: y,
       head: [['Phase', ...rom.ROLES.map(r => r.label.split(' ')[0]), 'Total']],
       body: [
@@ -463,6 +480,33 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
       alternateRowStyles: { fillColor: GRAY },
       styles:             { cellPadding: { top: 4, bottom: 4, left: 6, right: 6 } },
       columnStyles:       { 0: { cellWidth: 160 } },
+    }) + 20
+  }
+
+  // Task notes — render a compact table of any line-level notes for this scope
+  const noteLines = rom.lineItems.filter(l => l.coaId === scope.id && String(l.notes || '').trim())
+  if (noteLines.length) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...MUTED)
+    doc.text('TASK NOTES', margin, y); y += 10
+    const noteRows = noteLines.map(l => {
+      // Find the task label from the WBS
+      let taskLabel = l.taskId || '—'
+      for (const role of Object.values(rom.wbs)) {
+        for (const phase of Object.values(role)) {
+          const t = phase.find?.(t => t.id === l.taskId)
+          if (t) { taskLabel = t.label; break }
+        }
+        if (taskLabel !== l.taskId) break
+      }
+      return [taskLabel, String(l.notes).trim()]
+    })
+    table({
+      startY: y,
+      body: noteRows,
+      margin: { left: margin, right: margin }, tableWidth: inner,
+      styles: { fontSize: 8, cellPadding: { top: 3, bottom: 3, left: 5, right: 5 }, textColor: TEXT },
+      columnStyles: { 0: { cellWidth: 160, fontStyle: 'bold', textColor: MUTED }, 1: { fontStyle: 'italic' } },
+      theme: 'plain',
     })
   }
 }

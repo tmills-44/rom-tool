@@ -52,7 +52,7 @@
       </div>
       <div class="summary-card">
         <div class="sc-label">Shipping ({{ rom.material.shippingPct * 100 }}%)</div>
-        <div class="sc-value">{{ fmt(shippingAmount) }}</div>
+        <div class="sc-value">{{ fmt(rom.shippingCost) }}</div>
       </div>
       <div class="summary-card highlight">
         <div class="sc-label">Material Total</div>
@@ -60,16 +60,42 @@
       </div>
     </div>
 
+    <!-- Flat materials total — for jobs with no MEL, enter one number here -->
+    <div class="manual-material-row">
+      <label class="manual-material-label" for="manual-material-input">
+        <i class="ti ti-pencil-dollar" aria-hidden="true"></i>
+        Materials Total
+      </label>
+      <div class="manual-material-input-wrap">
+        <span class="manual-dollar">$</span>
+        <input
+          id="manual-material-input"
+          class="manual-material-input"
+          type="number"
+          min="0"
+          step="100"
+          :key="`manual-${rom.activeCoaId}-${rom.resetCount}`"
+          :value="rom.material.manualAmounts[rom.activeCoaId] || 0"
+          @change="rom.setManualMaterialAmount(rom.activeCoaId, $event.target.value)"
+          placeholder="0"
+        />
+      </div>
+      <span class="manual-material-hint">Skip the BOM — enter a flat total when there's no detailed equipment list</span>
+    </div>
+
     <!-- BOM Table — grouped by category -->
     <div class="section-card">
       <div class="section-header">
-        <h3>Bill of Materials</h3>
+        <button class="bom-toggle" @click="bomVisible = !bomVisible" type="button">
+          <i class="ti" :class="bomVisible ? 'ti-chevron-down' : 'ti-chevron-right'" aria-hidden="true"></i>
+          <h3>Bill of Materials</h3>
+        </button>
         <div class="section-header-hint">
           Categories are managed in <strong>Admin → Material Categories</strong>
         </div>
       </div>
 
-      <div class="bom-table-wrap">
+      <div v-if="bomVisible" class="bom-table-wrap">
         <table class="bom-table">
           <thead>
             <tr>
@@ -298,7 +324,7 @@
           <span class="pct-sign">%</span>
         </div>
         <div class="ship-calc">
-          {{ fmt(hardwareSubtotal) }} × {{ (rom.material.shippingPct * 100).toFixed(1) }}% = <strong>{{ fmt(shippingAmount) }}</strong>
+          {{ fmt(rom.materialUnloaded) }} × {{ (rom.material.shippingPct * 100).toFixed(1) }}% = <strong>{{ fmt(rom.shippingCost) }}</strong>
         </div>
       </div>
     </div>
@@ -320,6 +346,7 @@ const UNIT_OPTIONS = ['ea', 'ft', 'm', 'ft²', 'm²', 'lot', 'set', 'kit', 'pkg'
 const totalColumns = computed(() => 7)
 
 // Track which parent rows have their sub-component table expanded.
+const bomVisible      = ref(false)
 const expandedItemIds = ref(new Set())
 function isExpanded(id)   { return expandedItemIds.value.has(id) }
 function toggleExpand(id) {
@@ -328,12 +355,9 @@ function toggleExpand(id) {
   expandedItemIds.value = s
 }
 
+
 const hardwareSubtotal = computed(() =>
   rom.activeMaterialItems.reduce((s, i) => s + rom.itemActiveQty(i) * rom.bundleUnitCost(i), 0)
-)
-
-const shippingAmount = computed(() =>
-  hardwareSubtotal.value * (rom.material.shippingPct || 0)
 )
 
 // Filter active scope's items down to a single category
@@ -469,6 +493,51 @@ function pickClass(t) {
 }
 .summary-card.highlight .sc-value {
   color: var(--rom-accent);
+}
+
+/* Additional Materials manual input */
+.manual-material-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px;
+  background: var(--rom-surface);
+  border: 1px solid var(--rom-border);
+  border-radius: 8px;
+}
+.bom-toggle {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
+  color: var(--rom-text);
+}
+.bom-toggle h3 { font-size: 15px; font-weight: 700; margin: 0; }
+.bom-toggle .ti { font-size: 14px; color: var(--rom-text-muted); }
+.bom-toggle:hover h3 { color: var(--rom-accent); }
+
+.manual-material-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--rom-text);
+  white-space: nowrap; min-width: 170px;
+}
+.manual-material-label .ti { color: var(--rom-accent); font-size: 15px; }
+.manual-material-input-wrap {
+  display: flex; align-items: center;
+  border: 1px solid var(--rom-border); border-radius: 6px;
+  background: var(--rom-surface-alt);
+  overflow: hidden;
+}
+.manual-dollar {
+  padding: 0 6px 0 10px;
+  font-size: 13px; font-weight: 600; color: var(--rom-text-muted);
+  user-select: none;
+}
+.manual-material-input {
+  border: none; background: transparent;
+  padding: 6px 10px 6px 2px;
+  font-size: 13px; font-family: inherit; color: var(--rom-text);
+  width: 130px; text-align: right;
+}
+.manual-material-input:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-radius: 5px; }
+.manual-material-hint {
+  font-size: 11px; color: var(--rom-text-muted); font-style: italic;
 }
 
 /* Section card */

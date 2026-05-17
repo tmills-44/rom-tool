@@ -15,6 +15,7 @@
         @keydown.arrow-up.prevent="moveUp"
         autocomplete="off"
       />
+      <button v-if="modelValue" class="ss-clear" @mousedown.prevent="clear" tabindex="-1" type="button" aria-label="Clear">×</button>
       <span class="ss-arrow" @mousedown.prevent="toggleOpen">▾</span>
     </div>
 
@@ -105,6 +106,12 @@ function pick(opt) {
   open.value  = false
 }
 
+function clear() {
+  emit('update:modelValue', '')
+  query.value = ''
+  open.value  = false
+}
+
 function selectFirst() {
   if (filtered.value.length) pick(filtered.value[cursor.value] ?? filtered.value[0])
 }
@@ -141,6 +148,15 @@ function moveUp() {
 }
 .ss-input:focus { outline: none; }
 .ss-input::placeholder { color: var(--rom-text-faint); }
+
+.ss-clear {
+  flex-shrink: 0;
+  background: none; border: none; padding: 0 4px 0 6px;
+  font-size: 15px; line-height: 1; color: var(--rom-text-faint);
+  cursor: pointer;
+  transition: color .1s;
+}
+.ss-clear:hover { color: var(--rom-danger, #c0392b); }
 
 .ss-arrow {
   padding: 0 8px; color: var(--rom-text-muted);

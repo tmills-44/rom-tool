@@ -450,3 +450,172 @@ ${scopeSections}
   a.click()
   setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 0)
 }
+
+// ── Labor title groups — matches the 1-page PDF cost summary groupings ──
+const SUMMARY_LABOR_GROUPS = [
+  { title: 'Engineering',        catIds: ['eng1', 'eng2', 'eng3'] },
+  { title: 'Programming',        catIds: ['prog1', 'prog2', 'prog3'] },
+  { title: 'Project Management', catIds: ['pm1'] },
+  { title: 'Project Support',    catIds: ['pm2'] },
+  { title: 'Procurement',        catIds: ['proc'] },
+  { title: 'Warehouse',          catIds: ['wh'] },
+  { title: 'Technician',         catIds: ['tech1', 'tech2', 'tech3'] },
+]
+
+function buildScopeSummaryHTML(rom, scope, logo) {
+  const t   = rom.coaTotals(scope.id)
+
+  // Project info — two columns, matching PDF layout
+  // Left: Date, Cronos Lead, Gov Lead, PM Lead  |  Right: Sponsor, Building, Room, City
+  const leftFields  = [
+    ['date',            'Date'],
+    ['projectEngineer', 'Cronos Project Lead'],
+    ['govLead',         'Government Project Lead'],
+    ['pmSupportLead',   'PM Support Lead'],
+  ].filter(([k]) => includeProjectField(rom.project, k))
+   .map(([k, label]) => [label, esc(rom.project?.[k] || '')])
+
+  const rightFields = [
+    ['sponsor',  'Sponsor'],
+    ['building', 'Building'],
+    ['roomName', 'Room'],
+    ['cityBase', 'City / Base'],
+  ].filter(([k]) => includeProjectField(rom.project, k))
+   .map(([k, label]) => [label, esc(rom.project?.[k] || '')])
+
+  const maxRows = Math.max(leftFields.length, rightFields.length)
+  const piRows = Array.from({ length: maxRows }, (_, i) => {
+    const l = leftFields[i]  || ['', '']
+    const r = rightFields[i] || ['', '']
+    return `<tr>
+      <td class="pi-label">${esc(l[0])}</td><td class="pi-value">${l[1]}</td>
+      <td class="pi-gap"></td>
+      <td class="pi-label">${esc(r[0])}</td><td class="pi-value">${r[1]}</td>
+    </tr>`
+  }).join('')
+
+  // Labor hours by title group
+  const lines = rom.lineItems.filter(l => l.coaId === scope.id)
+  const hoursByCat = {}
+  lines.forEach(l => { hoursByCat[l.laborCat] = (hoursByCat[l.laborCat] || 0) + (l.days || 0) * (l.hoursPerDay || 0) })
+  const groupRows = SUMMARY_LABOR_GROUPS.map(g => {
+    const hrs = g.catIds.reduce((s, id) => s + (hoursByCat[id] || 0), 0)
+    return `<tr class="body-row"><td>${esc(g.title)}</td><td class="r">${Math.round(hrs)}</td></tr>`
+  }).join('')
+  const totalHrs = SUMMARY_LABOR_GROUPS.reduce((s, g) =>
+    s + g.catIds.reduce((ss, id) => ss + (hoursByCat[id] || 0), 0), 0)
+
+  const matUnloaded = rom.materialUnloadedFor(scope.id)
+  const shipping    = matUnloaded * (rom.material.shippingPct || 0)
+  const odcTotal    = t.trips + matUnloaded + shipping
+
+  return `
+    <table class="hdr" cellspacing="0" cellpadding="0"><tr>
+      <td class="hdr-left">${logo ? `<img src="${logo}" width="110" alt="Cronos">` : ''}</td>
+      <td class="hdr-right"><div class="hdr-title">Cost Estimate</div><div class="hdr-sub">${esc(scope.name)}</div></td>
+    </tr></table>
+    <div class="hdr-rule"></div>
+
+    <table class="pi-tbl" cellspacing="0" cellpadding="0">${piRows}</table>
+
+    <div class="sec-label">Labor</div>
+    <table class="half-tbl" cellspacing="0" cellpadding="0">
+      <tr class="col-hdr"><td>Title</td><td class="r">Hours</td></tr>
+      ${groupRows}
+      <tr class="rule-row"><td>Total Hours</td><td class="r">${Math.round(totalHrs)}</td></tr>
+      <tr class="rule-row"><td>Labor Subtotal</td><td class="r">${dollar(t.labor)}</td></tr>
+    </table>
+
+    <div class="sec-label">ODC</div>
+    <table class="half-tbl" cellspacing="0" cellpadding="0">
+      <tr class="body-row"><td class="b">Travel Subtotal</td><td class="r">${dollar(t.trips)}</td></tr>
+      <tr class="body-row"><td class="b">Material Subtotal</td><td class="r">${dollar(matUnloaded)}</td></tr>
+      <tr class="body-row"><td class="b">Shipping</td><td class="r">${dollar(shipping)}</td></tr>
+      <tr class="rule-row"><td>Total ODC</td><td class="r">${dollar(odcTotal)}</td></tr>
+    </table>
+
+    <div style="height:10pt;"></div>
+    <table class="half-tbl" cellspacing="0" cellpadding="0">
+      <tr class="rule-row"><td>Total Estimate</td><td class="r">${dollar(t.unloaded)}</td></tr>
+      <tr class="rule-row"><td>Contract Fee</td><td class="r">${dollar(t.ohTotal + t.scr)}</td></tr>
+      <tr class="grand-row"><td>Grand Total</td><td class="r">${dollar(t.totalLoaded)}</td></tr>
+    </table>
+  `
+}
+
+export async function generateWordSummary(rom) {
+  const included = rom.coas.filter(c => c.includeInQuote)
+  if (included.length === 0) {
+    throw new Error('No scopes are ticked "include in quote". Open the Scopes dropdown and tick at least one.')
+  }
+
+  const logo = await loadLogoDataUri()
+
+  const styles = `
+    <style>
+      @page { margin: 0.6in 0.6in; }
+      body  { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10pt; color: #1A2133; }
+
+      /* Header band */
+      .hdr       { width: 100%; margin: 0 0 4pt; }
+      .hdr-left  { width: 35%; vertical-align: middle; padding: 0; }
+      .hdr-right { width: 65%; vertical-align: bottom; text-align: left; padding: 0 0 2pt; }
+      .hdr-title { font-size: 22pt; font-weight: bold; color: #1A2133; line-height: 1; }
+      .hdr-sub   { font-size: 10pt; color: #4A5A78; margin-top: 2pt; }
+      .hdr-rule  { width: 100%; height: 2pt; background: #1A3560; margin: 0 0 10pt; line-height: 0; font-size: 0; }
+
+      /* Two-column project info table */
+      .pi-tbl        { width: 100%; border-collapse: collapse; margin: 0 0 14pt; }
+      .pi-tbl td     { padding: 3pt 6pt; font-size: 10pt; border-bottom: 0.5pt solid #1A3560; }
+      .pi-label      { font-weight: bold; color: #1A2133; width: 22%; }
+      .pi-value      { color: #1A2133; width: 26%; }
+      .pi-gap        { width: 4%; border-bottom: none !important; }
+
+      /* Section header — bold label above the table */
+      .sec-label { font-size: 12pt; font-weight: bold; color: #1A2133; margin: 12pt 0 3pt; }
+
+      /* Half-page table (matches PDF colR = half the page width) */
+      .half-tbl          { width: 52%; border-collapse: collapse; margin: 0; }
+      .half-tbl td       { padding: 3pt 8pt; font-size: 10pt; color: #1A2133; border-bottom: 0.5pt solid #c4cede; }
+
+      /* Column header row */
+      .col-hdr td        { font-weight: bold; font-size: 9pt; border-bottom: 1pt solid #1A2133; }
+
+      /* Subtotal rows — bold + thick top rule, like PDF rowWithRule */
+      .rule-row td       { font-weight: bold; border-top: 1pt solid #1A2133; border-bottom: none; padding-top: 5pt; }
+
+      /* Grand total — accent border box, no fill */
+      .grand-row td      { font-weight: bold; font-size: 12pt; color: #1A5FB4;
+                           border: 1.5pt solid #1A5FB4; border-top: 1.5pt solid #1A5FB4;
+                           padding: 4pt 8pt; }
+
+      /* Utilities */
+      .r  { text-align: right; }
+      .b  { font-weight: bold; }
+      .page-break { page-break-before: always; mso-special-character: line-break; }
+    </style>
+  `
+
+  const sections = included.map((s, i) =>
+    `<div${i === 0 ? '' : ' class="page-break"'}>${buildScopeSummaryHTML(rom, s, logo)}</div>`
+  ).join('')
+
+  const html = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>Cost Estimate</title>${styles}</head>
+<body>${sections}</body>
+</html>`
+
+  const blob = new Blob(['﻿', html], { type: 'application/msword' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  const sponsor = (rom.project.sponsor || 'Quote').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40)
+  const dateStr = new Date().toISOString().slice(0, 10)
+  a.download = `ROM_${sponsor}_CostSummary_${dateStr}.doc`
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 0)
+}

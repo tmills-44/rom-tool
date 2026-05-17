@@ -481,7 +481,7 @@ export const TEMPLATES = [
       ['Engineer — Training / Follow-Up',  2, 1, 5, true,  false, true ],
     ],
   },
-  { id: 'baseline-x', name: 'Custom (X)', description: 'Empty WBS — start from scratch and add tasks manually.' },
+  { id: 'baseline-x', name: 'New', description: 'Blank room — start from scratch with an empty task and equipment list.' },
 ]
 
 // ─── Internal helpers ────────────────────────────────────────────────
@@ -667,7 +667,9 @@ export const useRomStore = defineStore('rom', () => {
     items: [], shippingPct: 0.03,
     categories: defaultMaterialCategories(),
     activeTemplate: 'X',
+    manualAmounts: {},   // coaId → additional flat dollar amount
   })
+  if (!material.manualAmounts) material.manualAmounts = {}
   // ── Migration: ensure categories list, active template, and per-item shape.
   if (!Array.isArray(material.categories) || material.categories.length === 0) {
     material.categories = defaultMaterialCategories()
@@ -742,6 +744,7 @@ export const useRomStore = defineStore('rom', () => {
 
   // Cronos is always on; gov and sub are opt-in
   const enabledEntities = ref(saved?.enabledEntities ?? ['cronos'])
+  const resetCount = ref(0)
 
   // Global UI pref — whether the Rate column shows on the deliverables page
   const showRates = ref(saved?.showRates ?? true)
@@ -1474,16 +1477,23 @@ export const useRomStore = defineStore('rom', () => {
   // each item has one qty; unit cost comes from the component bundle
   // (with a flat unitCost fallback for parents with no components yet).
   const activeMaterialItems = computed(() => material.items.filter(i => (i.coaId ?? coas[0].id) === activeCoaId.value))
-  const materialUnloaded    = computed(() => activeMaterialItems.value.reduce((s, i) => s + itemActiveQty(i) * bundleUnitCost(i), 0))
+  const materialUnloaded    = computed(() => {
+    const bomTotal = activeMaterialItems.value.reduce((s, i) => s + itemActiveQty(i) * bundleUnitCost(i), 0)
+    return bomTotal + (material.manualAmounts[activeCoaId.value] || 0)
+  })
   const shippingCost        = computed(() => materialUnloaded.value * material.shippingPct)
   const materialTotal       = computed(() => materialUnloaded.value + shippingCost.value)
   // Helpers that compute material totals for any specific COA — used by Summary + exports
   function materialUnloadedFor(coaId) {
-    return material.items.filter(i => (i.coaId ?? coas[0].id) === coaId).reduce((s, i) => s + itemActiveQty(i) * bundleUnitCost(i), 0)
+    const bom = material.items.filter(i => (i.coaId ?? coas[0].id) === coaId).reduce((s, i) => s + itemActiveQty(i) * bundleUnitCost(i), 0)
+    return bom + (material.manualAmounts[coaId] || 0)
   }
   function materialTotalFor(coaId) {
     const u = materialUnloadedFor(coaId)
     return u + u * (material.shippingPct || 0)
+  }
+  function setManualMaterialAmount(coaId, value) {
+    material.manualAmounts[coaId] = Math.max(0, Number(value) || 0)
   }
   const materialTotalForQuote = computed(() =>
     quoteCoaIds.value.reduce((s, id) => s + materialTotalFor(id), 0))
@@ -1551,6 +1561,7 @@ export const useRomStore = defineStore('rom', () => {
       rate:        opts.rate        ?? (laborCat ? laborCatRate(laborCat) : 0),
       sortOrder:   opts.sortOrder   ?? nextSortOrder(entity, phaseId),
       coaId:       opts.coaId       ?? activeCoaId.value,
+      notes:       opts.notes       ?? '',
     })
   }
 
@@ -1589,6 +1600,13 @@ export const useRomStore = defineStore('rom', () => {
     const dropIdx = without.findIndex(l => l.id === dropId)
     without.splice(after ? dropIdx + 1 : dropIdx, 0, drag)
     without.forEach((l, i) => { l.sortOrder = i })
+  }
+
+  function copyLineToScope(lineId, targetCoaId) {
+    const src = lineItems.find(l => l.id === lineId)
+    if (!src || !coas.some(c => c.id === targetCoaId)) return
+    snapshotLines()
+    lineItems.push({ ...src, id: uuid(), coaId: targetCoaId })
   }
 
   function removeLine(lineId) {
@@ -1710,6 +1728,11 @@ export const useRomStore = defineStore('rom', () => {
 
     // Make sure overhead has a slot for this scope
     if (!overheadByCoa[targetCoa]) overheadByCoa[targetCoa] = defaultOverhead()
+
+    // Load the MEL for the selected baseline class (A–D → their preset, X → blank)
+    const melClassMap = { 'baseline-a': 'A', 'baseline-b': 'B', 'baseline-c': 'C', 'baseline-d': 'D', 'baseline-x': 'X' }
+    const melClass = melClassMap[tmpl.id]
+    if (melClass) loadMELForClass(melClass)
 
     project.templateId   = tmpl.id
     project.templateName = tmpl.name
@@ -2003,10 +2026,12 @@ export const useRomStore = defineStore('rom', () => {
   }
 
   function resetAll() {
+    resetCount.value++
     Object.assign(project, { sponsor: '', roomName: '', date: new Date().toISOString().split('T')[0], projectEngineer: '', anticipatedFYFunds: 5_000_000, templateId: null, templateName: null })
     lineItems.splice(0, lineItems.length)
     Object.keys(wbs).forEach(k => delete wbs[k]); Object.assign(wbs, deepClone(DEFAULT_WBS))
     Object.keys(travel).forEach(k => delete travel[k]); Object.assign(travel, emptyTravelData())
+    Object.keys(material.manualAmounts).forEach(k => delete material.manualAmounts[k])
     Object.assign(material, { items: [], shippingPct: 0.03, activeTemplate: 'X' })
     // Wipe scopes (coas) back to the factory default: one primary scope only.
     coas.splice(0, coas.length, { id: 'coa-primary', name: 'Scope 1 — Primary', description: '', includeInQuote: true })
@@ -2041,7 +2066,7 @@ export const useRomStore = defineStore('rom', () => {
     // LABOR_CATS now refers to the reactive editable list (was a const)
     LABOR_CATS: laborCats,
     project, wbs, lineItems, travel, material, overhead, laborCats,
-    enabledEntities, selectedTabId, visibleEntities,
+    enabledEntities, selectedTabId, visibleEntities, resetCount,
     engineeringTotal, engineeringHours, travelTotal,
     materialUnloaded, shippingCost, materialTotal, unloadedProjectTotal,
     scpCost, globalCost, govLaborCost, managementReserveCost,
@@ -2050,10 +2075,10 @@ export const useRomStore = defineStore('rom', () => {
     addTask, removeTask, updateTask, moveTask, reorderTask, resetWbs,
     lineHours, lineCost, tasksFor, linesForPhase, linesForRole,
     phaseHours, phaseCost, roleHours, roleCost, entityHours, entityCost, travelLineCost,
-    addLine, duplicateLine, removeLine, updateLine, swapLineOrder, reorderLine, enableEntity, disableEntity, applyTemplate, resetAll,
+    addLine, duplicateLine, removeLine, copyLineToScope, updateLine, swapLineOrder, reorderLine, enableEntity, disableEntity, applyTemplate, resetAll,
     coas, activeCoaId, activeCoa, activeLineItems, quoteCoaIds,
     engineeringTotalForQuote, engineeringHoursForQuote,
-    activeMaterialItems, materialUnloadedFor, materialTotalFor, materialTotalForQuote,
+    activeMaterialItems, materialUnloadedFor, materialTotalFor, materialTotalForQuote, setManualMaterialAmount,
     overheadByCoa, laborTotalFor, laborHoursFor, travelTotalFor, coaTotals, totalLoadedForQuote,
     roleCostForCoa, phaseCostForCoa, entityCostForCoa,
     addOverheadItem, removeOverheadItem, updateOverheadItem, reorderOverheadItem,

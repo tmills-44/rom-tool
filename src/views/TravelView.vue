@@ -24,7 +24,10 @@
     <!-- GSA API info bar -->
     <div class="gsa-info-bar">
       <i class="ti ti-building-bank"></i>
-      <span>GSA Per Diem FY{{ gsaFiscalYear() }} — rates auto-fill when you enter a city and state</span>
+      <span>GSA Per Diem FY{{ gsaFiscalYear() }} — rates load from local database when you pick a city</span>
+      <a href="https://www.gsa.gov/travel/plan-book/per-diem-rates" target="_blank" rel="noopener noreferrer" class="gsa-info-link">
+        <i class="ti ti-external-link"></i> GSA Per Diem Rates
+      </a>
     </div>
 
     <!-- Entity sections -->
@@ -113,12 +116,9 @@
                   />
                 </div>
 
-                <!-- 3a. City (CONUS) — uses live GSA cache OR pre-loaded rates file OR free text -->
+                <!-- 3a. City (CONUS) — reads from local conus.xlsx data -->
                 <div v-if="(trip.region || 'conus') === 'conus'" class="trip-field trip-field--city">
-                  <label>
-                    City
-                    <span v-if="citiesLoading[trip.state]" class="spin-inline">⟳</span>
-                  </label>
+                  <label>City</label>
                   <SearchSelect v-if="citiesForState(trip.state).length"
                     :model-value="trip.destination"
                     :options="citiesForState(trip.state).map(c => ({ value: c.city, label: c.city }))"
@@ -129,7 +129,6 @@
                     :value="trip.destination"
                     placeholder="Type city name…"
                     @input="rom.updateTrip(entity.id, trip.id, { destination: $event.target.value })"
-                    @blur="onManualCityBlur(entity.id, trip)"
                   />
                   <div v-else class="city-placeholder">Select a state first</div>
                 </div>
@@ -163,10 +162,7 @@
                   </div>
                 </div>
                 <div class="trip-field trip-field--sm">
-                  <label class="rate-label">
-                    Hotel/night ($)
-                    <span v-if="gsaLoading[trip.id]" class="spin-inline">⟳</span>
-                  </label>
+                  <label class="rate-label">Hotel/night ($)</label>
                   <input type="number" min="0" step="1"
                     :value="trip.lodgingRate || 0" placeholder="0"
                     @input="rom.updateTrip(entity.id, trip.id, { lodgingRate: +$event.target.value })"
@@ -182,15 +178,12 @@
                 <!-- Refresh (CONUS only) / State Dept link (OCONUS) -->
                 <div class="trip-field trip-field--action">
                   <label>&nbsp;</label>
-                  <button v-if="(trip.region || 'conus') === 'conus'"
-                    class="gsa-refresh-btn"
-                    :class="{ loading: gsaLoading[trip.id] }"
-                    :disabled="!trip.destination || !trip.state || gsaLoading[trip.id]"
-                    title="Re-fetch GSA rates"
-                    @click="lookupGSA(entity.id, trip)">
-                    <i :class="gsaLoading[trip.id] ? 'ti ti-loader spin' : 'ti ti-refresh'"></i>
-                  </button>
-                  <a v-else href="https://allowances.state.gov/web920/per_diem.asp" target="_blank"
+                  <a v-if="(trip.region || 'conus') === 'conus'"
+                    href="https://www.gsa.gov/travel/plan-book/per-diem-rates" target="_blank" rel="noopener noreferrer"
+                    class="state-dept-link" title="GSA Per Diem Rates">
+                    <i class="ti ti-external-link"></i>
+                  </a>
+                  <a v-else href="https://allowances.state.gov/web920/per_diem.asp" target="_blank" rel="noopener noreferrer"
                     class="state-dept-link" title="Look up State Dept rates">
                     <i class="ti ti-external-link"></i>
                   </a>
@@ -439,10 +432,8 @@ const rom = useRomStore()
 const MONTHS       = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep']
 const currentMonth = new Date().toLocaleString('en-US', { month: 'short' })
 
-const gsaError     = reactive({})
-const gsaLoading   = reactive({})
-const stateCities  = reactive({})   // { "CA": [{ city, lodging, mie, gsaMonthlyRates }] }
-const citiesLoading = reactive({})  // { "CA": true/false }
+const gsaError    = reactive({})
+const stateCities = reactive({})   // local cache of cities built from gsaRateMap per state
 
 // ── US States list ───────────────────────────────────────────────────
 const US_STATES = [
@@ -541,49 +532,11 @@ function gsaFiscalYear() {
   return d.getMonth() >= 9 ? d.getFullYear() + 1 : d.getFullYear()
 }
 
-// ── Fetch all cities for a state (cached) ────────────────────────────
-// Trick: querying a dummy city returns ALL cities in the state from GSA API
-async function fetchCitiesForState(stateCode) {
+// ── Build city list for a state from local conus.xlsx data ──────────
+function fetchCitiesForState(stateCode) {
   if (!stateCode || stateCode.length !== 2) return
-  if (stateCities[stateCode] || citiesLoading[stateCode]) return  // already have or loading
-
-  citiesLoading[stateCode] = true
-  try {
-    const year = gsaFiscalYear()
-    const url  = `https://api.gsa.gov/travel/perdiem/v2/rates/city/zzz/state/${stateCode}/year/${year}?api_key=DEMO_KEY`
-    const res  = await fetch(url)
-    if (!res.ok) throw new Error(`GSA ${res.status}`)
-    const data = await res.json()
-
-    const entries = data?.rates?.[0]?.rate ?? []
-    if (!entries.length) { stateCities[stateCode] = []; return }
-
-    // Build enriched city list
-    const cities = entries
-      .filter(e => e.city && e.city !== 'Undefined')
-      .map(e => {
-        const monthlyArr = e.months?.month ?? []
-        const gsaMonthlyRates = monthlyArr.length
-          ? Object.fromEntries(monthlyArr.map(m => [m.short, m.value]))
-          : null
-        const lodging = gsaMonthlyRates
-          ? (gsaMonthlyRates[currentMonth] ?? Object.values(gsaMonthlyRates)[0] ?? 0)
-          : 0
-        return { city: e.city, lodging, mie: e.meals ?? 0, gsaMonthlyRates, standardRate: e.standardRate }
-      })
-      .sort((a, b) => {
-        // Standard Rate last, then alphabetical
-        if (a.standardRate === 'true') return 1
-        if (b.standardRate === 'true') return -1
-        return a.city.localeCompare(b.city)
-      })
-
-    stateCities[stateCode] = cities
-  } catch {
-    stateCities[stateCode] = []
-  } finally {
-    citiesLoading[stateCode] = false
-  }
+  if (stateCities[stateCode]) return  // already built
+  stateCities[stateCode] = citiesForState(stateCode)
 }
 
 // ── Region / State / Country / City handlers ─────────────────────────
@@ -624,13 +577,9 @@ function onCountryChange(entityId, trip, country) {
   gsaError[trip.id] = ''
 }
 
-// Unified city source — combines live GSA cache and pre-loaded rates file
+// City list for a state — reads entirely from local conus.xlsx data
 function citiesForState(stateCode) {
   if (!stateCode) return []
-  // 1) Live GSA cache (preferred — carries gsaMonthlyRates for peak-month math)
-  const live = stateCities[stateCode]
-  if (Array.isArray(live) && live.length) return live
-  // 2) Pre-loaded CONUS rates file (rom.gsaRateMap)
   const map = rom.gsaRateMap
   if (!map) return []
   const matches = []
@@ -640,20 +589,14 @@ function citiesForState(stateCode) {
     const city    = cityRaw.replace(/\b\w/g, c => c.toUpperCase())
     matches.push({
       city,
-      lodging: val.lodging || 0,
-      mie:     val.mie     || 0,
-      gsaMonthlyRates: val.months || null,
+      lodging:         val.lodging || 0,
+      mie:             val.mie     || 0,
+      gsaMonthlyRates: val.months  || null,
     })
   }
   return matches.sort((a, b) => a.city.localeCompare(b.city))
 }
 
-// When the user types a city manually (free text) and tabs out, try a live lookup
-function onManualCityBlur(entityId, trip) {
-  if (trip.destination?.trim() && trip.state?.length === 2) {
-    lookupGSA(entityId, trip)
-  }
-}
 
 function onCitySelect(entityId, trip, cityName) {
   // Find the enriched city entry — check live cache first, then the pre-loaded rates file
@@ -697,84 +640,6 @@ function onOconusLocationSelect(entityId, trip, location) {
   }
 }
 
-// ── Live GSA API lookup (refresh button) ────────────────────────────
-async function lookupGSA(entityId, trip) {
-  if (!trip.destination?.trim() || trip.state?.trim().length !== 2) return
-
-  // If city cache is populated, read from it
-  const cached = stateCities[trip.state]?.find(c => c.city === trip.destination)
-  if (cached) {
-    onCitySelect(entityId, trip, trip.destination)
-    return
-  }
-
-  // Hit the GSA public API directly
-  gsaLoading[trip.id] = true
-  gsaError[trip.id] = ''
-  try {
-    const year    = gsaFiscalYear()
-    const cityEnc = encodeURIComponent(trip.destination.trim())
-    const state   = trip.state.trim().toUpperCase()
-    const url     = `https://api.gsa.gov/travel/perdiem/v2/rates/city/${cityEnc}/state/${state}/year/${year}?api_key=DEMO_KEY`
-
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`GSA API returned ${res.status}`)
-    const data = await res.json()
-
-    const entries = data?.rates?.[0]?.rate ?? []
-    if (!entries.length) throw new Error(`No GSA data for ${state} FY${year}`)
-
-    const entry = findBestMatch(trip.destination, entries)
-    if (!entry) throw new Error(`No rate found for "${trip.destination}"`)
-
-    const monthlyArr = entry.months?.month ?? []
-    const gsaMonthlyRates = monthlyArr.length
-      ? Object.fromEntries(monthlyArr.map(m => [m.short, m.value]))
-      : null
-
-    // Always pick the peak (highest-lodging) month — single value, no user month choice
-    const monthlyEntries = gsaMonthlyRates
-      ? Object.entries(gsaMonthlyRates).sort((a, b) => b[1] - a[1])
-      : []
-    const [peakName, peakRate] = monthlyEntries[0] ?? [null, monthlyArr[0]?.value ?? 0]
-    const lodging = peakRate || 0
-    const mie     = entry.meals ?? 0
-
-    rom.updateTrip(entityId, trip.id, {
-      lodgingRate: lodging,
-      mieRate:     mie,
-      gsaMonthlyRates,
-      travelMonth: peakName,
-    })
-
-    const matched  = entry.city?.trim() ?? ''
-    const queried  = trip.destination.trim()
-    const peakNote = peakName ? ` · peak: ${peakName} ★` : ''
-    gsaError[trip.id] = matched.toLowerCase() !== queried.toLowerCase()
-      ? `✓ Matched: ${matched} · $${lodging}/night · $${mie}/day${peakNote}`
-      : `✓ GSA FY${year} · $${lodging}/night · $${mie}/day${peakNote}`
-  } catch (err) {
-    gsaError[trip.id] = err.message
-  } finally {
-    gsaLoading[trip.id] = false
-  }
-}
-
-// ── Fuzzy city match ─────────────────────────────────────────────────
-function findBestMatch(query, entries) {
-  const needle = query.trim().toLowerCase()
-  let hit = entries.find(e => e.city?.trim().toLowerCase() === needle)
-  if (hit) return hit
-  hit = entries.find(e => e.city?.toLowerCase().includes(needle))
-  if (hit) return hit
-  const words = needle.split(/[\s/,]+/).filter(w => w.length > 3)
-  hit = entries.find(e => {
-    const ec = e.city?.toLowerCase() ?? ''
-    return words.some(w => ec.includes(w))
-  })
-  if (hit) return hit
-  return entries.find(e => e.standardRate === 'true' || e.city === 'Standard Rate') ?? null
-}
 
 // Travel month is no longer user-selectable — the app always uses the peak (most expensive)
 // month's lodging rate so quotes are conservative. peakMonth/monthLabel/onMonthChange removed.
@@ -819,6 +684,15 @@ onMounted(() => {
   font-size: 12px; color: var(--rom-accent-dark);
 }
 .gsa-info-bar .ti { font-size: 13px; flex-shrink: 0; }
+.gsa-info-link {
+  margin-left: auto; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  color: var(--rom-accent); text-decoration: none;
+  opacity: 0.8;
+  transition: opacity .15s;
+}
+.gsa-info-link:hover { opacity: 1; text-decoration: underline; }
 
 /* Entities */
 .entities-wrap { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
@@ -941,16 +815,6 @@ onMounted(() => {
 .month-select:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
 
 /* GSA refresh button */
-.gsa-refresh-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px;
-  border: 1px solid var(--rom-border); border-radius: 5px;
-  background: var(--rom-surface); color: var(--rom-accent); cursor: pointer;
-  font-size: 14px; transition: background .15s, border-color .15s;
-}
-.gsa-refresh-btn:hover:not(:disabled) { background: var(--rom-accent-bg); border-color: var(--rom-accent); }
-.gsa-refresh-btn:disabled { opacity: .4; cursor: default; }
-.gsa-refresh-btn.loading { border-color: var(--rom-accent); background: var(--rom-accent-bg); }
 
 /* Rate label + inline spinner */
 .rate-label { display: flex; align-items: center; gap: 5px; }
@@ -1060,6 +924,26 @@ onMounted(() => {
   font-size: 9px; padding: 1px 4px; border-radius: 3px;
   background: #fff; color: #8a6508; opacity: .75;
   border: 1px solid #b8860b;
+}
+
+:root[data-theme="dark"] .defaults-bar {
+  background: rgba(255, 200, 80, 0.06);
+  border-top-color: var(--rom-border);
+  border-bottom-color: var(--rom-border);
+}
+:root[data-theme="dark"] .defaults-label { color: var(--rom-text-muted); }
+:root[data-theme="dark"] .default-field i { color: var(--rom-text-muted); }
+:root[data-theme="dark"] .default-field label { color: var(--rom-text-muted); }
+:root[data-theme="dark"] .default-field input {
+  background: var(--rom-surface-alt);
+  border-color: var(--rom-border);
+  color: var(--rom-text);
+}
+:root[data-theme="dark"] .default-tag {
+  background: transparent;
+  color: var(--rom-text-muted);
+  border-color: var(--rom-border);
+  opacity: 1;
 }
 
 /* ─── Travelers table ──────────────────────────────────────────── */
@@ -1175,6 +1059,17 @@ onMounted(() => {
   padding: 1px 6px; border-radius: 3px;
   background: #b8860b; color: #fff;
   letter-spacing: .04em; margin-left: 4px;
+}
+
+:root[data-theme="dark"] .per-diem-chip {
+  background: rgba(255, 200, 80, 0.08);
+  border-color: rgba(255, 200, 80, 0.25);
+  color: #e8c76a;
+}
+:root[data-theme="dark"] .per-diem-peak-tag {
+  background: rgba(255, 200, 80, 0.2);
+  color: #f5d87a;
+  border: 1px solid rgba(255, 200, 80, 0.3);
 }
 
 /* ─── Trip footer (Add traveler + Trip total) ─────────────────── */

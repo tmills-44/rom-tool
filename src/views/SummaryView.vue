@@ -50,6 +50,7 @@
               <div class="th-sub" v-if="c.name.includes(' — ')">{{ c.name.split(' — ').slice(1).join(' — ') }}</div>
             </th>
             <th class="amt col-total">Total</th>
+            <th class="amt col-pct">% loaded</th>
           </tr>
         </thead>
         <tbody>
@@ -62,11 +63,13 @@
               {{ fmt(coaLaborByRole(c.id, role.id)) }}
             </td>
             <td class="amt col-total">{{ fmt(rolledLabor(role.id)) }}</td>
+            <td class="amt col-pct">{{ pct(rolledLabor(role.id)) }}</td>
           </tr>
           <tr class="break-sub-row">
             <td>Labor subtotal</td>
             <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.laborTotalFor(c.id)) }}</td>
             <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.laborTotalFor(c.id))) }}</td>
+            <td class="amt col-pct">{{ pct(sum(includedScopes, c => rom.laborTotalFor(c.id))) }}</td>
           </tr>
 
           <!-- Travel section -->
@@ -75,6 +78,7 @@
             <td class="col-label-cell"><i class="ti ti-plane" aria-hidden="true"></i> Trips + per diem</td>
             <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.travelTotalFor(c.id)) }}</td>
             <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.travelTotalFor(c.id))) }}</td>
+            <td class="amt col-pct">{{ pct(sum(includedScopes, c => rom.travelTotalFor(c.id))) }}</td>
           </tr>
 
           <!-- Material section -->
@@ -83,6 +87,7 @@
             <td class="col-label-cell"><i class="ti ti-package" aria-hidden="true"></i> Equipment (unloaded)</td>
             <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.materialUnloadedFor(c.id)) }}</td>
             <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.materialUnloadedFor(c.id))) }}</td>
+            <td class="amt col-pct">{{ pct(sum(includedScopes, c => rom.materialUnloadedFor(c.id))) }}</td>
           </tr>
           <tr class="break-detail-row">
             <td class="col-label-cell">Shipping ({{ (rom.material.shippingPct * 100).toFixed(1) }}%)</td>
@@ -92,11 +97,13 @@
             <td class="amt col-total">
               {{ fmt(sum(includedScopes, c => rom.materialUnloadedFor(c.id) * rom.material.shippingPct)) }}
             </td>
+            <td class="amt col-pct">{{ pct(sum(includedScopes, c => rom.materialUnloadedFor(c.id) * rom.material.shippingPct)) }}</td>
           </tr>
           <tr class="break-sub-row">
             <td>Material subtotal</td>
             <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.materialTotalFor(c.id)) }}</td>
             <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.materialTotalFor(c.id))) }}</td>
+            <td class="amt col-pct">{{ pct(sum(includedScopes, c => rom.materialTotalFor(c.id))) }}</td>
           </tr>
 
           <!-- Unloaded sub -->
@@ -104,6 +111,7 @@
             <td>Unloaded subtotal</td>
             <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.coaTotals(c.id).unloaded) }}</td>
             <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.coaTotals(c.id).unloaded)) }}</td>
+            <td class="amt col-pct">{{ pct(sum(includedScopes, c => rom.coaTotals(c.id).unloaded)) }}</td>
           </tr>
 
           <!-- Overhead section -->
@@ -112,11 +120,13 @@
             <td class="col-label-cell">Project overhead (SCP + Global + Gov + Mgmt rsv)</td>
             <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.coaTotals(c.id).ohTotal) }}</td>
             <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.coaTotals(c.id).ohTotal)) }}</td>
+            <td class="amt col-pct">{{ pct(sum(includedScopes, c => rom.coaTotals(c.id).ohTotal)) }}</td>
           </tr>
           <tr class="break-detail-row">
             <td class="col-label-cell">SCR loading</td>
             <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.coaTotals(c.id).scr) }}</td>
             <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.coaTotals(c.id).scr)) }}</td>
+            <td class="amt col-pct">{{ pct(sum(includedScopes, c => rom.coaTotals(c.id).scr)) }}</td>
           </tr>
 
           <!-- Grand row -->
@@ -124,6 +134,7 @@
             <td>Loaded total</td>
             <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.coaTotals(c.id).totalLoaded) }}</td>
             <td class="amt col-total">{{ fmt(rom.totalLoadedForQuote) }}</td>
+            <td class="amt col-pct col-pct--grand">100%</td>
           </tr>
 
         </tbody>
@@ -141,7 +152,9 @@ const rom = useRomStore()
 
 const includedScopes = computed(() => rom.coas.filter(c => c.includeInQuote))
 const excludedScopes = computed(() => rom.coas.filter(c => !c.includeInQuote))
-const cols           = computed(() => includedScopes.value.length + 2)
+const cols           = computed(() => includedScopes.value.length + 3)
+const grandTotal     = computed(() => rom.totalLoadedForQuote)
+function pct(n) { return grandTotal.value ? (n / grandTotal.value * 100).toFixed(1) + '%' : '—' }
 
 // Labor cost for one scope filtered to a specific role
 function coaLaborByRole(coaId, roleId) {
@@ -251,5 +264,12 @@ function fmt(n) { return n ? '$' + Math.round(n).toLocaleString() : '—' }
   font-size: 14px;
 }
 .break-grand-row td.col-total { background: var(--rom-accent-dark); color: #7dd3fc; font-size: 16px; }
+
+.col-pct {
+  text-align: right; white-space: nowrap;
+  color: var(--rom-text-muted); font-size: 12px;
+  min-width: 70px;
+}
+.col-pct--grand { color: #fff; font-weight: 700; font-size: 14px; }
 
 </style>
