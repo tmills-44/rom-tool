@@ -262,7 +262,7 @@
                     <tr>
                       <th class="t-col-name">Traveler</th>
                       <th class="t-col-cat">Pay Cat</th>
-                      <th class="t-col-qty">Qty</th>
+                      <th class="t-col-qty">Travelers</th>
                       <th class="t-col-days">Days</th>
                       <th class="t-col-hrs">Travel hrs</th>
                       <th class="t-col-svc">Hotel + M&amp;IE</th>
