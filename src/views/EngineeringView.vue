@@ -374,13 +374,13 @@
           <div class="travel-labor-roles">
             <template v-for="role in rom.ROLES" :key="role.id">
               <div
-                v-if="rom.travelLaborByRole(role.id, null) > 0"
+                v-if="rom.travelLaborByRole(role.id, rom.activeCoaId) > 0"
                 class="travel-labor-role-chip"
               >
                 <i class="ti" :class="role.icon"></i>
                 <span class="tl-role-label">{{ role.label }}</span>
-                <span class="tl-role-hrs">{{ Math.round(rom.travelLaborHoursForRole(role.id, null)) }} hrs</span>
-                <span class="tl-role-cost">{{ fmt(rom.travelLaborByRole(role.id, null)) }}</span>
+                <span class="tl-role-hrs">{{ Math.round(rom.travelLaborHoursForRole(role.id, rom.activeCoaId)) }} hrs</span>
+                <span class="tl-role-cost">{{ fmt(rom.travelLaborByRole(role.id, rom.activeCoaId)) }}</span>
               </div>
             </template>
           </div>
