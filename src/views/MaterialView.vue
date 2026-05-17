@@ -310,8 +310,10 @@
       <div class="section-header">
         <h3>Shipping &amp; Freight</h3>
       </div>
+
+      <!-- Row 1: Shipping percentage -->
       <div class="shipping-row">
-        <label class="ship-label">Shipping markup (% of hardware)</label>
+        <label class="ship-label">Shipping %</label>
         <div class="pct-wrap">
           <input
             class="pct-input"
@@ -324,9 +326,39 @@
           />
           <span class="pct-sign">%</span>
         </div>
-        <div class="ship-calc">
-          {{ fmt(rom.materialUnloaded) }} × {{ (rom.material.shippingPct * 100).toFixed(1) }}% = <strong>{{ fmt(rom.shippingCost) }}</strong>
+        <div class="ship-calc" v-if="rom.material.shippingPct > 0">
+          {{ fmt(rom.materialUnloaded) }} × {{ (rom.material.shippingPct * 100).toFixed(1) }}% = <strong>{{ fmt(rom.materialUnloaded * rom.material.shippingPct) }}</strong>
         </div>
+      </div>
+
+      <!-- Row 2: Third-party shipper -->
+      <div class="shipping-row shipping-row--shipper">
+        <label class="ship-label">Third-party shipper</label>
+        <input
+          class="shipper-name-input"
+          type="text"
+          placeholder="Shipping company name…"
+          :value="rom.material.shipperName"
+          @input="rom.material.shipperName = $event.target.value"
+        />
+        <div class="dollar-field-wrap">
+          <span class="dollar-sign">$</span>
+          <input
+            class="shipper-cost-input"
+            type="number"
+            min="0"
+            step="100"
+            placeholder="0"
+            :value="rom.material.shipperCost || 0"
+            @input="rom.material.shipperCost = parseFloat($event.target.value) || 0"
+          />
+        </div>
+      </div>
+
+      <!-- Total row -->
+      <div class="shipping-total-row" v-if="rom.shippingCost > 0">
+        <span class="shipping-total-label">Total Shipping</span>
+        <strong class="shipping-total-val">{{ fmt(rom.shippingCost) }}</strong>
       </div>
     </div>
 
@@ -854,6 +886,82 @@ function pickClass(t) {
 .ship-calc strong {
   color: var(--rom-accent);
   font-weight: 700;
+}
+
+/* Align both shipping labels to the same width */
+.ship-label {
+  min-width: 140px;
+}
+
+/* Third-party shipper row */
+.shipping-row--shipper {
+  padding-top: 0;
+  border-top: 1px solid var(--rom-border);
+  margin-top: 0;
+}
+.shipper-name-input {
+  flex: 1;
+  min-width: 180px;
+  border: 1px solid var(--rom-border);
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--rom-text);
+  background: var(--rom-surface);
+  transition: border-color .15s, box-shadow .15s;
+}
+.shipper-name-input:focus {
+  outline: none;
+  border-color: var(--rom-accent);
+  box-shadow: 0 0 0 2px var(--rom-accent-bg);
+}
+.dollar-field-wrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--rom-border);
+  border-radius: 5px;
+  background: var(--rom-surface);
+  overflow: hidden;
+  transition: border-color .15s, box-shadow .15s;
+}
+.dollar-field-wrap:focus-within {
+  border-color: var(--rom-accent);
+  box-shadow: 0 0 0 2px var(--rom-accent-bg);
+}
+.dollar-field-wrap .dollar-sign {
+  padding: 0 4px 0 8px;
+}
+.shipper-cost-input {
+  border: none;
+  background: transparent;
+  padding: 6px 8px 6px 0;
+  font-size: 13px;
+  color: var(--rom-text);
+  width: 110px;
+  text-align: right;
+  font-family: inherit;
+}
+.shipper-cost-input:focus { outline: none; }
+
+/* Total shipping row */
+.shipping-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px 14px;
+  border-top: 1px solid var(--rom-border);
+  background: var(--rom-accent-bg);
+}
+.shipping-total-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rom-accent);
+}
+.shipping-total-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--rom-accent);
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 640px) {

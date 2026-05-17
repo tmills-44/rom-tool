@@ -664,12 +664,16 @@ export const useRomStore = defineStore('rom', () => {
     ]
   }
   const material  = reactive(saved?.material  ?? {
-    items: [], shippingPct: 0.03,
+    items: [], shippingPct: 0,
     categories: defaultMaterialCategories(),
     activeTemplate: 'X',
     manualAmounts: {},   // coaId → additional flat dollar amount
+    shipperName: '',     // third-party shipper name
+    shipperCost: 0,      // flat shipper invoice amount
   })
   if (!material.manualAmounts) material.manualAmounts = {}
+  if (material.shipperName === undefined) material.shipperName = ''
+  if (material.shipperCost === undefined) material.shipperCost = 0
   // ── Migration: ensure categories list, active template, and per-item shape.
   if (!Array.isArray(material.categories) || material.categories.length === 0) {
     material.categories = defaultMaterialCategories()
@@ -1481,7 +1485,7 @@ export const useRomStore = defineStore('rom', () => {
     const bomTotal = activeMaterialItems.value.reduce((s, i) => s + itemActiveQty(i) * bundleUnitCost(i), 0)
     return bomTotal + (material.manualAmounts[activeCoaId.value] || 0)
   })
-  const shippingCost        = computed(() => materialUnloaded.value * material.shippingPct)
+  const shippingCost        = computed(() => materialUnloaded.value * (material.shippingPct || 0) + (material.shipperCost || 0))
   const materialTotal       = computed(() => materialUnloaded.value + shippingCost.value)
   // Helpers that compute material totals for any specific COA — used by Summary + exports
   function materialUnloadedFor(coaId) {
@@ -1490,7 +1494,7 @@ export const useRomStore = defineStore('rom', () => {
   }
   function materialTotalFor(coaId) {
     const u = materialUnloadedFor(coaId)
-    return u + u * (material.shippingPct || 0)
+    return u + u * (material.shippingPct || 0) + (material.shipperCost || 0)
   }
   function setManualMaterialAmount(coaId, value) {
     material.manualAmounts[coaId] = Math.max(0, Number(value) || 0)
@@ -2032,7 +2036,7 @@ export const useRomStore = defineStore('rom', () => {
     Object.keys(wbs).forEach(k => delete wbs[k]); Object.assign(wbs, deepClone(DEFAULT_WBS))
     Object.keys(travel).forEach(k => delete travel[k]); Object.assign(travel, emptyTravelData())
     Object.keys(material.manualAmounts).forEach(k => delete material.manualAmounts[k])
-    Object.assign(material, { items: [], shippingPct: 0.03, activeTemplate: 'X' })
+    Object.assign(material, { items: [], shippingPct: 0, activeTemplate: 'X', shipperName: '', shipperCost: 0 })
     // Wipe scopes (coas) back to the factory default: one primary scope only.
     coas.splice(0, coas.length, { id: 'coa-primary', name: 'Scope 1 — Primary', description: '', includeInQuote: true })
     activeCoaId.value = coas[0].id
