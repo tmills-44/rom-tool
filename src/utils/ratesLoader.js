@@ -100,7 +100,7 @@ export async function loadCONUS() {
     const mie = numVal(row, mieKey)
     if (!lodging && !mie) return
 
-    map[`${city}|${state}`] = { lodging, mie, months: hasMonths ? months : null }
+    map[`${city.toLowerCase()}|${state}`] = { lodging, mie, months: hasMonths ? months : null }
   })
 
   return map

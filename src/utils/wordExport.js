@@ -10,6 +10,31 @@
  * No external library required — Word opens HTML-as-doc natively.
  */
 
+function entityTravelLaborForScope(rom, entityId, scopeId) {
+  let t = 0
+  ;(rom.travel[entityId] ?? []).forEach(trip => {
+    if ((trip.coaId ?? rom.coas[0].id) !== scopeId) return
+    ;(trip.travelers ?? []).forEach(tr => { t += rom.travelLaborCost(trip, tr) })
+  })
+  return t
+}
+
+function travelHrsByCat(rom, scopeId) {
+  const out = {}
+  rom.ENTITIES.forEach(e => (rom.travel[e.id] ?? []).forEach(trip => {
+    if ((trip.coaId ?? rom.coas[0].id) !== scopeId) return
+    const tripHrs = trip.travelHoursItems?.length
+      ? trip.travelHoursItems.reduce((s, x) => s + (x.hours || 0), 0)
+      : null
+    ;(trip.travelers ?? []).forEach(tr => {
+      if (!tr.laborCat) return
+      const hrs = (tripHrs ?? (tr.travelHours || 0)) * Math.max(1, tr.qty || 1)
+      out[tr.laborCat] = (out[tr.laborCat] || 0) + hrs
+    })
+  }))
+  return out
+}
+
 function fmt(n)    { return Math.round(n || 0) }
 function pct(v)    { return ((v || 0) * 100).toFixed(0) + '%' }
 function dollar(n) { return n ? '$' + Math.round(n).toLocaleString() : '$0' }
@@ -127,11 +152,13 @@ function breakdownTable(rom, scope, t, oh) {
   const roleRows = rom.ROLES.map(r =>
     `<tr><td>${esc(r.label)}</td><td class="amt">${dollar(rom.roleCostForCoa(r.id, null, scope.id))}</td></tr>`
   ).join('')
+  const travelLaborAmt = rom.travelLaborFor(scope.id)
   return `
   <table class="break" cellspacing="0" cellpadding="0">
     <tr class="break-head"><td>Description</td><td>Amount</td></tr>
     <tr class="break-section"><td colspan="2">Engineering Labor</td></tr>
     ${roleRows}
+    ${travelLaborAmt > 0 ? `<tr><td>Travel Labor (travel hours)</td><td class="amt">${dollar(travelLaborAmt)}</td></tr>` : ''}
     <tr class="break-sub"><td>Engineering Subtotal</td><td class="amt">${dollar(t.labor)}</td></tr>
 
     <tr class="break-section"><td colspan="2">Other Costs</td></tr>
@@ -160,7 +187,7 @@ function entityRoleTable(rom, scope, t) {
   const foot = `
     <tr class="erf">
       <td>Total</td>
-      ${rom.visibleEntities.map(e => `<td class="amt">${dollar(rom.entityCostForCoa(e.id, scope.id))}</td>`).join('')}
+      ${rom.visibleEntities.map(e => `<td class="amt">${dollar(rom.entityCostForCoa(e.id, scope.id) + entityTravelLaborForScope(rom, e.id, scope.id))}</td>`).join('')}
       <td class="amt">${dollar(t.labor)}</td>
     </tr>`
   return `<table class="er" cellspacing="0" cellpadding="0">${head}${rows}${foot}</table>`
@@ -181,7 +208,7 @@ function phaseRoleTable(rom, scope, t) {
   const head = `<tr class="erh"><td>Phase</td>${rom.ROLES.map(r => `<td class="amt">${esc(r.label.split(' ')[0])}</td>`).join('')}<td class="amt">Total</td></tr>`
   const foot = `<tr class="erf">
     <td>Total</td>
-    ${rom.ROLES.map(r => `<td class="amt">${dollar(rom.roleCostForCoa(r.id, null, scope.id))}</td>`).join('')}
+    ${rom.ROLES.map(r => `<td class="amt">${dollar(rom.roleCostForCoa(r.id, null, scope.id) + rom.travelLaborByRole(r.id, scope.id))}</td>`).join('')}
     <td class="amt">${dollar(t.labor)}</td>
   </tr>`
   return `<table class="er" cellspacing="0" cellpadding="0">${head}${phaseRows}${foot}</table>`
@@ -498,6 +525,8 @@ function buildScopeSummaryHTML(rom, scope, logo) {
   const lines = rom.lineItems.filter(l => l.coaId === scope.id && rom.enabledEntities.includes(l.entity))
   const hoursByCat = {}
   lines.forEach(l => { hoursByCat[l.laborCat] = (hoursByCat[l.laborCat] || 0) + (l.days || 0) * (l.hoursPerDay || 0) })
+  const trvHrs = travelHrsByCat(rom, scope.id)
+  Object.entries(trvHrs).forEach(([cat, hrs]) => { hoursByCat[cat] = (hoursByCat[cat] || 0) + hrs })
   const groupRows = SUMMARY_LABOR_GROUPS.map(g => {
     const hrs = g.catIds.reduce((s, id) => s + (hoursByCat[id] || 0), 0)
     return `<tr class="body-row"><td>${esc(g.title)}</td><td class="r">${Math.round(hrs)}</td></tr>`

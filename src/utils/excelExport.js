@@ -15,6 +15,22 @@ const WHITE   = 'FFFFFF'
 const TEXTDK  = '1A2133'
 const TEXTMUT = '4A5A78'
 
+function travelHrsByCat(rom, scopeId) {
+  const out = {}
+  rom.ENTITIES.forEach(e => (rom.travel[e.id] ?? []).forEach(trip => {
+    if ((trip.coaId ?? rom.coas[0].id) !== scopeId) return
+    const tripHrs = trip.travelHoursItems?.length
+      ? trip.travelHoursItems.reduce((s, x) => s + (x.hours || 0), 0)
+      : null
+    ;(trip.travelers ?? []).forEach(tr => {
+      if (!tr.laborCat) return
+      const hrs = (tripHrs ?? (tr.travelHours || 0)) * Math.max(1, tr.qty || 1)
+      out[tr.laborCat] = (out[tr.laborCat] || 0) + hrs
+    })
+  }))
+  return out
+}
+
 function fmt(n)    { return Math.round(n || 0) }
 function pct(v)    { return ((v || 0) * 100).toFixed(2) + '%' }
 function dollar(n) { return '$' + Math.round(n || 0).toLocaleString() }
@@ -115,6 +131,8 @@ function buildScopeSheet(XLSX, rom, scope) {
   rows.push(['DESCRIPTION', 'AMOUNT'])
   rows.push(['ENGINEERING LABOR'])
   rom.ROLES.forEach(r => rows.push([r.label, rom.roleCostForCoa(r.id, null, scope.id)]))
+  const scopeTravelLabor = rom.travelLaborFor(scope.id)
+  if (scopeTravelLabor > 0) rows.push(['Travel Labor (travel hours)', scopeTravelLabor])
   rows.push(['Engineering Subtotal', t.labor])
   rows.push([])
   rows.push(['OTHER COSTS'])
@@ -237,8 +255,13 @@ function buildScopeSheet(XLSX, rom, scope) {
     setStyle(ws, addr(r, 0), styleCell)
     setStyle(ws, addr(r, 1), styleCurrency)
   }
-  // Engineering subtotal
-  let r = breakdownTop + 2 + rom.ROLES.length
+  // Travel Labor row (italic/muted style when present)
+  if (scopeTravelLabor > 0) {
+    const tlRow = breakdownTop + 2 + rom.ROLES.length
+    setStyle(ws, addr(tlRow, 0), styleCellMuted); setStyle(ws, addr(tlRow, 1), { ...styleCurrency, font: { ...styleCell.font, color: { rgb: TEXTMUT } } })
+  }
+  // Engineering subtotal (offset by 1 if Travel Labor row was inserted)
+  let r = breakdownTop + 2 + rom.ROLES.length + (scopeTravelLabor > 0 ? 1 : 0)
   setStyle(ws, addr(r, 0), styleSubRow); setStyle(ws, addr(r, 1), styleSubRowR)
   // Other costs section header
   r += 2
@@ -381,6 +404,8 @@ function buildScopeSummarySheet(XLSX, rom, scope) {
   const lines = rom.lineItems.filter(l => l.coaId === scope.id)
   const hoursByCat = {}
   lines.forEach(l => { hoursByCat[l.laborCat] = (hoursByCat[l.laborCat] || 0) + (l.days || 0) * (l.hoursPerDay || 0) })
+  const trvHrs = travelHrsByCat(rom, scope.id)
+  Object.entries(trvHrs).forEach(([cat, hrs]) => { hoursByCat[cat] = (hoursByCat[cat] || 0) + hrs })
   const totalHrs = SUMMARY_LABOR_GROUPS.reduce((s, g) =>
     s + g.catIds.reduce((ss, id) => ss + (hoursByCat[id] || 0), 0), 0)
 
@@ -611,6 +636,8 @@ function buildExcelJSSummarySheet(ws, workbook, logoId, rom, scope) {
   const lines      = rom.lineItems.filter(l => l.coaId === scope.id)
   const hoursByCat = {}
   lines.forEach(l => { hoursByCat[l.laborCat] = (hoursByCat[l.laborCat] || 0) + (l.days || 0) * (l.hoursPerDay || 0) })
+  const trvHrs2 = travelHrsByCat(rom, scope.id)
+  Object.entries(trvHrs2).forEach(([cat, hrs]) => { hoursByCat[cat] = (hoursByCat[cat] || 0) + hrs })
   const totalHrs    = SUMMARY_LABOR_GROUPS.reduce((s, g) => s + g.catIds.reduce((ss, id) => ss + (hoursByCat[id] || 0), 0), 0)
   const matUnloaded = rom.materialUnloadedFor(scope.id)
   const shipping    = matUnloaded * (rom.material.shippingPct || 0)

@@ -3,18 +3,11 @@
 
     <!-- Summary strip -->
     <div class="summary-strip">
-      <div class="summary-card">
-        <div class="summary-label">Unloaded Total</div>
-        <div class="summary-value">{{ fmt(rom.unloadedProjectTotal) }}</div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">Contract Fee</div>
-        <div class="summary-value">{{ fmt(rom.contractFee) }}</div>
-      </div>
-      <div class="summary-card summary-card--accent">
-        <div class="summary-label">Grand Total (Loaded)</div>
-        <div class="summary-value">{{ fmt(rom.totalLoadedCost) }}</div>
-      </div>
+      <span class="sstat"><span class="sstat-lbl">Unloaded Total</span><strong>{{ fmt(rom.unloadedProjectTotal) }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat"><span class="sstat-lbl">Contract Fee</span><strong>{{ fmt(rom.contractFee) }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat sstat--total sstat--accent"><span class="sstat-lbl">Grand Total (Loaded)</span><strong>{{ fmt(rom.totalLoadedCost) }}</strong></span>
     </div>
 
     <div class="oh-body">
@@ -235,21 +228,19 @@ function placeholderFor(idx) {
 
 /* Summary strip */
 .summary-strip {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex; align-items: center;
+  padding: 0 20px; min-height: 44px;
   border-bottom: 1px solid var(--rom-border);
   background: var(--rom-surface);
+  flex-wrap: wrap; gap: 0;
 }
-.summary-card {
-  padding: 12px 20px;
-  border-right: 1px solid var(--rom-border);
-}
-.summary-card:last-child { border-right: none; }
-.summary-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--rom-text-muted); margin-bottom: 3px; }
-.summary-value { font-size: 20px; font-weight: 500; }
-.summary-card--accent { background: var(--rom-accent-bg); }
-.summary-card--accent .summary-label { color: var(--rom-accent-dark); opacity: .8; }
-.summary-card--accent .summary-value { color: var(--rom-accent-dark); }
+.sstat { display: flex; align-items: baseline; gap: 6px; padding: 10px 16px; white-space: nowrap; }
+.sstat-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--rom-text-muted); }
+.sstat strong { font-size: 15px; font-weight: 600; color: var(--rom-text); font-variant-numeric: tabular-nums; }
+.sstat-div { width: 1px; height: 20px; background: var(--rom-border); flex-shrink: 0; }
+.sstat--accent strong { color: var(--rom-accent); }
+.sstat--total { margin-left: auto; }
+.sstat--total strong { font-size: 17px; color: var(--rom-accent); }
 
 /* Body — single column, capped width so it reads nicely */
 .oh-body {

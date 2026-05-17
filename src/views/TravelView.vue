@@ -3,22 +3,17 @@
 
     <!-- Summary strip -->
     <div class="summary-strip">
-      <div class="summary-card">
-        <div class="summary-label">Total Trips</div>
-        <div class="summary-value">{{ allTrips.length }}</div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">Total Travelers</div>
-        <div class="summary-value">{{ totalPersons }}</div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">Total Travel Hours</div>
-        <div class="summary-value">{{ totalHours }}</div>
-      </div>
-      <div class="summary-card summary-card--accent">
-        <div class="summary-label">Travel Total</div>
-        <div class="summary-value">{{ fmt(rom.travelTotal) }}</div>
-      </div>
+      <span class="sstat"><span class="sstat-lbl">Trips</span><strong>{{ allTrips.length }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat"><span class="sstat-lbl">Travelers</span><strong>{{ totalPersons }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat"><span class="sstat-lbl">Travel Hours</span><strong>{{ totalHours }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat"><span class="sstat-lbl">Travel Expenses</span><strong>{{ fmt(rom.travelExpensesTotal) }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat sstat--accent"><span class="sstat-lbl">Travel Labor</span><strong>{{ fmt(rom.travelLaborTotal) }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat sstat--total"><span class="sstat-lbl">Total</span><strong>{{ fmt(rom.travelTotal) }}</strong></span>
     </div>
 
     <!-- GSA API info bar -->
@@ -166,19 +161,25 @@
                   <input type="number" min="0" step="1"
                     :value="trip.lodgingRate || 0" placeholder="0"
                     @input="rom.updateTrip(entity.id, trip.id, { lodgingRate: +$event.target.value })"
-                    :class="['gsa-rate-input', { 'rate-filled': (trip.lodgingRate || 0) > 0 }]" />
+                    :class="['gsa-rate-input', { 'rate-filled': (trip.lodgingRate || 0) > 0, 'rate-modified': trip.gsaLodgingRate != null && trip.lodgingRate !== trip.gsaLodgingRate }]" />
                 </div>
                 <div class="trip-field trip-field--sm">
                   <label>M&amp;IE/day ($)</label>
                   <input type="number" min="0" step="1"
                     :value="trip.mieRate || 0" placeholder="0"
                     @input="rom.updateTrip(entity.id, trip.id, { mieRate: +$event.target.value })"
-                    :class="['gsa-rate-input', { 'rate-filled': (trip.mieRate || 0) > 0 }]" />
+                    :class="['gsa-rate-input', { 'rate-filled': (trip.mieRate || 0) > 0, 'rate-modified': trip.gsaMieRate != null && trip.mieRate !== trip.gsaMieRate }]" />
                 </div>
-                <!-- Refresh (CONUS only) / State Dept link (OCONUS) -->
+                <!-- Re-sync or external link -->
                 <div class="trip-field trip-field--action">
                   <label>&nbsp;</label>
-                  <a v-if="(trip.region || 'conus') === 'conus'"
+                  <button v-if="(trip.gsaLodgingRate != null && trip.lodgingRate !== trip.gsaLodgingRate) || (trip.gsaMieRate != null && trip.mieRate !== trip.gsaMieRate)"
+                    class="df-resync-btn"
+                    title="Re-sync to loaded rates"
+                    @click.stop="rom.updateTrip(entity.id, trip.id, { lodgingRate: trip.gsaLodgingRate, mieRate: trip.gsaMieRate })">
+                    <i class="ti ti-refresh"></i> Re-sync
+                  </button>
+                  <a v-else-if="(trip.region || 'conus') === 'conus'"
                     href="https://www.gsa.gov/travel/plan-book/per-diem-rates" target="_blank" rel="noopener noreferrer"
                     class="state-dept-link" title="GSA Per Diem Rates">
                     <i class="ti ti-external-link"></i>
@@ -209,25 +210,28 @@
                   <i class="ti ti-clock" aria-hidden="true"></i>
                   <label>Travel hrs</label>
                   <input type="number" min="0" step="0.5"
-                    :value="trip.defaultTravelHours ?? 4"
-                    @change="rom.updateTrip(entity.id, trip.id, { defaultTravelHours: +$event.target.value })" />
+                    :value="trip.travelHoursItems?.length ? effHours(trip, null) : (trip.defaultTravelHours ?? 4)"
+                    @change="onHoursDefaultChange(entity.id, trip, $event)" />
+                  <button class="seg-open-btn" :class="{ 'seg-open-btn--has': trip.travelHoursItems?.length }"
+                    title="Break down into segments"
+                    @click.stop="openHoursPanel(entity.id, trip)">
+                    <i class="ti ti-list-details"></i>
+                  </button>
                 </div>
 
-                <div class="default-field">
+                <div class="default-field" :class="{ 'default-field--modified': trip.hotelDailyTotal != null }">
                   <i class="ti ti-bed" aria-hidden="true"></i>
-                  <label>Hotel/night</label>
+                  <label>Lodging+M&amp;IE</label>
                   <input type="number" min="0" step="1"
-                    :value="trip.lodgingRate || 0"
-                    @input="rom.updateTrip(entity.id, trip.id, { lodgingRate: +$event.target.value })" />
-                  <span class="default-tag">GSA</span>
-                </div>
-
-                <div class="default-field">
-                  <i class="ti ti-utensils" aria-hidden="true"></i>
-                  <label>M&amp;IE/day</label>
-                  <input type="number" min="0" step="1"
-                    :value="trip.mieRate || 0"
-                    @input="rom.updateTrip(entity.id, trip.id, { mieRate: +$event.target.value })" />
+                    :value="trip.hotelDailyTotal ?? ((trip.lodgingRate || 0) + (trip.mieRate || 0))"
+                    :class="{ 'df-override': trip.hotelDailyTotal != null }"
+                    @change="rom.updateTrip(entity.id, trip.id, { hotelDailyTotal: +$event.target.value })" />
+                  <button v-if="trip.hotelDailyTotal != null"
+                    class="df-resync-btn"
+                    @click.stop="rom.updateTrip(entity.id, trip.id, { hotelDailyTotal: null })">
+                    <i class="ti ti-refresh"></i> Re-sync
+                  </button>
+                  <span v-else class="default-tag">GSA</span>
                 </div>
 
                 <div class="default-field">
@@ -250,8 +254,13 @@
                   <i class="ti ti-dots" aria-hidden="true"></i>
                   <label>Misc</label>
                   <input type="number" min="0" step="5"
-                    :value="trip.defaultMiscRate ?? 50"
-                    @change="rom.updateTrip(entity.id, trip.id, { defaultMiscRate: +$event.target.value })" />
+                    :value="trip.miscItems?.length ? miscItemsTotal(trip) : (trip.defaultMiscRate ?? 50)"
+                    @change="onMiscDefaultChange(entity.id, trip, $event)" />
+                  <button class="seg-open-btn" :class="{ 'seg-open-btn--has': trip.miscItems?.length }"
+                    title="Itemize misc fees"
+                    @click.stop="openMiscPanel(entity.id, trip)">
+                    <i class="ti ti-receipt"></i>
+                  </button>
                 </div>
               </div>
 
@@ -286,7 +295,7 @@
                           :value="tr.laborCat || ''"
                           class="cat-select"
                           @change="rom.updateTraveler(entity.id, trip.id, tr.id, { laborCat: $event.target.value })"
-                          :title="rom.showRates && tr.laborCat ? `Travel labor: ${fmt(rom.travelLaborCost(tr))}` : 'Pick a pay category for this traveler'"
+                          :title="rom.showRates && tr.laborCat ? `Travel labor: ${fmt(rom.travelLaborCost(trip, tr))}` : 'Pick a pay category for this traveler'"
                         >
                           <option value="">— Pay cat —</option>
                           <option v-for="cat in rom.LABOR_CATS" :key="cat.id" :value="cat.id">
@@ -313,7 +322,7 @@
                         <div class="svc-cell" :class="{ 'svc-cell--on': tr.hotel }">
                           <label class="svc-row">
                             <input type="checkbox" :checked="tr.hotel"
-                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { hotel: $event.target.checked })" />
+                              @change="toggleService(entity.id, trip.id, tr.id, 'hotel', $event.target.checked)" />
                             <span class="svc-cost">{{ tr.hotel ? fmt(hotelCost(trip, tr)) : '—' }}</span>
                             <button v-if="tr.hotel" class="breakdown-btn"
                               @click.stop.prevent="openBreakdownAt($event, entity.id, trip, tr)"
@@ -323,12 +332,18 @@
                           </label>
                           <div v-if="tr.hotel" class="svc-rate-row">
                             <input type="number" min="0" step="1"
-                              :value="effLodging(trip, tr)"
+                              :value="effHotelDaily(trip, tr)"
                               class="svc-rate-input"
-                              :class="{ 'svc-rate-input--override': isOverride(tr, 'lodgingRate', 'lodgingRate', trip) }"
-                              :title="`Lodging per night · trip default $${trip.lodgingRate || 0}`"
-                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { lodgingRate: +$event.target.value })" />
-                            <span class="svc-unit">/nt</span>
+                              :class="{ 'svc-rate-input--modified': tr.hotelDailyRate != null }"
+                              :title="`Hotel+M&IE per day · default $${effHotelDaily(trip, null)}`"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { hotelDailyRate: +$event.target.value })" />
+                            <span class="svc-unit">/dy</span>
+                            <button v-if="tr.hotelDailyRate != null"
+                              class="svc-resync-btn"
+                              title="Re-sync to trip default"
+                              @click.stop="rom.updateTraveler(entity.id, trip.id, tr.id, { hotelDailyRate: null })">
+                              <i class="ti ti-refresh"></i>
+                            </button>
                           </div>
                         </div>
                       </td>
@@ -336,7 +351,7 @@
                         <div class="svc-cell" :class="{ 'svc-cell--on': tr.car }">
                           <label class="svc-row">
                             <input type="checkbox" :checked="tr.car"
-                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { car: $event.target.checked })" />
+                              @change="toggleService(entity.id, trip.id, tr.id, 'car', $event.target.checked)" />
                             <span class="svc-cost">{{ tr.car ? fmt(carCost(trip, tr)) : '—' }}</span>
                           </label>
                           <div v-if="tr.car" class="svc-rate-row">
@@ -354,7 +369,7 @@
                         <div class="svc-cell" :class="{ 'svc-cell--on': tr.airfare }">
                           <label class="svc-row">
                             <input type="checkbox" :checked="tr.airfare"
-                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { airfare: $event.target.checked })" />
+                              @change="toggleService(entity.id, trip.id, tr.id, 'airfare', $event.target.checked)" />
                             <span class="svc-cost">{{ tr.airfare ? fmt(airfareCost(trip, tr)) : '—' }}</span>
                           </label>
                           <div v-if="tr.airfare" class="svc-rate-row">
@@ -372,21 +387,26 @@
                         <div class="svc-cell" :class="{ 'svc-cell--on': tr.misc }">
                           <label class="svc-row">
                             <input type="checkbox" :checked="tr.misc"
-                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { misc: $event.target.checked })" />
+                              @change="toggleService(entity.id, trip.id, tr.id, 'misc', $event.target.checked)" />
                             <span class="svc-cost">{{ tr.misc ? fmt(miscCost(trip, tr)) : '—' }}</span>
                           </label>
                           <div v-if="tr.misc" class="svc-rate-row">
-                            <input type="number" min="0" step="5"
-                              :value="effMisc(trip, tr)"
-                              class="svc-rate-input"
-                              :class="{ 'svc-rate-input--override': isOverride(tr, 'miscRate', 'defaultMiscRate', trip) }"
-                              :title="`Misc per person · trip default $${trip.defaultMiscRate || 50}`"
-                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { miscRate: +$event.target.value })" />
-                            <span class="svc-unit">/ea</span>
+                            <template v-if="trip.miscItems?.length">
+                              <span class="svc-misc-sum">{{ fmt(miscItemsTotal(trip)) }}/ea</span>
+                            </template>
+                            <template v-else>
+                              <input type="number" min="0" step="5"
+                                :value="effMisc(trip, tr)"
+                                class="svc-rate-input"
+                                :class="{ 'svc-rate-input--override': isOverride(tr, 'miscRate', 'defaultMiscRate', trip) }"
+                                :title="`Misc per person · trip default $${trip.defaultMiscRate || 50}`"
+                                @change="rom.updateTraveler(entity.id, trip.id, tr.id, { miscRate: +$event.target.value })" />
+                              <span class="svc-unit">/ea</span>
+                            </template>
                           </div>
                         </div>
                       </td>
-                      <td class="t-col-total">{{ fmt(rom.travelerCost(trip, tr) + rom.travelLaborCost(tr)) }}</td>
+                      <td class="t-col-total">{{ fmt(rom.travelerCost(trip, tr) + rom.travelLaborCost(trip, tr)) }}</td>
                       <td class="t-col-del">
                         <button class="del-btn" @click="rom.removeTraveler(entity.id, trip.id, tr.id)" title="Remove traveler">
                           <i class="ti ti-trash" aria-hidden="true"></i>
@@ -447,49 +467,170 @@
           <button class="breakdown-close" @click="openBreakdown = null">×</button>
         </div>
 
-        <table class="breakdown-table">
-          <thead>
-            <tr>
-              <th>Day</th>
-              <th class="bd-num">M&amp;IE</th>
-              <th class="bd-num">Lodging</th>
-              <th class="bd-num">Daily Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in breakdownDays(bdTrip, bdTr)" :key="row.day"
-                :class="{ 'bd-row--part': row.partial }">
-              <td class="bd-day">{{ row.label }}</td>
-              <td class="bd-num">
-                <span class="bd-mie-wrap">
-                  <span v-if="row.partial" class="bd-pct">75%</span>
-                  <span>{{ fmt(row.mie) }}</span>
-                </span>
-              </td>
-              <td class="bd-num">{{ fmt(row.lodging) }}</td>
-              <td class="bd-num bd-day-total">{{ fmt(row.mie + row.lodging) }}</td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr class="bd-subtotal">
-              <td>Per traveler</td>
-              <td class="bd-num" colspan="2"></td>
-              <td class="bd-num">{{ fmt(breakdownDays(bdTrip, bdTr).reduce((s,r) => s + r.mie + r.lodging, 0)) }}</td>
-            </tr>
-            <tr v-if="(bdTr.qty || 1) > 1" class="bd-total">
-              <td>Total (× {{ bdTr.qty }} travelers)</td>
-              <td class="bd-num" colspan="2"></td>
-              <td class="bd-num">{{ fmt(hotelCost(bdTrip, bdTr)) }}</td>
-            </tr>
-          </tfoot>
-        </table>
+        <!-- Override mode: flat combined daily rate (per-traveler or trip-level) -->
+        <template v-if="bdTr.hotelDailyRate != null || bdTrip.hotelDailyTotal != null">
+          <table class="breakdown-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th class="bd-num">Daily Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="i in Math.max(0, bdTr.days || 0)" :key="i">
+                <td class="bd-day">Day {{ i }}</td>
+                <td class="bd-num bd-day-total">{{ fmt(effHotelDaily(bdTrip, bdTr)) }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="bd-subtotal">
+                <td>Per traveler</td>
+                <td class="bd-num">{{ fmt(effHotelDaily(bdTrip, bdTr) * Math.max(0, bdTr.days || 0)) }}</td>
+              </tr>
+              <tr v-if="(bdTr.qty || 1) > 1" class="bd-total">
+                <td>Total (× {{ bdTr.qty }} travelers)</td>
+                <td class="bd-num">{{ fmt(hotelCost(bdTrip, bdTr)) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <p class="bd-override-note">
+            Using combined daily rate. <button class="bd-link" @click="rom.updateTrip(openBreakdown.entityId, bdTrip.id, { hotelDailyTotal: null })">Reset to Hotel + M&amp;IE rates</button>
+          </p>
+        </template>
 
-        <label class="fld-checkbox">
-          <input type="checkbox"
-            :checked="bdTr.firstLastDay ?? true"
-            @change="rom.updateTraveler(openBreakdown.entityId, bdTrip.id, bdTr.id, { firstLastDay: $event.target.checked })" />
-          Apply first &amp; last day travel rule <span class="fld-hint">(75% M&amp;IE on travel days)</span>
-        </label>
+        <!-- Normal mode: separate lodging + M&IE with first/last day -->
+        <template v-else>
+          <table class="breakdown-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th class="bd-num">M&amp;IE</th>
+                <th class="bd-num">Lodging</th>
+                <th class="bd-num">Daily Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in breakdownDays(bdTrip, bdTr)" :key="row.day"
+                  :class="{ 'bd-row--part': row.partial }">
+                <td class="bd-day">{{ row.label }}</td>
+                <td class="bd-num">
+                  <span class="bd-mie-wrap">
+                    <span v-if="row.partial" class="bd-pct">75%</span>
+                    <span>{{ fmt(row.mie) }}</span>
+                  </span>
+                </td>
+                <td class="bd-num">{{ fmt(row.lodging) }}</td>
+                <td class="bd-num bd-day-total">{{ fmt(row.mie + row.lodging) }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="bd-subtotal">
+                <td>Per traveler</td>
+                <td class="bd-num" colspan="2"></td>
+                <td class="bd-num">{{ fmt(breakdownDays(bdTrip, bdTr).reduce((s,r) => s + r.mie + r.lodging, 0)) }}</td>
+              </tr>
+              <tr v-if="(bdTr.qty || 1) > 1" class="bd-total">
+                <td>Total (× {{ bdTr.qty }} travelers)</td>
+                <td class="bd-num" colspan="2"></td>
+                <td class="bd-num">{{ fmt(hotelCost(bdTrip, bdTr)) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <label class="fld-checkbox">
+            <input type="checkbox"
+              :checked="bdTr.firstLastDay ?? true"
+              @change="rom.updateTraveler(openBreakdown.entityId, bdTrip.id, bdTr.id, { firstLastDay: $event.target.checked })" />
+            Apply first &amp; last day travel rule <span class="fld-hint">(75% M&amp;IE on travel days)</span>
+          </label>
+        </template>
+      </div>
+    </div>
+
+    <!-- Overwrite confirm dialog -->
+    <div v-if="overwriteConfirm" class="breakdown-overlay" @click.self="cancelOverwrite">
+      <div class="ow-modal">
+        <p class="ow-msg">
+          {{ overwriteConfirm.type === 'hours'
+            ? `This trip has ${overwriteConfirm.segCount} hour segment(s) totaling ${overwriteConfirm.oldVal} hrs. Replace them all with ${overwriteConfirm.value} hrs?`
+            : `This trip has ${overwriteConfirm.segCount} misc fee(s) totaling $${overwriteConfirm.oldVal}. Replace them all with $${overwriteConfirm.value}/ea?`
+          }}
+        </p>
+        <div class="ow-actions">
+          <button class="btn" @click="cancelOverwrite">Cancel</button>
+          <button class="btn btn-secondary" @click="confirmOverwrite">Yes, overwrite</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Travel hours segments modal -->
+    <div v-if="openHours && hdTrip" class="breakdown-overlay" @click.self="openHours = null">
+      <div class="breakdown-card items-card">
+        <div class="breakdown-header">
+          <span class="breakdown-title">Travel Hour Segments — {{ hdTrip.tripName || 'Trip' }}</span>
+          <button class="breakdown-close" @click="openHours = null">×</button>
+        </div>
+        <div class="items-body">
+          <div v-if="!hdTrip.travelHoursItems?.length" class="items-empty">
+            No segments yet. The flat default hours value is used for all travelers.
+          </div>
+          <div v-for="item in (hdTrip.travelHoursItems ?? [])" :key="item.id" class="items-row">
+            <input class="items-label-input" type="text" placeholder="Description (e.g. Flight to DC)"
+              :value="item.label"
+              @change="rom.updateTravelHoursItem(openHours.entityId, hdTrip.id, item.id, { label: $event.target.value })" />
+            <input class="items-num-input" type="number" min="0" step="0.5" placeholder="0"
+              :value="item.hours"
+              @change="rom.updateTravelHoursItem(openHours.entityId, hdTrip.id, item.id, { hours: +$event.target.value || 0 })" />
+            <span class="items-unit">hrs</span>
+            <button class="items-del" @click="rom.removeTravelHoursItem(openHours.entityId, hdTrip.id, item.id)">×</button>
+          </div>
+        </div>
+        <div class="items-footer">
+          <button class="items-add-btn" @click="rom.addTravelHoursItem(openHours.entityId, hdTrip.id)">
+            + Add Segment
+          </button>
+          <span v-if="hdTrip.travelHoursItems?.length" class="items-total">
+            Total: <strong>{{ effHours(hdTrip, null) }} hrs</strong> per traveler
+          </span>
+          <span v-else class="items-total items-total--flat">
+            Flat default: <strong>{{ hdTrip.defaultTravelHours ?? 4 }} hrs</strong>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Misc fees modal -->
+    <div v-if="openMisc && mdTrip" class="breakdown-overlay" @click.self="openMisc = null">
+      <div class="breakdown-card items-card">
+        <div class="breakdown-header">
+          <span class="breakdown-title">Misc Fees — {{ mdTrip.tripName || 'Trip' }}</span>
+          <button class="breakdown-close" @click="openMisc = null">×</button>
+        </div>
+        <div class="items-body">
+          <div v-if="!mdTrip.miscItems?.length" class="items-empty">
+            No items yet. The flat per-person rate is used for all travelers.
+          </div>
+          <div v-for="item in (mdTrip.miscItems ?? [])" :key="item.id" class="items-row">
+            <input class="items-label-input" type="text" placeholder="Description (e.g. Baggage fee)"
+              :value="item.label"
+              @change="rom.updateMiscItem(openMisc.entityId, mdTrip.id, item.id, { label: $event.target.value })" />
+            <input class="items-num-input" type="number" min="0" step="1" placeholder="0"
+              :value="item.amount"
+              @change="rom.updateMiscItem(openMisc.entityId, mdTrip.id, item.id, { amount: +$event.target.value || 0 })" />
+            <span class="items-unit">/ea</span>
+            <button class="items-del" @click="rom.removeMiscItem(openMisc.entityId, mdTrip.id, item.id)">×</button>
+          </div>
+        </div>
+        <div class="items-footer">
+          <button class="items-add-btn" @click="rom.addMiscItem(openMisc.entityId, mdTrip.id)">
+            + Add Fee
+          </button>
+          <span v-if="mdTrip.miscItems?.length" class="items-total">
+            Total: <strong>{{ fmt(miscItemsTotal(mdTrip)) }}/ea</strong>
+          </span>
+          <span v-else class="items-total items-total--flat">
+            Flat default: <strong>{{ fmt(mdTrip.defaultMiscRate ?? 50) }}/ea</strong>
+          </span>
+        </div>
       </div>
     </div>
 
@@ -508,7 +649,10 @@ const currentMonth = new Date().toLocaleString('en-US', { month: 'short' })
 
 const gsaError      = reactive({})
 const stateCities   = reactive({})
-const openBreakdown = ref(null)   // { entityId, tripId, travelerId, style } when popup is open
+const openBreakdown = ref(null)   // { entityId, tripId, travelerId } when hotel popup is open
+const openHours        = ref(null)   // { entityId, tripId } when hours panel is open
+const openMisc         = ref(null)   // { entityId, tripId } when misc panel is open
+const overwriteConfirm = ref(null)   // { entityId, tripId, type, value, oldVal, segCount }
 
 // Always look up the live store objects so the popup reacts to changes (e.g. firstLastDay checkbox)
 const bdTrip = computed(() => {
@@ -520,6 +664,14 @@ const bdTr = computed(() => {
   if (!bdTrip.value) return null
   return (bdTrip.value.travelers ?? []).find(t => t.id === openBreakdown.value.travelerId) ?? null
 })
+
+function _liveTrip(openRef) {
+  if (!openRef.value) return null
+  const { entityId, tripId } = openRef.value
+  return (rom.travel[entityId] ?? []).find(t => t.id === tripId) ?? null
+}
+const hdTrip = computed(() => _liveTrip(openHours))
+const mdTrip = computed(() => _liveTrip(openMisc))
 
 function openBreakdownAt(evt, entityId, trip, tr) {
   openBreakdown.value = { entityId, tripId: trip.id, travelerId: tr.id }
@@ -574,7 +726,7 @@ const totalPersons = computed(() =>
   allTrips.value.reduce((s, t) => s + (t.travelers || []).reduce((a, tr) => a + (tr.qty || 1), 0), 0))
 const totalHours   = computed(() =>
   allTrips.value.reduce((s, t) => s + (t.travelers || []).reduce(
-    (a, tr) => a + (tr.travelHours ?? t.defaultTravelHours ?? 0) * (tr.qty || 1), 0), 0))
+    (a, tr) => a + effHours(t, tr) * (tr.qty || 1), 0), 0))
 
 // Per-day M&IE + lodging breakdown for the popup
 function breakdownDays(trip, tr) {
@@ -598,7 +750,7 @@ function breakdownDays(trip, tr) {
 }
 
 function tripLaborTotal(trip) {
-  return (trip.travelers || []).reduce((s, tr) => s + rom.travelLaborCost(tr), 0)
+  return (trip.travelers || []).reduce((s, tr) => s + rom.travelLaborCost(trip, tr), 0)
 }
 
 function trips(entityId) {
@@ -608,6 +760,16 @@ function trips(entityId) {
 function entityTotal(entityId){ return trips(entityId).reduce((s, t) => s + rom.tripCost(t), 0) }
 function fmt(n)               { return '$' + Math.round(n || 0).toLocaleString() }
 
+// Re-enabling a service clears saved per-traveler rates so the trip default is pulled
+function toggleService(entityId, tripId, travelerId, service, enabled) {
+  const patch = { [service]: enabled }
+  if (enabled) {
+    const rateFields = { hotel: ['hotelDailyRate', 'lodgingRate', 'mieRate'], car: ['carRate'], airfare: ['airfareRate'], misc: ['miscRate'] }
+    ;(rateFields[service] ?? []).forEach(f => { patch[f] = null })
+  }
+  rom.updateTraveler(entityId, tripId, travelerId, patch)
+}
+
 // Effective rate getters — per-row override falls back to trip default
 function effLodging(trip, tr) { return tr.lodgingRate != null ? tr.lodgingRate : (trip.lodgingRate || 0) }
 function effMie(trip, tr)     { return tr.mieRate     != null ? tr.mieRate     : (trip.mieRate     || 0) }
@@ -615,11 +777,84 @@ function effCar(trip, tr)     { return tr.carRate     != null ? tr.carRate     :
 function effAirfare(trip, tr) { return tr.airfareRate != null ? tr.airfareRate : (trip.defaultAirfareRate || 0) }
 function effMisc(trip, tr)    { return tr.miscRate    != null ? tr.miscRate    : (trip.defaultMiscRate    || 0) }
 
+// Open hours panel — pre-populate with flat default if list is empty
+function openHoursPanel(entityId, trip) {
+  if (!(trip.travelHoursItems?.length)) {
+    rom.addTravelHoursItem(entityId, trip.id, trip.defaultTravelHours ?? 4)
+  }
+  openHours.value = { entityId, tripId: trip.id }
+}
+
+// Open misc panel — pre-populate with flat default if list is empty
+function openMiscPanel(entityId, trip) {
+  if (!(trip.miscItems?.length)) {
+    rom.addMiscItem(entityId, trip.id, trip.defaultMiscRate ?? 50)
+  }
+  openMisc.value = { entityId, tripId: trip.id }
+}
+
+// Intercept manual typing in defaults bar — ask to overwrite if segments exist
+function onHoursDefaultChange(entityId, trip, evt) {
+  const val = +evt.target.value || 0
+  if ((trip.travelHoursItems?.length ?? 0) > 1) {
+    overwriteConfirm.value = {
+      entityId, tripId: trip.id, type: 'hours', value: val,
+      oldVal: effHours(trip, null), segCount: trip.travelHoursItems.length,
+    }
+    evt.target.value = effHours(trip, null)   // reset display until confirmed
+  } else if (trip.travelHoursItems?.length === 1) {
+    rom.updateTravelHoursItem(entityId, trip.id, trip.travelHoursItems[0].id, { hours: val })
+  } else {
+    rom.updateTrip(entityId, trip.id, { defaultTravelHours: val })
+  }
+}
+function onMiscDefaultChange(entityId, trip, evt) {
+  const val = +evt.target.value || 0
+  if ((trip.miscItems?.length ?? 0) > 1) {
+    overwriteConfirm.value = {
+      entityId, tripId: trip.id, type: 'misc', value: val,
+      oldVal: miscItemsTotal(trip), segCount: trip.miscItems.length,
+    }
+    evt.target.value = miscItemsTotal(trip)   // reset display until confirmed
+  } else if (trip.miscItems?.length === 1) {
+    rom.updateMiscItem(entityId, trip.id, trip.miscItems[0].id, { amount: val })
+  } else {
+    rom.updateTrip(entityId, trip.id, { defaultMiscRate: val })
+  }
+}
+
+function confirmOverwrite() {
+  const { entityId, tripId, type, value } = overwriteConfirm.value
+  if (type === 'hours') {
+    rom.updateTrip(entityId, tripId, { travelHoursItems: [], defaultTravelHours: value })
+  } else {
+    rom.updateTrip(entityId, tripId, { miscItems: [], defaultMiscRate: value })
+  }
+  overwriteConfirm.value = null
+}
+function cancelOverwrite() {
+  overwriteConfirm.value = null
+}
+
+function effHours(trip, tr) {
+  return trip?.travelHoursItems?.length
+    ? trip.travelHoursItems.reduce((s, x) => s + (x.hours || 0), 0)
+    : (tr?.travelHours ?? trip?.defaultTravelHours ?? 0)
+}
+function miscItemsTotal(trip) {
+  return (trip?.miscItems ?? []).reduce((s, x) => s + (x.amount || 0), 0)
+}
+
 // Per-toggle cost helpers — match what travelerCost() computes in the store
+function effHotelDaily(trip, tr) {
+  if (tr?.hotelDailyRate != null) return tr.hotelDailyRate
+  if (trip?.hotelDailyTotal != null) return trip.hotelDailyTotal
+  return (trip?.lodgingRate || 0) + (trip?.mieRate || 0)
+}
 function hotelCost(trip, tr) {
-  const qty    = Math.max(1, tr.qty || 1)
-  const days   = Math.max(0, tr.days || 0)
-  return qty * (effLodging(trip, tr) * days + effMie(trip, tr) * days)
+  const qty  = Math.max(1, tr.qty || 1)
+  const days = Math.max(0, tr.days || 0)
+  return qty * effHotelDaily(trip, tr) * days
 }
 function carCost(trip, tr) {
   const qty  = Math.max(1, tr.qty || 1)
@@ -630,7 +865,9 @@ function airfareCost(trip, tr) {
   return Math.max(1, tr.qty || 1) * effAirfare(trip, tr)
 }
 function miscCost(trip, tr) {
-  return Math.max(1, tr.qty || 1) * effMisc(trip, tr)
+  const qty = Math.max(1, tr.qty || 1)
+  if (trip.miscItems?.length) return qty * miscItemsTotal(trip)
+  return qty * effMisc(trip, tr)
 }
 
 // True when the row's rate differs from the trip default (drives a small visual cue)
@@ -731,8 +968,10 @@ function onCitySelect(entityId, trip, cityName) {
     destination:     cityName,
     lodgingRate:     peakRate || 0,
     mieRate:         cached.mie ?? 0,
+    gsaLodgingRate:  peakRate || 0,
+    gsaMieRate:      cached.mie ?? 0,
     gsaMonthlyRates: cached.gsaMonthlyRates ?? null,
-    travelMonth:     peakName,   // kept only as a label so we can show which month is peak
+    travelMonth:     peakName,
   })
 
   const peakNote = peakName ? ` · peak: ${peakName} ★` : ''
@@ -743,9 +982,11 @@ function onOconusLocationSelect(entityId, trip, location) {
   const locData = rom.oconusByCountry?.[trip.country]?.find(l => l.location === location)
   if (locData) {
     rom.updateTrip(entityId, trip.id, {
-      destination: location,
-      lodgingRate: locData.lodging ?? 0,
-      mieRate:     locData.mie ?? 0,
+      destination:    location,
+      lodgingRate:    locData.lodging ?? 0,
+      mieRate:        locData.mie ?? 0,
+      gsaLodgingRate: locData.lodging ?? 0,
+      gsaMieRate:     locData.mie ?? 0,
       gsaMonthlyRates: null,
     })
     gsaError[trip.id] = `✓ State Dept · $${locData.lodging}/night · $${locData.mie}/day`
@@ -774,17 +1015,29 @@ onMounted(() => {
 
 /* Summary strip */
 .summary-strip {
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
   border-bottom: 1px solid var(--rom-border);
   background: var(--rom-surface);
+  min-height: 44px;
+  flex-wrap: wrap;
+  gap: 0;
 }
-.summary-card { padding: 12px 20px; border-right: 1px solid var(--rom-border); }
-.summary-card:last-child { border-right: none; }
-.summary-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--rom-text-muted); margin-bottom: 3px; }
-.summary-value { font-size: 20px; font-weight: 500; }
-.summary-card--accent { background: var(--rom-accent-bg); }
-.summary-card--accent .summary-label { color: var(--rom-accent-dark); opacity: .8; }
-.summary-card--accent .summary-value { color: var(--rom-accent-dark); }
+.sstat {
+  display: flex; align-items: baseline; gap: 6px;
+  padding: 10px 16px;
+  white-space: nowrap;
+}
+.sstat-lbl {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--rom-text-muted);
+}
+.sstat strong { font-size: 15px; font-weight: 600; color: var(--rom-text); font-variant-numeric: tabular-nums; }
+.sstat-div { width: 1px; height: 20px; background: var(--rom-border); flex-shrink: 0; }
+.sstat--accent strong { color: var(--rom-accent); }
+.sstat--total { margin-left: auto; }
+.sstat--total strong { font-size: 17px; color: var(--rom-accent); }
 
 /* GSA info bar */
 .gsa-info-bar {
@@ -951,6 +1204,14 @@ onMounted(() => {
   border-color: var(--rom-accent);
   background: var(--rom-accent-bg);
   color: var(--rom-accent-dark);
+}
+.gsa-rate-input.rate-modified {
+  border-color: #b87c00;
+  background: rgba(184,124,0,.07);
+  color: #7a5200;
+}
+@media (prefers-color-scheme: dark) {
+  .gsa-rate-input.rate-modified { color: #f0c060; background: rgba(184,124,0,.15); }
 }
 .gsa-rate-input:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
 .gsa-error { font-size: 11px; color: var(--rom-danger); align-self: flex-end; }
@@ -1303,4 +1564,144 @@ onMounted(() => {
 }
 .fld-checkbox input[type="checkbox"] { accent-color: var(--rom-accent); width: 15px; height: 15px; cursor: pointer; }
 .fld-hint { font-size: 11px; color: var(--rom-text-muted); font-weight: 400; margin-left: 2px; }
+
+/* ─── Hotel daily override ──────────────────────────────────────── */
+.default-field--modified { background: rgba(133,79,11,.06); border-radius: 6px; padding: 2px 5px; }
+.df-override { border-color: var(--rom-warn) !important; color: var(--rom-warn) !important; font-weight: 600; }
+.df-resync-btn {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border: 1px solid var(--rom-warn);
+  background: transparent; color: var(--rom-warn);
+  border-radius: 4px; font-size: 10px; font-family: inherit;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: background .12s;
+}
+.df-resync-btn:hover { background: rgba(133,79,11,.12); }
+.svc-rate-input--modified { border-color: var(--rom-warn) !important; font-weight: 600; }
+.svc-resync-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; flex-shrink: 0; margin-left: 2px;
+  border: 1px solid var(--rom-warn); background: transparent;
+  border-radius: 3px; cursor: pointer; padding: 0;
+  color: var(--rom-warn); font-size: 11px;
+  transition: background .12s;
+}
+.svc-resync-btn:hover { background: rgba(133,79,11,.12); }
+.bd-override-note {
+  font-size: 12px; color: var(--rom-text-muted);
+  padding: 8px 0 0; border-top: 1px solid var(--rom-border);
+}
+.bd-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--rom-accent); font-size: 12px; font-family: inherit;
+  text-decoration: underline;
+}
+
+/* ─── Overwrite confirm dialog ─────────────────────────────────── */
+.ow-modal {
+  background: var(--rom-surface);
+  border-radius: 10px;
+  padding: 22px 24px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 12px 48px rgba(0,0,0,.22);
+  display: flex; flex-direction: column; gap: 18px;
+}
+.ow-msg {
+  font-size: 13px; color: var(--rom-text); line-height: 1.6;
+}
+.ow-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+}
+.ow-actions .btn {
+  background: transparent; color: var(--rom-text);
+  border: 1px solid var(--rom-border);
+}
+.ow-actions .btn:hover { background: var(--rom-readonly); }
+.ow-actions .btn-secondary { background: var(--rom-accent); color: #fff; border-color: var(--rom-accent); }
+.ow-actions .btn-secondary:hover { background: var(--rom-accent-hover); }
+
+/* ─── Segment trigger (travel hours cell) ──────────────────────── */
+.seg-trigger {
+  display: flex; align-items: center; gap: 4px;
+  justify-content: flex-end;
+}
+.seg-val {
+  font-variant-numeric: tabular-nums; min-width: 28px; text-align: right;
+  font-size: 12px; color: var(--rom-text);
+}
+.seg-open-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; flex-shrink: 0;
+  border: 1px solid var(--rom-border); background: var(--rom-surface-alt);
+  border-radius: 3px; cursor: pointer; padding: 0;
+  color: var(--rom-text-muted); font-size: 12px;
+  transition: background .12s, color .12s;
+}
+.seg-open-btn:hover { background: var(--rom-readonly); color: var(--rom-accent); }
+.seg-open-btn--has { border-color: var(--rom-accent); color: var(--rom-accent); }
+
+/* Misc fee button highlight */
+.breakdown-btn--has { color: var(--rom-accent) !important; }
+.svc-misc-sum {
+  font-size: 12px; color: var(--rom-text); font-variant-numeric: tabular-nums;
+}
+
+/* ─── Hours / Misc items modal ─────────────────────────────────── */
+.items-card { width: 480px; }
+.items-body {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 340px; overflow-y: auto;
+  padding: 4px 0;
+}
+.items-empty {
+  font-size: 12px; color: var(--rom-text-muted);
+  padding: 10px 0;
+}
+.items-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.items-label-input {
+  flex: 1; padding: 4px 7px;
+  border: 1px solid var(--rom-border); border-radius: 5px;
+  background: var(--rom-surface); color: var(--rom-text);
+  font-family: inherit; font-size: 12px;
+}
+.items-label-input:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; }
+.items-num-input {
+  width: 68px; padding: 4px 6px; text-align: right;
+  border: 1px solid var(--rom-border); border-radius: 5px;
+  background: var(--rom-surface); color: var(--rom-text);
+  font-family: inherit; font-size: 12px;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.items-num-input::-webkit-inner-spin-button,
+.items-num-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.items-num-input:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; }
+.items-unit { font-size: 11px; color: var(--rom-text-muted); width: 24px; }
+.items-del {
+  background: none; border: none; cursor: pointer;
+  color: var(--rom-text-faint); font-size: 16px; line-height: 1;
+  padding: 0 2px; flex-shrink: 0;
+  transition: color .12s;
+}
+.items-del:hover { color: var(--rom-danger); }
+.items-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 8px; border-top: 1px solid var(--rom-border);
+}
+.items-add-btn {
+  background: none; border: 1px dashed var(--rom-border);
+  border-radius: 5px; padding: 4px 10px;
+  font-size: 12px; color: var(--rom-accent); cursor: pointer;
+  font-family: inherit;
+  transition: background .12s;
+}
+.items-add-btn:hover { background: var(--rom-surface-alt); }
+.items-total {
+  font-size: 12px; color: var(--rom-text-muted);
+}
+.items-total strong { color: var(--rom-text); }
+.items-total--flat { font-style: italic; }
+.items-total-qty { margin-left: 4px; color: var(--rom-text-muted); }
 </style>

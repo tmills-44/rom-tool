@@ -38,8 +38,85 @@
       No scopes ticked for the quote. Open the Scopes dropdown and tick the ones you want.
     </div>
 
-    <!-- ── Side-by-side: every included scope as its own column ──────── -->
-    <div v-if="includedScopes.length" class="sum-card sum-card--scroll">
+    <!-- ── Single scope: clean two-column breakdown ─────────────────── -->
+    <div v-if="includedScopes.length === 1" class="sum-card">
+      <div class="sum-card-head">{{ includedScopes[0].name }}</div>
+      <table class="break-table">
+        <tbody>
+          <template v-for="c in includedScopes" :key="c.id">
+            <tr class="break-section-row"><td colspan="3">Labor</td></tr>
+            <tr v-for="role in rom.ROLES" :key="`r-${role.id}`" class="break-detail-row">
+              <td class="col-label-cell"><i class="ti" :class="role.icon"></i> {{ role.label }}</td>
+              <td class="amt">{{ fmt(coaLaborByRole(c.id, role.id)) }}</td>
+              <td class="amt col-pct">{{ pct(coaLaborByRole(c.id, role.id)) }}</td>
+            </tr>
+            <template v-for="role in rom.ROLES" :key="`tl-${role.id}`">
+              <tr v-if="rom.travelLaborByRole(role.id, c.id) > 0" class="break-detail-row break-detail-row--travel-labor">
+                <td class="col-label-cell travel-labor-sub"><i class="ti ti-car"></i> {{ role.label }} — travel time</td>
+                <td class="amt">{{ fmt(rom.travelLaborByRole(role.id, c.id)) }}</td>
+                <td class="amt col-pct">{{ pct(rom.travelLaborByRole(role.id, c.id)) }}</td>
+              </tr>
+            </template>
+            <tr class="break-sub-row">
+              <td>Labor subtotal</td>
+              <td class="amt">{{ fmt(rom.laborTotalFor(c.id)) }}</td>
+              <td class="amt col-pct">{{ pct(rom.laborTotalFor(c.id)) }}</td>
+            </tr>
+
+            <tr class="break-section-row"><td colspan="3">Travel Expenses</td></tr>
+            <tr class="break-detail-row">
+              <td class="col-label-cell"><i class="ti ti-plane"></i> Hotel, car, airfare &amp; misc</td>
+              <td class="amt">{{ fmt(rom.travelTotalFor(c.id)) }}</td>
+              <td class="amt col-pct">{{ pct(rom.travelTotalFor(c.id)) }}</td>
+            </tr>
+
+            <tr class="break-section-row"><td colspan="3">Material</td></tr>
+            <tr class="break-detail-row">
+              <td class="col-label-cell"><i class="ti ti-package"></i> Equipment (unloaded)</td>
+              <td class="amt">{{ fmt(rom.materialUnloadedFor(c.id)) }}</td>
+              <td class="amt col-pct">{{ pct(rom.materialUnloadedFor(c.id)) }}</td>
+            </tr>
+            <tr class="break-detail-row">
+              <td class="col-label-cell">Shipping ({{ (rom.material.shippingPct * 100).toFixed(1) }}%)</td>
+              <td class="amt">{{ fmt(rom.materialUnloadedFor(c.id) * rom.material.shippingPct) }}</td>
+              <td class="amt col-pct">{{ pct(rom.materialUnloadedFor(c.id) * rom.material.shippingPct) }}</td>
+            </tr>
+            <tr class="break-sub-row">
+              <td>Material subtotal</td>
+              <td class="amt">{{ fmt(rom.materialTotalFor(c.id)) }}</td>
+              <td class="amt col-pct">{{ pct(rom.materialTotalFor(c.id)) }}</td>
+            </tr>
+
+            <tr class="break-sub-row break-sub-row--strong">
+              <td>Unloaded subtotal</td>
+              <td class="amt">{{ fmt(rom.coaTotals(c.id).unloaded) }}</td>
+              <td class="amt col-pct">{{ pct(rom.coaTotals(c.id).unloaded) }}</td>
+            </tr>
+
+            <tr class="break-section-row"><td colspan="3">Overhead</td></tr>
+            <tr class="break-detail-row">
+              <td class="col-label-cell">Project overhead (SCP + Global + Gov + Mgmt rsv)</td>
+              <td class="amt">{{ fmt(rom.coaTotals(c.id).ohTotal) }}</td>
+              <td class="amt col-pct">{{ pct(rom.coaTotals(c.id).ohTotal) }}</td>
+            </tr>
+            <tr class="break-detail-row">
+              <td class="col-label-cell">SCR loading</td>
+              <td class="amt">{{ fmt(rom.coaTotals(c.id).scr) }}</td>
+              <td class="amt col-pct">{{ pct(rom.coaTotals(c.id).scr) }}</td>
+            </tr>
+
+            <tr class="break-grand-row">
+              <td>Loaded total</td>
+              <td class="amt col-total">{{ fmt(rom.coaTotals(c.id).totalLoaded) }}</td>
+              <td class="amt col-pct col-pct--grand">{{ pct(rom.coaTotals(c.id).totalLoaded) }}</td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Multiple scopes: side-by-side columns ──────────────────────── -->
+    <div v-if="includedScopes.length > 1" class="sum-card sum-card--scroll">
       <div class="sum-card-head">Full breakdown — side-by-side</div>
       <table class="break-table break-table--cols">
         <thead>
@@ -66,6 +143,17 @@
             <td class="amt col-total">{{ fmt(rolledLabor(role.id)) }}</td>
             <td class="amt col-pct">{{ pct(rolledLabor(role.id)) }}</td>
           </tr>
+          <template v-for="role in rom.ROLES" :key="`tl-${role.id}`">
+            <tr v-if="includedScopes.some(c => rom.travelLaborByRole(role.id, c.id) > 0)"
+                class="break-detail-row break-detail-row--travel-labor">
+              <td class="col-label-cell travel-labor-sub"><i class="ti ti-car" aria-hidden="true"></i> {{ role.label }} — travel time</td>
+              <td v-for="c in includedScopes" :key="c.id" class="amt">
+                {{ fmt(rom.travelLaborByRole(role.id, c.id)) }}
+              </td>
+              <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.travelLaborByRole(role.id, c.id))) }}</td>
+              <td class="amt col-pct">{{ pct(sum(includedScopes, c => rom.travelLaborByRole(role.id, c.id))) }}</td>
+            </tr>
+          </template>
           <tr class="break-sub-row">
             <td>Labor subtotal</td>
             <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.laborTotalFor(c.id)) }}</td>
@@ -74,9 +162,9 @@
           </tr>
 
           <!-- Travel section -->
-          <tr class="break-section-row"><td :colspan="cols">Travel</td></tr>
+          <tr class="break-section-row"><td :colspan="cols">Travel Expenses</td></tr>
           <tr class="break-detail-row">
-            <td class="col-label-cell"><i class="ti ti-plane" aria-hidden="true"></i> Trips + per diem</td>
+            <td class="col-label-cell"><i class="ti ti-plane" aria-hidden="true"></i> Hotel, car, airfare &amp; misc</td>
             <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.travelTotalFor(c.id)) }}</td>
             <td class="amt col-total">{{ fmt(sum(includedScopes, c => rom.travelTotalFor(c.id))) }}</td>
             <td class="amt col-pct">{{ pct(sum(includedScopes, c => rom.travelTotalFor(c.id))) }}</td>
@@ -157,7 +245,7 @@ const cols           = computed(() => includedScopes.value.length + 3)
 const grandTotal     = computed(() => rom.totalLoadedForQuote)
 function pct(n) { return grandTotal.value ? (n / grandTotal.value * 100).toFixed(1) + '%' : '—' }
 
-// Labor cost for one scope filtered to a specific role
+// Regular line-item labor for one scope + role (excludes travel labor)
 function coaLaborByRole(coaId, roleId) {
   return rom.lineItems
     .filter(l => l.coaId === coaId && l.role === roleId)
@@ -251,6 +339,11 @@ function fmt(n) { return n ? '$' + Math.round(n).toLocaleString() : '—' }
 .break-detail-row td.amt { color: var(--rom-text); }
 .break-detail-row:hover td { background: var(--rom-surface-alt); }
 
+/* Travel labor sub-rows under Labor section */
+.break-detail-row--travel-labor td { color: var(--rom-text-muted); font-style: italic; }
+.break-detail-row--travel-labor .travel-labor-sub { padding-left: 44px; font-size: 12px; }
+.break-detail-row--travel-labor:hover td { background: var(--rom-surface-alt); }
+
 .break-sub-row td {
   font-weight: 700;
   background: #fafafb;
@@ -264,7 +357,7 @@ function fmt(n) { return n ? '$' + Math.round(n).toLocaleString() : '—' }
   font-weight: 700;
   font-size: 14px;
 }
-.break-grand-row td.col-total { background: var(--rom-accent-dark); color: #7dd3fc; font-size: 16px; }
+.break-grand-row td.col-total { background: var(--rom-accent-dark); color: #fff; font-size: 16px; }
 
 .col-pct {
   text-align: right; white-space: nowrap;

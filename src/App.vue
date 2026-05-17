@@ -325,6 +325,7 @@
       <span v-else class="stat stat-saved"><i class="ti ti-device-floppy" aria-hidden="true"></i> Auto-saved</span>
       <span v-if="ratesLoadFailed" class="stat stat-warn" :title="ratesStatus.errors.join('\n')"><i class="ti ti-alert-triangle" aria-hidden="true"></i> GSA rates failed to load</span>
       <span v-if="tabConflict" class="stat stat-warn" title="Another browser tab saved this document — your data may be out of sync. Reload or download a backup."><i class="ti ti-layers-intersect" aria-hidden="true"></i> Multiple tabs open <button class="stat-dismiss" @click="tabConflict = false">×</button></span>
+      <button class="stat-clear-cache" title="Clear app cache and reload to get the latest version" @click="clearCacheAndReload"><i class="ti ti-refresh" aria-hidden="true"></i> Reload app</button>
     </footer>
 
     </div><!-- /.main-col -->
@@ -442,6 +443,18 @@ window.addEventListener('beforeunload', e => {
     e.preventDefault()
   }
 })
+
+async function clearCacheAndReload() {
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations()
+    await Promise.all(regs.map(r => r.unregister()))
+  }
+  if ('caches' in window) {
+    const keys = await caches.keys()
+    await Promise.all(keys.map(k => caches.delete(k)))
+  }
+  window.location.reload()
+}
 
 // Page load timestamp — stamped once on mount so the user can verify they're on a fresh build
 const pageLoadedAt   = ref('')   // e.g. "2:34 PM"
@@ -1490,6 +1503,12 @@ body {
 .stat-dismiss { background: none; border: none; color: inherit; cursor: pointer; font-size: 12px; padding: 0 0 0 2px; line-height: 1; opacity: .7; }
 .stat-dismiss:hover { opacity: 1; }
 .stat-build { opacity: .35; font-size: 10px; font-variant-numeric: tabular-nums; margin-left: auto; }
+.stat-clear-cache {
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  font-size: 10px; color: rgba(255,255,255,.35); padding: 0; margin-left: 12px;
+  display: inline-flex; align-items: center; gap: 3px; transition: color .15s;
+}
+.stat-clear-cache:hover { color: rgba(255,255,255,.8); }
 
 /* ─── Modal backdrop ─────────────────────────────────────────────── */
 .modal-backdrop {

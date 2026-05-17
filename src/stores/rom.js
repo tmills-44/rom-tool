@@ -710,13 +710,13 @@ export const useRomStore = defineStore('rom', () => {
   function defaultOverhead() {
     return {
       overheadEnabled: true,
-      showLineItems:   true,    // export setting — show each line OR collapse to single Contract Fee
+      showLineItems:   true,
       items: [
-        { id: 'oh-' + uuid(), label: 'PM/Financial Support',    pct: 0.02,  enabled: true, base: 'unloaded'     },
-        { id: 'oh-' + uuid(), label: 'Material Tracking',       pct: 0,     enabled: true, base: 'unloaded'     },
-        { id: 'oh-' + uuid(), label: 'Government PM Labor',     pct: 0.015, enabled: true, base: 'unloaded'     },
-        { id: 'oh-' + uuid(), label: 'Management Reserve',      pct: 0.01,  enabled: true, base: 'unloaded'     },
-        { id: 'oh-' + uuid(), label: 'Support Cost Rate (SCR)', pct: 0.12,  enabled: true, base: 'withOverhead' },
+        { id: 'oh-' + uuid(), label: 'PM/Financial Support',    pct: 0, enabled: true, base: 'unloaded'     },
+        { id: 'oh-' + uuid(), label: 'Material Tracking',       pct: 0, enabled: true, base: 'unloaded'     },
+        { id: 'oh-' + uuid(), label: 'Government PM Labor',     pct: 0, enabled: true, base: 'unloaded'     },
+        { id: 'oh-' + uuid(), label: 'Management Reserve',      pct: 0, enabled: true, base: 'unloaded'     },
+        { id: 'oh-' + uuid(), label: 'Support Cost Rate (SCR)', pct: 0, enabled: true, base: 'withOverhead' },
       ],
     }
   }
@@ -932,8 +932,11 @@ export const useRomStore = defineStore('rom', () => {
   const engineeringHours = computed(() =>
     lineItems.filter(l => l.coaId === activeCoaId.value).reduce((s, l) => s + lineHours(l), 0))
   // Summed across all COAs flagged to print in the final quote
-  const engineeringTotalForQuote = computed(() =>
-    lineItems.filter(l => quoteCoaIds.value.includes(l.coaId)).reduce((s, l) => s + lineCost(l), 0))
+  const engineeringTotalForQuote = computed(() => {
+    const ids = quoteCoaIds.value
+    const lineLabor = lineItems.filter(l => ids.includes(l.coaId)).reduce((s, l) => s + lineCost(l), 0)
+    return lineLabor + ids.reduce((s, id) => s + travelLaborFor(id), 0)
+  })
   const engineeringHoursForQuote = computed(() =>
     lineItems.filter(l => quoteCoaIds.value.includes(l.coaId)).reduce((s, l) => s + lineHours(l), 0))
 
@@ -964,14 +967,20 @@ export const useRomStore = defineStore('rom', () => {
       mieRate:     t.mieRate     ?? 0,
       carRate:     t.rentalCarRate ?? 75,
       airfareRate: t.airfareRate ?? 600,
+      hotelDailyRate: null,
       miscRate:    50,
+      travelHoursItems: [],
+      miscItems: [],
     }
     Object.assign(t, {
       tripName:           t.travelerName || '',
+      hotelDailyTotal:    null,
       defaultTravelHours: t.travelHours ?? 4,
       defaultCarRate:     t.rentalCarRate ?? 75,
       defaultAirfareRate: t.airfareRate ?? 600,
       defaultMiscRate:    50,
+      travelHoursItems:   [],
+      miscItems:          [],
       travelers:          [traveler],
       coaId:              t.coaId || coas[0].id,
     })
@@ -994,38 +1003,52 @@ export const useRomStore = defineStore('rom', () => {
     const days = Math.max(0, tr.days || 0)
     let c = 0
     if (tr.hotel) {
-      const lodging = travelerRate(trip, tr, 'lodgingRate', 'lodgingRate')
-      const mie     = travelerRate(trip, tr, 'mieRate', 'mieRate')
-      c += lodging * days
-      // First & last day rule (GSA): first and last day of travel = 75% M&IE.
-      // Enabled by default (firstLastDay ?? true). Uncheck to use full rates.
-      const useFLD = (tr.firstLastDay ?? true) && days > 0
-      if (useFLD) {
-        const middleDays = Math.max(0, days - 2)
-        const partDays   = days === 1 ? 1 : 2   // just "first" when 1-day trip
-        c += mie * (middleDays + partDays * 0.75)
+      if (tr.hotelDailyRate != null) {
+        c += tr.hotelDailyRate * days
+      } else if (trip.hotelDailyTotal != null) {
+        c += trip.hotelDailyTotal * days
       } else {
-        c += mie * days
+        const lodging = travelerRate(trip, tr, 'lodgingRate', 'lodgingRate')
+        const mie     = travelerRate(trip, tr, 'mieRate', 'mieRate')
+        c += lodging * days
+        // First & last day rule (GSA): first and last day of travel = 75% M&IE.
+        const useFLD = (tr.firstLastDay ?? true) && days > 0
+        if (useFLD) {
+          const middleDays = Math.max(0, days - 2)
+          const partDays   = days === 1 ? 1 : 2
+          c += mie * (middleDays + partDays * 0.75)
+        } else {
+          c += mie * days
+        }
       }
     }
     if (tr.car)     c += travelerRate(trip, tr, 'carRate',     'defaultCarRate')     * days
     if (tr.airfare) c += travelerRate(trip, tr, 'airfareRate', 'defaultAirfareRate')
-    if (tr.misc)    c += travelerRate(trip, tr, 'miscRate',    'defaultMiscRate')
+    if (tr.misc) {
+      const miscAmt = trip.miscItems?.length
+        ? trip.miscItems.reduce((s, x) => s + (x.amount || 0), 0)
+        : travelerRate(trip, tr, 'miscRate', 'defaultMiscRate')
+      c += miscAmt
+    }
     return c * qty
   }
   // Travel-labor: pay-category rate × travel hours × qty. Tracked separately so the
   // caller can decide whether to roll it into the trip total or report it on its own.
-  function travelLaborCost(tr) {
+  function travelLaborCost(trip, tr) {
     if (!tr?.laborCat) return 0
     const rate = laborCatRate(tr.laborCat) || 0
-    return rate * (tr.travelHours || 0) * Math.max(1, tr.qty || 1)
+    const hours = trip?.travelHoursItems?.length
+      ? trip.travelHoursItems.reduce((s, x) => s + (x.hours || 0), 0)
+      : (tr.travelHours || 0)
+    return rate * hours * Math.max(1, tr.qty || 1)
   }
 
-  function tripCost(trip) {
+  // Non-labor travel costs only (hotel, car, airfare, misc fees)
+  function tripExpenses(trip) {
     if (!trip) return 0
     migrateTrip(trip)
     if (Array.isArray(trip.travelers)) {
-      return trip.travelers.reduce((s, tr) => s + travelerCost(trip, tr) + travelLaborCost(tr), 0)
+      return trip.travelers.reduce((s, tr) => s + travelerCost(trip, tr), 0)
     }
     // Legacy fallthrough — should be unreachable after migration
     const persons = Math.max(1, trip.persons || 1)
@@ -1034,7 +1057,7 @@ export const useRomStore = defineStore('rom', () => {
     const hotelRate = trip.lodgingRate || 0
     let cost = 0
     if (trip.hotel)     cost += nights * hotelRate * persons
-    cost += days * (trip.mieRate || 0) * persons               // M&IE always included
+    cost += days * (trip.mieRate || 0) * persons
     if (trip.rentalCar) cost += days * (trip.rentalCarRate || 75)
     if (trip.airfare)   cost += persons * (trip.airfareRate || 600)
     cost += persons * (trip.baggageFees || 0)
@@ -1042,24 +1065,76 @@ export const useRomStore = defineStore('rom', () => {
     return cost
   }
 
+  function tripCost(trip) {
+    if (!trip) return 0
+    migrateTrip(trip)
+    if (Array.isArray(trip.travelers)) {
+      return trip.travelers.reduce((s, tr) => s + travelerCost(trip, tr) + travelLaborCost(trip, tr), 0)
+    }
+    return tripExpenses(trip)
+  }
+
   // keep travelLineCost as alias for legacy references
   function travelLineCost(line, catId) { return tripCost(line) }
 
-  // Travel total scoped to the active COA (matches Labor behavior)
-  const travelTotal = computed(() => {
-    const coaId = activeCoaId.value
+  // Per-COA travel breakdown helpers
+  function travelExpensesFor(coaId) {
     let t = 0
     ENTITIES.forEach(e => (travel[e.id] ?? []).forEach(trip => {
-      if ((trip.coaId ?? coas[0].id) === coaId) t += tripCost(trip)
+      if ((trip.coaId ?? coas[0].id) === coaId) t += tripExpenses(trip)
     }))
     return t
-  })
-  // Travel total summed across all COAs flagged for the final quote
+  }
+  function travelLaborFor(coaId) {
+    let t = 0
+    ENTITIES.forEach(e => (travel[e.id] ?? []).forEach(trip => {
+      if ((trip.coaId ?? coas[0].id) === coaId)
+        ;(trip.travelers ?? []).forEach(tr => { t += travelLaborCost(trip, tr) })
+    }))
+    return t
+  }
+  // Travel labor broken down by labor role (engineering, pm, etc.)
+  function travelLaborByRole(roleId, coaId) {
+    let t = 0
+    ENTITIES.forEach(e => (travel[e.id] ?? []).forEach(trip => {
+      if (coaId != null && (trip.coaId ?? coas[0].id) !== coaId) return
+      ;(trip.travelers ?? []).forEach(tr => {
+        const cat = laborCats.find(c => c.id === tr.laborCat)
+        if (cat?.role === roleId) t += travelLaborCost(trip, tr)
+      })
+    }))
+    return t
+  }
+  // Travel hours broken down by labor role — for hour counts in breakdowns
+  function travelLaborHoursForRole(roleId, coaId) {
+    let h = 0
+    ENTITIES.forEach(e => (travel[e.id] ?? []).forEach(trip => {
+      if (coaId != null && (trip.coaId ?? coas[0].id) !== coaId) return
+      const tripHrs = trip.travelHoursItems?.length
+        ? trip.travelHoursItems.reduce((s, x) => s + (x.hours || 0), 0)
+        : null
+      ;(trip.travelers ?? []).forEach(tr => {
+        const cat = laborCats.find(c => c.id === tr.laborCat)
+        if (cat?.role !== roleId) return
+        const hrs = tripHrs ?? (tr.travelHours || 0)
+        h += hrs * Math.max(1, tr.qty || 1)
+      })
+    }))
+    return h
+  }
+
+  // Travel totals scoped to the active COA
+  const travelExpensesTotal = computed(() => travelExpensesFor(activeCoaId.value))
+  const travelLaborTotal    = computed(() => travelLaborFor(activeCoaId.value))
+  // travelTotal = expenses + labor (unchanged sum — keeps overhead math correct)
+  const travelTotal = computed(() => travelExpensesTotal.value + travelLaborTotal.value)
+
+  // Travel total summed across all COAs flagged for the final quote (expenses only — labor is in engineeringTotalForQuote)
   const travelTotalForQuote = computed(() => {
     const ids = quoteCoaIds.value
     let t = 0
     ENTITIES.forEach(e => (travel[e.id] ?? []).forEach(trip => {
-      if (ids.includes(trip.coaId ?? coas[0].id)) t += tripCost(trip)
+      if (ids.includes(trip.coaId ?? coas[0].id)) t += tripExpenses(trip)
     }))
     return t
   })
@@ -1076,10 +1151,13 @@ export const useRomStore = defineStore('rom', () => {
       region: 'conus', country: '', destination: '', state: '',
       travelMonth: curMonth,
       lodgingRate: 0, mieRate: 0,
+      hotelDailyTotal: null,
       defaultTravelHours: 4,
       defaultCarRate:     75,
       defaultAirfareRate: 600,
       defaultMiscRate:    50,
+      travelHoursItems: [],
+      miscItems: [],
       travelers: [],
       gsaMonthlyRates: null,
     })
@@ -1104,11 +1182,14 @@ export const useRomStore = defineStore('rom', () => {
       // Per-row rate overrides — initialized from trip defaults at create time.
       // Editing these per row sticks for that row; changes to trip defaults
       // only affect new travelers added after the change (matches Labor pattern).
-      lodgingRate: trip.lodgingRate ?? 0,
-      mieRate:     trip.mieRate     ?? 0,
-      carRate:     trip.defaultCarRate     ?? 75,
-      airfareRate: trip.defaultAirfareRate ?? 600,
-      miscRate:    trip.defaultMiscRate    ?? 50,
+      hotelDailyRate: null,
+      lodgingRate: null,
+      mieRate:     null,
+      carRate:     null,
+      airfareRate: null,
+      miscRate:    null,
+      travelHoursItems: [],
+      miscItems: [],
     })
   }
   function updateTraveler(entityId, tripId, travelerId, patch) {
@@ -1116,9 +1197,9 @@ export const useRomStore = defineStore('rom', () => {
     if (!trip || !Array.isArray(trip.travelers)) return
     const tr = trip.travelers.find(t => t.id === travelerId)
     if (!tr) return
-    const RATE_FIELDS = ['lodgingRate', 'mieRate', 'carRate', 'airfareRate', 'miscRate']
+    const RATE_FIELDS = ['hotelDailyRate', 'lodgingRate', 'mieRate', 'carRate', 'airfareRate', 'miscRate']
     RATE_FIELDS.forEach(f => {
-      if (patch[f] !== undefined) patch = { ...patch, [f]: Math.max(0, Math.min(99999, +patch[f] || 0)) }
+      if (patch[f] !== undefined && patch[f] !== null) patch = { ...patch, [f]: Math.max(0, Math.min(99999, +patch[f] || 0)) }
     })
     if (patch.qty  !== undefined) patch = { ...patch, qty:  Math.max(1, Math.min(999, +patch.qty  || 1)) }
     if (patch.days !== undefined) patch = { ...patch, days: Math.max(0, Math.min(365, +patch.days || 0)) }
@@ -1130,6 +1211,52 @@ export const useRomStore = defineStore('rom', () => {
     const i = trip.travelers.findIndex(t => t.id === travelerId)
     if (i >= 0) trip.travelers.splice(i, 1)
   }
+
+  // ── Travel-hours segment items (trip-level, shared by all travelers) ──
+  function _getTrip(entityId, tripId) {
+    return (travel[entityId] ?? []).find(t => t.id === tripId) ?? null
+  }
+  function addTravelHoursItem(entityId, tripId, initialHours = 0) {
+    const trip = _getTrip(entityId, tripId)
+    if (!trip) return
+    if (!trip.travelHoursItems) trip.travelHoursItems = []
+    trip.travelHoursItems.push({ id: uuid(), label: '', hours: initialHours })
+  }
+  function updateTravelHoursItem(entityId, tripId, itemId, patch) {
+    const trip = _getTrip(entityId, tripId)
+    const item = trip?.travelHoursItems?.find(x => x.id === itemId)
+    if (!item) return
+    if (patch.hours !== undefined) patch = { ...patch, hours: Math.max(0, +patch.hours || 0) }
+    Object.assign(item, patch)
+  }
+  function removeTravelHoursItem(entityId, tripId, itemId) {
+    const trip = _getTrip(entityId, tripId)
+    if (!trip?.travelHoursItems) return
+    const i = trip.travelHoursItems.findIndex(x => x.id === itemId)
+    if (i >= 0) trip.travelHoursItems.splice(i, 1)
+  }
+
+  // ── Misc fee items (trip-level, per-person total replaces flat rate) ──
+  function addMiscItem(entityId, tripId, initialAmount = 0) {
+    const trip = _getTrip(entityId, tripId)
+    if (!trip) return
+    if (!trip.miscItems) trip.miscItems = []
+    trip.miscItems.push({ id: uuid(), label: '', amount: initialAmount })
+  }
+  function updateMiscItem(entityId, tripId, itemId, patch) {
+    const trip = _getTrip(entityId, tripId)
+    const item = trip?.miscItems?.find(x => x.id === itemId)
+    if (!item) return
+    if (patch.amount !== undefined) patch = { ...patch, amount: Math.max(0, +patch.amount || 0) }
+    Object.assign(item, patch)
+  }
+  function removeMiscItem(entityId, tripId, itemId) {
+    const trip = _getTrip(entityId, tripId)
+    if (!trip?.miscItems) return
+    const i = trip.miscItems.findIndex(x => x.id === itemId)
+    if (i >= 0) trip.miscItems.splice(i, 1)
+  }
+
   // Common city aliases — maps what people type → what GSA calls it
   const CITY_ALIASES = {
     'washington|DC':      'district of columbia',
@@ -1142,6 +1269,11 @@ export const useRomStore = defineStore('rom', () => {
     'vegas|NV':           'las vegas',
     'nola|LA':            'new orleans',
     'honolulu|HI':        'honolulu',
+    'fort walton beach|FL': 'fort walton beach / de funiak springs',
+    'fort walton|FL':       'fort walton beach / de funiak springs',
+    'eglin|FL':             'fort walton beach / de funiak springs',
+    'defuniak springs|FL':  'fort walton beach / de funiak springs',
+    'de funiak springs|FL': 'fort walton beach / de funiak springs',
   }
 
   function lookupGSARate(city, state) {
@@ -1158,7 +1290,7 @@ export const useRomStore = defineStore('rom', () => {
     const candidates = Object.entries(gsaRateMap)
       .filter(([k]) => k.endsWith(`|${st}`))
       .map(([k, v]) => {
-        const cityPart = k.slice(0, k.lastIndexOf('|'))
+        const cityPart = k.slice(0, k.lastIndexOf('|')).toLowerCase()
         let score = 0
         if (cityPart.includes(aliasedNeedle))       score = 3
         else if (aliasedNeedle.includes(cityPart))  score = 2
@@ -1722,9 +1854,9 @@ export const useRomStore = defineStore('rom', () => {
     // City/Base on the project info and the destination + state on every seeded
     // trip so the GSA per-diem can resolve. Skip for Custom (X).
     const isBaseline = (tmpl.id || '').startsWith('baseline-') && tmpl.id !== 'baseline-x'
-    const seedCity   = isBaseline ? 'Fort Walton Beach' : ''
-    const seedState  = isBaseline ? 'FL'                : ''
-    if (isBaseline && !project.cityBase) project.cityBase = 'Fort Walton Beach, FL'
+    const seedCity   = isBaseline ? 'Fort Walton Beach / De Funiak Springs' : ''
+    const seedState  = isBaseline ? 'FL'                                    : ''
+    if (isBaseline && !project.cityBase) project.cityBase = 'Fort Walton Beach / De Funiak Springs, FL'
 
     // Try a local rates lookup so the trip lands with per-diem already populated
     let seedLodging = 0, seedMie = 0, seedMonthly = null
@@ -1752,6 +1884,8 @@ export const useRomStore = defineStore('rom', () => {
         defaultCarRate:     75,
         defaultAirfareRate: 600,
         defaultMiscRate:    50,
+        travelHoursItems: [],
+        miscItems: [],
         gsaMonthlyRates: seedMonthly,
         travelers: [{
           id: uuid(),
@@ -1908,16 +2042,27 @@ export const useRomStore = defineStore('rom', () => {
   // ── Per-COA aggregate totals (used by the upcoming Summary tab + exports) ──
   function laborTotalFor(coaId) {
     return lineItems.filter(l => l.coaId === coaId).reduce((s, l) => s + lineCost(l), 0)
+      + travelLaborFor(coaId)
   }
   function laborHoursFor(coaId) {
-    return lineItems.filter(l => l.coaId === coaId).reduce((s, l) => s + lineHours(l), 0)
-  }
-  function travelTotalFor(coaId) {
-    let t = 0
+    const lineHrs = lineItems.filter(l => l.coaId === coaId).reduce((s, l) => s + lineHours(l), 0)
+    let travelHrs = 0
     ENTITIES.forEach(e => (travel[e.id] ?? []).forEach(trip => {
-      if ((trip.coaId ?? coas[0].id) === coaId) t += tripCost(trip)
+      if ((trip.coaId ?? coas[0].id) !== coaId) return
+      const tripHrs = trip.travelHoursItems?.length
+        ? trip.travelHoursItems.reduce((s, x) => s + (x.hours || 0), 0)
+        : null
+      ;(trip.travelers ?? []).forEach(tr => {
+        if (!tr.laborCat) return
+        const hrs = tripHrs ?? (tr.travelHours || 0)
+        travelHrs += hrs * Math.max(1, tr.qty || 1)
+      })
     }))
-    return t
+    return lineHrs + travelHrs
+  }
+  // Travel expenses only (labor portion is now reported under Labor)
+  function travelTotalFor(coaId) {
+    return travelExpensesFor(coaId)
   }
   function coaTotals(coaId) {
     const oh = overheadByCoa[coaId] ?? defaultOverhead()
@@ -2122,7 +2267,7 @@ export const useRomStore = defineStore('rom', () => {
     LABOR_CATS: laborCats,
     project, wbs, lineItems, travel, material, overhead, laborCats,
     enabledEntities, selectedTabId, visibleEntities, resetCount,
-    engineeringTotal, engineeringHours, travelTotal,
+    engineeringTotal, engineeringHours, travelTotal, travelExpensesTotal, travelLaborTotal,
     materialUnloaded, shippingCost, materialTotal, unloadedProjectTotal,
     scpCost, globalCost, govLaborCost, managementReserveCost,
     projectOverheadTotal, projectWithOverhead, scrCost, totalOverhead, contractFee, totalLoadedCost,
@@ -2134,7 +2279,8 @@ export const useRomStore = defineStore('rom', () => {
     coas, activeCoaId, activeCoa, activeLineItems, quoteCoaIds,
     engineeringTotalForQuote, engineeringHoursForQuote,
     activeMaterialItems, materialUnloadedFor, materialTotalFor, materialTotalForQuote, setManualMaterialAmount,
-    overheadByCoa, laborTotalFor, laborHoursFor, travelTotalFor, coaTotals, totalLoadedForQuote,
+    overheadByCoa, laborTotalFor, laborHoursFor, travelTotalFor, travelExpensesFor, travelLaborFor,
+    travelLaborByRole, travelLaborHoursForRole, coaTotals, totalLoadedForQuote,
     roleCostForCoa, phaseCostForCoa, entityCostForCoa,
     addOverheadItem, removeOverheadItem, updateOverheadItem, reorderOverheadItem,
     addCoa, removeCoa, renameCoa, toggleCoaIncluded, setActiveCoa, duplicateCoa,
@@ -2145,8 +2291,10 @@ export const useRomStore = defineStore('rom', () => {
     setActiveMaterialTemplate, MATERIAL_TEMPLATES, itemActiveQty,
     loadMELForClass,
     addMaterialComponent, updateMaterialComponent, removeMaterialComponent, bundleUnitCost,
-    addTrip, updateTrip, removeTrip, tripCost, travelerCost, travelerRate, travelLaborCost,
+    addTrip, updateTrip, removeTrip, tripCost, tripExpenses, travelerCost, travelerRate, travelLaborCost,
     addTraveler, updateTraveler, removeTraveler,
+    addTravelHoursItem, updateTravelHoursItem, removeTravelHoursItem,
+    addMiscItem, updateMiscItem, removeMiscItem,
     travelTotalForQuote,
     gsaRateMap, importGSARates, lookupGSARate, clearGSARates,
     loadCONUSRates,

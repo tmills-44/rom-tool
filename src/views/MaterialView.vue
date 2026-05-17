@@ -24,41 +24,15 @@
       </div>
     </div>
 
-    <!-- Baseline template picker — single dropdown at the top of the tab.
-         Picking a baseline loads that template's MEL into the active scope.
-         "Custom (empty)" wipes the whole tool to start from scratch. -->
-    <div class="baseline-picker">
-      <label class="baseline-picker-label" for="baseline-template-select">Baseline template:</label>
-      <select
-        id="baseline-template-select"
-        class="baseline-picker-select"
-        :value="rom.material.activeTemplate"
-        @change="pickClass(rom.MATERIAL_TEMPLATES.find(t => t.id === $event.target.value))"
-      >
-        <option v-for="t in rom.MATERIAL_TEMPLATES" :key="t.id" :value="t.id">
-          {{ t.label }}
-        </option>
-      </select>
-    </div>
-
     <!-- Summary strip -->
     <div class="summary-strip">
-      <div class="summary-card">
-        <div class="sc-label">Line Items</div>
-        <div class="sc-value">{{ rom.activeMaterialItems.length }}</div>
-      </div>
-      <div class="summary-card">
-        <div class="sc-label">Hardware Subtotal</div>
-        <div class="sc-value">{{ fmt(hardwareSubtotal) }}</div>
-      </div>
-      <div class="summary-card">
-        <div class="sc-label">Shipping ({{ rom.material.shippingPct * 100 }}%)</div>
-        <div class="sc-value">{{ fmt(rom.shippingCost) }}</div>
-      </div>
-      <div class="summary-card highlight">
-        <div class="sc-label">Material Total</div>
-        <div class="sc-value">{{ fmt(rom.materialTotal) }}</div>
-      </div>
+      <span class="sstat"><span class="sstat-lbl">Line Items</span><strong>{{ rom.activeMaterialItems.length }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat"><span class="sstat-lbl">Hardware Subtotal</span><strong>{{ fmt(hardwareSubtotal) }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat"><span class="sstat-lbl">Shipping ({{ rom.material.shippingPct * 100 }}%)</span><strong>{{ fmt(rom.shippingCost) }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat sstat--total sstat--accent"><span class="sstat-lbl">Material Total</span><strong>{{ fmt(rom.materialTotal) }}</strong></span>
     </div>
 
     <!-- Flat materials total — for jobs with no MEL, enter one number here -->
@@ -497,36 +471,19 @@ function pickClass(t) {
 
 /* Summary strip */
 .summary-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-}
-.summary-card {
+  display: flex; align-items: center;
+  padding: 0 20px; min-height: 44px;
+  border-bottom: 1px solid var(--rom-border);
   background: var(--rom-surface);
-  border: 1px solid var(--rom-border);
-  border-radius: 8px;
-  padding: 14px 16px;
-  text-align: center;
+  flex-wrap: wrap; gap: 0;
 }
-.summary-card.highlight {
-  background: var(--rom-accent-bg);
-  border-color: var(--rom-accent);
-}
-.sc-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  color: var(--rom-text-muted);
-  margin-bottom: 6px;
-}
-.sc-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--rom-text);
-}
-.summary-card.highlight .sc-value {
-  color: var(--rom-accent);
-}
+.sstat { display: flex; align-items: baseline; gap: 6px; padding: 10px 16px; white-space: nowrap; }
+.sstat-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--rom-text-muted); }
+.sstat strong { font-size: 15px; font-weight: 600; color: var(--rom-text); font-variant-numeric: tabular-nums; }
+.sstat-div { width: 1px; height: 20px; background: var(--rom-border); flex-shrink: 0; }
+.sstat--accent strong { color: var(--rom-accent); }
+.sstat--total { margin-left: auto; }
+.sstat--total strong { font-size: 17px; color: var(--rom-accent); }
 
 /* Additional Materials manual input */
 .manual-material-row {
@@ -596,31 +553,6 @@ function pickClass(t) {
 }
 
 /* Baseline picker — slim dropdown row at the top of the tab */
-.baseline-picker {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.baseline-picker-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--rom-text-muted);
-  letter-spacing: 0.02em;
-}
-.baseline-picker-select {
-  min-width: 220px;
-  padding: 7px 10px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--rom-text);
-  background: var(--rom-surface);
-  border: 1px solid var(--rom-border);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: border-color .12s, box-shadow .12s;
-}
-.baseline-picker-select:hover  { border-color: var(--rom-accent); }
-.baseline-picker-select:focus  { outline: none; border-color: var(--rom-accent); box-shadow: 0 0 0 2px var(--rom-accent-bg); }
 
 /* Section header right side — categories hint */
 .section-header-actions {

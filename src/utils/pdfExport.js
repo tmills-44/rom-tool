@@ -49,6 +49,15 @@ function buildOverheadRows(oh, t) {
     })
 }
 
+function entityTravelLaborForScope(rom, entityId, scopeId) {
+  let t = 0
+  ;(rom.travel[entityId] ?? []).forEach(trip => {
+    if ((trip.coaId ?? rom.coas[0].id) !== scopeId) return
+    ;(trip.travelers ?? []).forEach(tr => { t += rom.travelLaborCost(trip, tr) })
+  })
+  return t
+}
+
 function loadImage(src) {
   return new Promise((resolve) => {
     const img = new Image()
@@ -63,6 +72,22 @@ function loadImage(src) {
     img.onerror = () => resolve(null)
     img.src = src + '?v=' + Date.now()
   })
+}
+
+function travelHrsByCat(rom, scopeId) {
+  const out = {}
+  rom.ENTITIES.forEach(e => (rom.travel[e.id] ?? []).forEach(trip => {
+    if ((trip.coaId ?? rom.coas[0].id) !== scopeId) return
+    const tripHrs = trip.travelHoursItems?.length
+      ? trip.travelHoursItems.reduce((s, x) => s + (x.hours || 0), 0)
+      : null
+    ;(trip.travelers ?? []).forEach(tr => {
+      if (!tr.laborCat) return
+      const hrs = (tripHrs ?? (tr.travelHours || 0)) * Math.max(1, tr.qty || 1)
+      out[tr.laborCat] = (out[tr.laborCat] || 0) + hrs
+    })
+  }))
+  return out
 }
 
 // Labor categories grouped by job title for the 1-page Cost Summary.
@@ -186,6 +211,8 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
     const h = (l.days || 0) * (l.hoursPerDay || 0)
     hoursByCat[l.laborCat] = (hoursByCat[l.laborCat] || 0) + h
   })
+  const trvHrs = travelHrsByCat(rom, scope.id)
+  Object.entries(trvHrs).forEach(([cat, hrs]) => { hoursByCat[cat] = (hoursByCat[cat] || 0) + hrs })
   const titleRows = LABOR_TITLE_GROUPS.map(g => {
     const hrs = g.catIds.reduce((s, id) => s + (hoursByCat[id] || 0), 0)
     return [g.title, Math.round(hrs)]
@@ -384,9 +411,11 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
   const sub   = (s) => ({ content: s,             styles: { fillColor: LTBLUE, textColor: NAVY,   fontStyle: 'bold' } })
   const grand = (s) => ({ content: s,             styles: { fillColor: NAVY,   textColor: WHITE,  fontStyle: 'bold', fontSize: 11 } })
 
+  const scopeTravelLabor = rom.travelLaborFor(scope.id)
   const breakdownBody = [
     [ sec('Engineering Labor') ],
     ...rom.ROLES.map(r => [r.label, fmt(rom.roleCostForCoa(r.id, null, scope.id))]),
+    ...(scopeTravelLabor > 0 ? [['Travel Labor (travel hours)', fmt(scopeTravelLabor)]] : []),
     [ sub('Engineering Subtotal'), sub(fmt(t.labor)) ],
 
     [ sec('Other Costs') ],
@@ -439,9 +468,14 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
           ...rom.visibleEntities.map(e => fmt(rom.roleCostForCoa(r.id, e.id, scope.id))),
           fmt(rom.roleCostForCoa(r.id, null, scope.id)),
         ]),
+        ...(scopeTravelLabor > 0 ? [[
+          { content: 'Travel Labor', styles: { fontStyle: 'italic', textColor: MUTED } },
+          ...rom.visibleEntities.map(() => ({ content: '—', styles: { fontStyle: 'italic', textColor: MUTED } })),
+          { content: fmt(scopeTravelLabor), styles: { fontStyle: 'italic', textColor: MUTED } },
+        ]] : []),
         [
           { content: 'Total', styles: { fontStyle: 'bold' } },
-          ...rom.visibleEntities.map(e => ({ content: fmt(rom.entityCostForCoa(e.id, scope.id)), styles: { fontStyle: 'bold' } })),
+          ...rom.visibleEntities.map(e => ({ content: fmt(rom.entityCostForCoa(e.id, scope.id) + entityTravelLaborForScope(rom, e.id, scope.id)), styles: { fontStyle: 'bold' } })),
           { content: fmt(t.labor), styles: { fontStyle: 'bold', textColor: ACCENT } },
         ],
       ],
@@ -470,7 +504,7 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
         ...phaseRows,
         [
           { content: 'Total', styles: { fontStyle: 'bold' } },
-          ...rom.ROLES.map(r => ({ content: fmt(rom.roleCostForCoa(r.id, null, scope.id)), styles: { fontStyle: 'bold' } })),
+          ...rom.ROLES.map(r => ({ content: fmt(rom.roleCostForCoa(r.id, null, scope.id) + rom.travelLaborByRole(r.id, scope.id)), styles: { fontStyle: 'bold' } })),
           { content: fmt(t.labor), styles: { fontStyle: 'bold', textColor: ACCENT } },
         ],
       ],

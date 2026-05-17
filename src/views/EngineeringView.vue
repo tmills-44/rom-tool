@@ -3,22 +3,13 @@
 
     <!-- ── Summary strip ────────────────────────────────────────── -->
     <div class="summary-strip">
-      <div class="summary-card">
-        <div class="summary-label">Total Hours</div>
-        <div class="summary-value">{{ Math.round(rom.engineeringHours) }}</div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">Labor Subtotal</div>
-        <div class="summary-value">{{ fmt(rom.engineeringTotal) }}</div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">Travel + Material</div>
-        <div class="summary-value">{{ fmt(rom.travelTotal + rom.materialTotal) }}</div>
-      </div>
-      <div class="summary-card summary-card--accent">
-        <div class="summary-label">Grand Total (Loaded)</div>
-        <div class="summary-value">{{ fmt(rom.totalLoadedCost) }}</div>
-      </div>
+      <span class="sstat"><span class="sstat-lbl">Total Hours</span><strong>{{ Math.round(rom.engineeringHours) }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat"><span class="sstat-lbl">Labor Subtotal</span><strong>{{ fmt(rom.engineeringTotal) }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat"><span class="sstat-lbl">Travel + Material</span><strong>{{ fmt(rom.travelTotal + rom.materialTotal) }}</strong></span>
+      <span class="sstat-div"></span>
+      <span class="sstat sstat--total sstat--accent"><span class="sstat-lbl">Grand Total (Loaded)</span><strong>{{ fmt(rom.totalLoadedCost) }}</strong></span>
     </div>
 
     <!-- ── Entity cards ──────────────────────────────────────────── -->
@@ -375,6 +366,26 @@
           </div>
         </div>
 
+        <!-- Travel labor summary — shows if any trip travelers are assigned to a labor cat -->
+        <div v-if="entityTravelLaborTotal(entity.id) > 0" class="travel-labor-banner">
+          <div class="travel-labor-banner-head">
+            <i class="ti ti-car"></i> Travel Labor — included in labor totals
+          </div>
+          <div class="travel-labor-roles">
+            <template v-for="role in rom.ROLES" :key="role.id">
+              <div
+                v-if="rom.travelLaborByRole(role.id, null) > 0"
+                class="travel-labor-role-chip"
+              >
+                <i class="ti" :class="role.icon"></i>
+                <span class="tl-role-label">{{ role.label }}</span>
+                <span class="tl-role-hrs">{{ Math.round(rom.travelLaborHoursForRole(role.id, null)) }} hrs</span>
+                <span class="tl-role-cost">{{ fmt(rom.travelLaborByRole(role.id, null)) }}</span>
+              </div>
+            </template>
+          </div>
+        </div>
+
       </div>
 
       <!-- Always-present add buttons below the entity stack. They stay visible
@@ -522,6 +533,9 @@ function entityHours(eid) {
 function entityCost(eid) {
   return rom.LIFECYCLE_PHASES.reduce((s, p) => s + phaseCost(eid, p.id), 0)
 }
+function entityTravelLaborTotal(eid) {
+  return rom.ROLES.reduce((s, r) => s + rom.travelLaborByRole(r.id, rom.activeCoaId), 0)
+}
 
 // ── Tasks for a line row ─────────────────────────────────────────────
 // Each role has its own WBS branch — programming now stands on its own,
@@ -646,17 +660,19 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 
 /* Summary strip */
 .summary-strip {
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: flex; align-items: center;
+  padding: 0 20px; min-height: 44px;
   border-bottom: 1px solid var(--rom-border);
   background: var(--rom-surface);
+  flex-wrap: wrap; gap: 0;
 }
-.summary-card { padding: 12px 20px; border-right: 1px solid var(--rom-border); }
-.summary-card:last-child { border-right: none; }
-.summary-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--rom-text-muted); margin-bottom: 3px; }
-.summary-value { font-size: 20px; font-weight: 500; }
-.summary-card--accent { background: var(--rom-accent-bg); }
-.summary-card--accent .summary-label { color: var(--rom-accent-dark); opacity: .8; }
-.summary-card--accent .summary-value { color: var(--rom-accent-dark); }
+.sstat { display: flex; align-items: baseline; gap: 6px; padding: 10px 16px; white-space: nowrap; }
+.sstat-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--rom-text-muted); }
+.sstat strong { font-size: 15px; font-weight: 600; color: var(--rom-text); font-variant-numeric: tabular-nums; }
+.sstat-div { width: 1px; height: 20px; background: var(--rom-border); flex-shrink: 0; }
+.sstat--accent strong { color: var(--rom-accent); }
+.sstat--total { margin-left: auto; }
+.sstat--total strong { font-size: 17px; color: var(--rom-accent); }
 
 /* Inline "Add Government / Subcontractor" — styled to match the standard
    `+ Add row` / `+ Add traveler` primary action buttons across the app */
@@ -1108,4 +1124,31 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   text-align: center; padding: 6px 8px !important;
 }
 .drop-zone-end--active .drop-zone-cell { color: var(--rom-accent); }
+
+/* Travel labor summary banner */
+.travel-labor-banner {
+  margin: 0;
+  padding: 10px 16px;
+  background: rgba(29,158,117,.07);
+  border-top: 1px solid rgba(29,158,117,.2);
+}
+.travel-labor-banner-head {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--rom-accent);
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.travel-labor-roles { display: flex; flex-wrap: wrap; gap: 8px; }
+.travel-labor-role-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: var(--rom-surface);
+  border: 1px solid rgba(29,158,117,.25);
+  border-radius: 20px;
+  font-size: 12px;
+}
+.tl-role-label { color: var(--rom-text-muted); }
+.tl-role-hrs { font-weight: 600; color: var(--rom-text); }
+.tl-role-cost { color: var(--rom-accent); font-weight: 700; margin-left: 2px; }
 </style>
