@@ -269,7 +269,6 @@
                       <th class="t-col-svc">Car</th>
                       <th class="t-col-svc">Airfare</th>
                       <th class="t-col-svc">Misc</th>
-                      <th class="t-col-svc">Labor</th>
                       <th class="t-col-total">Total</th>
                       <th class="t-col-del"></th>
                     </tr>
@@ -382,15 +381,6 @@
                           </div>
                         </div>
                       </td>
-                      <td class="t-col-svc">
-                        <div class="svc-cell" :class="{ 'svc-cell--on': tr.laborCat }" :title="tr.laborCat ? `${tr.travelHours ?? trip.defaultTravelHours ?? 0} hrs × rate` : 'Select a pay category to calculate travel labor'">
-                          <span class="svc-row">
-                            <span class="svc-cost" :style="tr.laborCat ? '' : 'opacity:.4'">
-                              {{ tr.laborCat ? fmt(rom.travelLaborCost(tr)) : '—' }}
-                            </span>
-                          </span>
-                        </div>
-                      </td>
                       <td class="t-col-total">{{ fmt(rom.travelerCost(trip, tr) + rom.travelLaborCost(tr)) }}</td>
                       <td class="t-col-del">
                         <button class="del-btn" @click="rom.removeTraveler(entity.id, trip.id, tr.id)" title="Remove traveler">
@@ -407,8 +397,14 @@
                   <i class="ti ti-plus" aria-hidden="true"></i> Add traveler
                 </button>
                 <div class="trip-total-pill">
-                  <span class="trip-total-label">Trip total</span>
-                  <span class="trip-total-value">{{ fmt(rom.tripCost(trip)) }}</span>
+                  <div v-if="tripLaborTotal(trip) > 0" class="trip-labor-line">
+                    <span class="trip-labor-label">Travel Labor</span>
+                    <span class="trip-labor-value">{{ fmt(tripLaborTotal(trip)) }}</span>
+                  </div>
+                  <div class="trip-grand-line">
+                    <span class="trip-total-label">Trip Total</span>
+                    <span class="trip-total-value">{{ fmt(rom.tripCost(trip)) }}</span>
+                  </div>
                 </div>
               </div>
 
@@ -495,6 +491,10 @@ const totalPersons = computed(() =>
 const totalHours   = computed(() =>
   allTrips.value.reduce((s, t) => s + (t.travelers || []).reduce(
     (a, tr) => a + (tr.travelHours ?? t.defaultTravelHours ?? 0) * (tr.qty || 1), 0), 0))
+
+function tripLaborTotal(trip) {
+  return (trip.travelers || []).reduce((s, tr) => s + rom.travelLaborCost(tr), 0)
+}
 
 function trips(entityId) {
   const coaId = rom.activeCoaId
@@ -969,7 +969,7 @@ onMounted(() => {
 .t-col-qty   { width: 60px;  text-align: center !important; }
 .t-col-days  { width: 70px;  text-align: center !important; }
 .t-col-hrs   { width: 80px;  text-align: center !important; }
-.t-col-svc   { width: 110px; text-align: center !important; }
+.t-col-svc   { width: 130px; text-align: center !important; }
 .t-col-total { width: 90px;  text-align: right !important; }
 .t-col-del   { width: 36px; }
 
@@ -1002,7 +1002,7 @@ onMounted(() => {
   background: var(--rom-surface-alt);
   border: 1px solid transparent;
   transition: background .12s;
-  min-width: 95px;
+  min-width: 110px;
 }
 .svc-cell:hover { background: #dfe7f5; }
 .svc-cell--on { background: var(--rom-accent-bg); border-color: var(--rom-accent); }
@@ -1098,7 +1098,23 @@ onMounted(() => {
 .add-traveler-btn:hover { background: var(--rom-accent-dark); border-color: var(--rom-accent-dark); }
 .add-traveler-btn .ti { font-size: 14px; }
 .trip-total-pill {
-  display: inline-flex; align-items: baseline; gap: 8px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+}
+.trip-labor-line {
+  display: flex; align-items: baseline; gap: 8px;
+}
+.trip-labor-label {
+  font-size: 10px; font-weight: 600;
+  color: var(--rom-text-muted);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.trip-labor-value {
+  font-size: 13px; font-weight: 700;
+  color: var(--rom-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.trip-grand-line {
+  display: flex; align-items: baseline; gap: 8px;
 }
 .trip-total-label {
   font-size: 11px; font-weight: 700;
