@@ -204,6 +204,7 @@
                           class="cell-select"
                           @change="onLaborCatChange(line.id, $event.target.value)"
                         >
+                          <option value="" disabled>— Select labor —</option>
                           <option
                             v-for="cat in rom.LABOR_CATS.filter(c => c.role === line.role)"
                             :key="cat.id"

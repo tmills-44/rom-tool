@@ -238,10 +238,12 @@
           <div class="wbs-picker">
             <label class="wbs-picker-label">Role</label>
             <select v-model="selectedRole" class="cell-input">
+              <option value="" disabled>— Select role —</option>
               <option v-for="role in rom.ROLES" :key="role.id" :value="role.id">{{ role.label }}</option>
             </select>
             <label class="wbs-picker-label">Phase</label>
             <select v-model="selectedPhase" class="cell-input">
+              <option value="" disabled>— Select phase —</option>
               <option v-for="phase in rom.LIFECYCLE_PHASES" :key="phase.id" :value="phase.id">{{ phase.label }}</option>
             </select>
           </div>
