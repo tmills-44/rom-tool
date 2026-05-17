@@ -1002,11 +1002,12 @@ onMounted(() => {
 
 /* ─── Defaults bar ─────────────────────────────────────────────── */
 .defaults-bar {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
-  padding: 8px 14px;
+  display: flex; align-items: center; flex-wrap: nowrap; gap: 8px;
+  padding: 6px 14px;
   background: #fdf6e3;
   border-top: 1px solid #c4cede;
   border-bottom: 1px solid #c4cede;
+  overflow-x: auto;
 }
 .defaults-label {
   font-size: 10px; font-weight: 700;
@@ -1015,13 +1016,13 @@ onMounted(() => {
   padding-right: 6px;
 }
 .default-field {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 11px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; white-space: nowrap; flex-shrink: 0;
 }
-.default-field i { font-size: 13px; color: #8a6508; }
+.default-field i { font-size: 12px; color: #8a6508; }
 .default-field label { color: #5f5e5a; }
 .default-field input {
-  width: 110px; padding: 4px 8px;
+  width: 72px; padding: 3px 5px;
   border: 1px solid #b8860b; border-radius: 3px;
   font-weight: 700; text-align: center;
   color: var(--rom-accent-dark, #1248a0);
