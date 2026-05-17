@@ -436,6 +436,11 @@ function fmtTime(d) {
     + ' · ' + d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
+// Select-all on focus for every number input so typing replaces the value
+document.addEventListener('focus', e => {
+  if (e.target.matches('input[type="number"]')) e.target.select()
+}, true)
+
 onMounted(async () => {
   if (!rom.project.templateId) showPicker.value = true
 
