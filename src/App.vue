@@ -9,7 +9,7 @@
         </div>
         <div class="sidebar-brand-text">
           <div>Cost Estimate Tool</div>
-          <div class="sidebar-build-tag">Test Build #1</div>
+          <div class="sidebar-build-tag">Build #{{ BUILD }}</div>
         </div>
       </div>
 
@@ -322,7 +322,6 @@
       <span class="stat">Overhead <strong>{{ fmtCompact(rom.totalOverhead) }}</strong></span>
       <span class="stat stat-loaded">Loaded total <strong>{{ fmt(rom.totalLoadedCost) }}</strong></span>
       <span class="stat stat-saved"><i class="ti ti-device-floppy" aria-hidden="true"></i> Auto-saved</span>
-      <span class="stat stat-build">build {{ BUILD }}</span>
     </footer>
 
     </div><!-- /.main-col -->
