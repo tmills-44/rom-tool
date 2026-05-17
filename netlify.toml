@@ -1,6 +1,15 @@
 [build]
-  command = "npm run build"
+  command = "npm ci --prefer-offline && npm run build"
   publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
+  NPM_FLAGS = "--prefer-offline"
+
+[build.processing]
+  skip_processing = false
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
