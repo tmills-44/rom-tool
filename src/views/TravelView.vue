@@ -255,131 +255,146 @@
                 </div>
               </div>
 
-              <!-- Traveler cards -->
-              <div v-if="(trip.travelers || []).length" class="travelers-cards">
-                <div v-for="tr in trip.travelers" :key="tr.id" class="tv-card">
-
-                  <!-- Top bar: name · pay cat · nums · total · delete -->
-                  <div class="tv-top">
-                    <input type="text" class="tv-name-input"
-                      :value="tr.name" placeholder="Traveler name…"
-                      @input="rom.updateTraveler(entity.id, trip.id, tr.id, { name: $event.target.value })" />
-                    <select class="tv-cat-select"
-                      :value="tr.laborCat || ''"
-                      :title="rom.showRates && tr.laborCat ? `Travel labor: ${fmt(rom.travelLaborCost(tr))}` : 'Pick a pay category'"
-                      @change="rom.updateTraveler(entity.id, trip.id, tr.id, { laborCat: $event.target.value })">
-                      <option value="">— Pay cat —</option>
-                      <option v-for="cat in rom.LABOR_CATS" :key="cat.id" :value="cat.id">
-                        {{ rom.showRates ? `${cat.label} ($${cat.defaultRate}/hr)` : cat.label }}
-                      </option>
-                    </select>
-                    <div class="tv-nums">
-                      <label class="tv-num-field">
-                        <span>Travelers</span>
+              <!-- Travelers table -->
+              <div v-if="(trip.travelers || []).length" class="travelers-wrap">
+                <table class="travelers-table">
+                  <thead>
+                    <tr>
+                      <th class="t-col-name">Traveler</th>
+                      <th class="t-col-cat">Pay Cat</th>
+                      <th class="t-col-qty">Travelers</th>
+                      <th class="t-col-days">Days</th>
+                      <th class="t-col-hrs">Travel hrs</th>
+                      <th class="t-col-svc">Hotel/M&amp;IE</th>
+                      <th class="t-col-svc">Car</th>
+                      <th class="t-col-svc">Airfare</th>
+                      <th class="t-col-svc">Misc</th>
+                      <th class="t-col-total">Total</th>
+                      <th class="t-col-del"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="tr in trip.travelers" :key="tr.id" class="traveler-row">
+                      <td class="t-col-name">
+                        <input type="text"
+                          :value="tr.name"
+                          placeholder="Traveler"
+                          @input="rom.updateTraveler(entity.id, trip.id, tr.id, { name: $event.target.value })" />
+                      </td>
+                      <td class="t-col-cat">
+                        <select
+                          :value="tr.laborCat || ''"
+                          class="cat-select"
+                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { laborCat: $event.target.value })"
+                          :title="rom.showRates && tr.laborCat ? `Travel labor: ${fmt(rom.travelLaborCost(tr))}` : 'Pick a pay category for this traveler'"
+                        >
+                          <option value="">— Pay cat —</option>
+                          <option v-for="cat in rom.LABOR_CATS" :key="cat.id" :value="cat.id">
+                            {{ rom.showRates ? `${cat.label} ($${cat.defaultRate}/hr)` : cat.label }}
+                          </option>
+                        </select>
+                      </td>
+                      <td class="t-col-qty">
                         <input type="number" min="1" step="1"
                           :value="tr.qty || 1"
                           @change="rom.updateTraveler(entity.id, trip.id, tr.id, { qty: Math.max(1, +$event.target.value || 1) })" />
-                      </label>
-                      <label class="tv-num-field">
-                        <span>Days</span>
+                      </td>
+                      <td class="t-col-days">
                         <input type="number" min="0" step="0.5"
                           :value="tr.days || 0"
                           @change="rom.updateTraveler(entity.id, trip.id, tr.id, { days: +$event.target.value || 0 })" />
-                      </label>
-                      <label class="tv-num-field">
-                        <span>Travel hrs</span>
+                      </td>
+                      <td class="t-col-hrs">
                         <input type="number" min="0" step="0.5"
                           :value="tr.travelHours ?? trip.defaultTravelHours ?? 4"
                           @change="rom.updateTraveler(entity.id, trip.id, tr.id, { travelHours: +$event.target.value || 0 })" />
-                      </label>
-                    </div>
-                    <span class="tv-row-total">{{ fmt(rom.travelerCost(trip, tr) + rom.travelLaborCost(tr)) }}</span>
-                    <button class="del-btn" @click="rom.removeTraveler(entity.id, trip.id, tr.id)" title="Remove traveler">
-                      <i class="ti ti-trash" aria-hidden="true"></i>
-                    </button>
-                  </div>
-
-                  <!-- Service tiles -->
-                  <div class="tv-services">
-                    <!-- Hotel / M&IE -->
-                    <div class="tv-svc" :class="{ 'tv-svc--on': tr.hotel }">
-                      <label class="tv-svc-check">
-                        <input type="checkbox" :checked="tr.hotel"
-                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { hotel: $event.target.checked })" />
-                        <span>Hotel / M&amp;IE</span>
-                        <button v-if="tr.hotel" class="breakdown-btn"
-                          @click.stop.prevent="openBreakdown = { entityId: entity.id, trip, tr }"
-                          title="View day-by-day breakdown">
-                          <i class="ti ti-info-circle"></i>
+                      </td>
+                      <td class="t-col-svc">
+                        <div class="svc-cell" :class="{ 'svc-cell--on': tr.hotel }">
+                          <label class="svc-row">
+                            <input type="checkbox" :checked="tr.hotel"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { hotel: $event.target.checked })" />
+                            <span class="svc-cost">{{ tr.hotel ? fmt(hotelCost(trip, tr)) : '—' }}</span>
+                            <button v-if="tr.hotel" class="breakdown-btn"
+                              @click.stop.prevent="openBreakdown = { entityId: entity.id, trip, tr }"
+                              title="View day-by-day breakdown">
+                              <i class="ti ti-info-circle"></i>
+                            </button>
+                          </label>
+                          <div v-if="tr.hotel" class="svc-rate-row">
+                            <input type="number" min="0" step="1"
+                              :value="effLodging(trip, tr)"
+                              class="svc-rate-input"
+                              :class="{ 'svc-rate-input--override': isOverride(tr, 'lodgingRate', 'lodgingRate', trip) }"
+                              :title="`Lodging per night · trip default $${trip.lodgingRate || 0}`"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { lodgingRate: +$event.target.value })" />
+                            <span class="svc-unit">/night</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="t-col-svc">
+                        <div class="svc-cell" :class="{ 'svc-cell--on': tr.car }">
+                          <label class="svc-row">
+                            <input type="checkbox" :checked="tr.car"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { car: $event.target.checked })" />
+                            <span class="svc-cost">{{ tr.car ? fmt(carCost(trip, tr)) : '—' }}</span>
+                          </label>
+                          <div v-if="tr.car" class="svc-rate-row">
+                            <input type="number" min="0" step="5"
+                              :value="effCar(trip, tr)"
+                              class="svc-rate-input"
+                              :class="{ 'svc-rate-input--override': isOverride(tr, 'carRate', 'defaultCarRate', trip) }"
+                              :title="`Rental car per day · trip default $${trip.defaultCarRate || 75}`"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { carRate: +$event.target.value })" />
+                            <span class="svc-unit">/day</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="t-col-svc">
+                        <div class="svc-cell" :class="{ 'svc-cell--on': tr.airfare }">
+                          <label class="svc-row">
+                            <input type="checkbox" :checked="tr.airfare"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { airfare: $event.target.checked })" />
+                            <span class="svc-cost">{{ tr.airfare ? fmt(airfareCost(trip, tr)) : '—' }}</span>
+                          </label>
+                          <div v-if="tr.airfare" class="svc-rate-row">
+                            <input type="number" min="0" step="25"
+                              :value="effAirfare(trip, tr)"
+                              class="svc-rate-input"
+                              :class="{ 'svc-rate-input--override': isOverride(tr, 'airfareRate', 'defaultAirfareRate', trip) }"
+                              :title="`Airfare per ticket · trip default $${trip.defaultAirfareRate || 600}`"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { airfareRate: +$event.target.value })" />
+                            <span class="svc-unit">/ticket</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="t-col-svc">
+                        <div class="svc-cell" :class="{ 'svc-cell--on': tr.misc }">
+                          <label class="svc-row">
+                            <input type="checkbox" :checked="tr.misc"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { misc: $event.target.checked })" />
+                            <span class="svc-cost">{{ tr.misc ? fmt(miscCost(trip, tr)) : '—' }}</span>
+                          </label>
+                          <div v-if="tr.misc" class="svc-rate-row">
+                            <input type="number" min="0" step="5"
+                              :value="effMisc(trip, tr)"
+                              class="svc-rate-input"
+                              :class="{ 'svc-rate-input--override': isOverride(tr, 'miscRate', 'defaultMiscRate', trip) }"
+                              :title="`Misc per person · trip default $${trip.defaultMiscRate || 50}`"
+                              @change="rom.updateTraveler(entity.id, trip.id, tr.id, { miscRate: +$event.target.value })" />
+                            <span class="svc-unit">flat</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="t-col-total">{{ fmt(rom.travelerCost(trip, tr) + rom.travelLaborCost(tr)) }}</td>
+                      <td class="t-col-del">
+                        <button class="del-btn" @click="rom.removeTraveler(entity.id, trip.id, tr.id)" title="Remove traveler">
+                          <i class="ti ti-trash" aria-hidden="true"></i>
                         </button>
-                      </label>
-                      <span class="tv-svc-cost">{{ tr.hotel ? fmt(hotelCost(trip, tr)) : '—' }}</span>
-                      <div v-if="tr.hotel" class="tv-svc-rate">
-                        <input type="number" min="0" step="1"
-                          :value="effLodging(trip, tr)" class="tv-rate-input"
-                          :class="{ 'tv-rate-input--override': isOverride(tr, 'lodgingRate', 'lodgingRate', trip) }"
-                          :title="`Lodging per night · default $${trip.lodgingRate || 0}`"
-                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { lodgingRate: +$event.target.value })" />
-                        <span class="tv-rate-unit">/night</span>
-                      </div>
-                    </div>
-
-                    <!-- Car -->
-                    <div class="tv-svc" :class="{ 'tv-svc--on': tr.car }">
-                      <label class="tv-svc-check">
-                        <input type="checkbox" :checked="tr.car"
-                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { car: $event.target.checked })" />
-                        <span>Rental Car</span>
-                      </label>
-                      <span class="tv-svc-cost">{{ tr.car ? fmt(carCost(trip, tr)) : '—' }}</span>
-                      <div v-if="tr.car" class="tv-svc-rate">
-                        <input type="number" min="0" step="5"
-                          :value="effCar(trip, tr)" class="tv-rate-input"
-                          :class="{ 'tv-rate-input--override': isOverride(tr, 'carRate', 'defaultCarRate', trip) }"
-                          :title="`Per day · default $${trip.defaultCarRate || 75}`"
-                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { carRate: +$event.target.value })" />
-                        <span class="tv-rate-unit">/day</span>
-                      </div>
-                    </div>
-
-                    <!-- Airfare -->
-                    <div class="tv-svc" :class="{ 'tv-svc--on': tr.airfare }">
-                      <label class="tv-svc-check">
-                        <input type="checkbox" :checked="tr.airfare"
-                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { airfare: $event.target.checked })" />
-                        <span>Airfare</span>
-                      </label>
-                      <span class="tv-svc-cost">{{ tr.airfare ? fmt(airfareCost(trip, tr)) : '—' }}</span>
-                      <div v-if="tr.airfare" class="tv-svc-rate">
-                        <input type="number" min="0" step="25"
-                          :value="effAirfare(trip, tr)" class="tv-rate-input"
-                          :class="{ 'tv-rate-input--override': isOverride(tr, 'airfareRate', 'defaultAirfareRate', trip) }"
-                          :title="`Per ticket · default $${trip.defaultAirfareRate || 600}`"
-                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { airfareRate: +$event.target.value })" />
-                        <span class="tv-rate-unit">/ticket</span>
-                      </div>
-                    </div>
-
-                    <!-- Misc -->
-                    <div class="tv-svc" :class="{ 'tv-svc--on': tr.misc }">
-                      <label class="tv-svc-check">
-                        <input type="checkbox" :checked="tr.misc"
-                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { misc: $event.target.checked })" />
-                        <span>Misc</span>
-                      </label>
-                      <span class="tv-svc-cost">{{ tr.misc ? fmt(miscCost(trip, tr)) : '—' }}</span>
-                      <div v-if="tr.misc" class="tv-svc-rate">
-                        <input type="number" min="0" step="5"
-                          :value="effMisc(trip, tr)" class="tv-rate-input"
-                          :class="{ 'tv-rate-input--override': isOverride(tr, 'miscRate', 'defaultMiscRate', trip) }"
-                          :title="`Per person · default $${trip.defaultMiscRate || 50}`"
-                          @change="rom.updateTraveler(entity.id, trip.id, tr.id, { miscRate: +$event.target.value })" />
-                        <span class="tv-rate-unit">flat</span>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
               <div class="trip-footer-bar">
@@ -1026,87 +1041,85 @@ onMounted(() => {
   opacity: 1;
 }
 
-/* ─── Traveler cards ───────────────────────────────────────────── */
-.travelers-cards { padding: 10px 14px 0; display: flex; flex-direction: column; gap: 10px; }
-
-.tv-card {
-  border: 1px solid var(--rom-border);
-  border-radius: 8px; overflow: hidden;
+/* ─── Travelers table ──────────────────────────────────────────── */
+.travelers-wrap { padding: 10px 14px 0; overflow-x: auto; }
+.travelers-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.travelers-table th {
+  text-align: left; padding: 8px 10px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--rom-text-muted);
+  border-bottom: 2px solid var(--rom-border);
+  background: var(--rom-surface);
+  white-space: nowrap;
 }
+.t-col-name  { min-width: 150px; }
+.t-col-cat   { width: 160px; }
+.t-col-qty   { width: 72px;  text-align: center !important; }
+.t-col-days  { width: 72px;  text-align: center !important; }
+.t-col-hrs   { width: 82px;  text-align: center !important; }
+.t-col-svc   { width: 150px; }
+.t-col-total { width: 90px;  text-align: right !important; }
+.t-col-del   { width: 40px; }
 
-.tv-top {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 10px 14px;
-  background: var(--rom-surface-alt);
-  border-bottom: 1px solid var(--rom-border);
-}
-.tv-name-input {
-  flex: 1; min-width: 130px;
-  padding: 6px 10px; font-size: 13px; font-weight: 500;
-  border: 1px solid var(--rom-border); border-radius: 5px;
+.cat-select {
+  width: 100%; padding: 5px 7px; font-size: 12px;
+  border: 1px solid var(--rom-border); border-radius: 4px;
   background: var(--rom-surface); color: var(--rom-text);
-  font-family: inherit;
 }
-.tv-name-input:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
-.tv-cat-select {
-  min-width: 160px; padding: 6px 8px; font-size: 13px;
-  border: 1px solid var(--rom-border); border-radius: 5px;
-  background: var(--rom-surface); color: var(--rom-text); cursor: pointer;
-}
-.tv-cat-select:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; }
+.cat-select:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: var(--rom-accent); }
 
-.tv-nums { display: flex; align-items: center; gap: 10px; }
-.tv-num-field {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  font-size: 10px; font-weight: 600; color: var(--rom-text-muted);
-  text-transform: uppercase; letter-spacing: .04em; cursor: default;
+.traveler-row td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--rom-border);
+  vertical-align: middle;
 }
-.tv-num-field input {
-  width: 58px; padding: 5px 6px; text-align: center;
+.traveler-row td input[type="text"],
+.traveler-row td input[type="number"] {
+  width: 100%; padding: 5px 7px; font-size: 12px;
   border: 1px solid var(--rom-border); border-radius: 4px;
-  font-size: 13px; background: var(--rom-surface); color: var(--rom-text);
+  background: var(--rom-surface); color: var(--rom-text);
 }
-.tv-num-field input:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
+.traveler-row .t-col-qty input,
+.traveler-row .t-col-days input,
+.traveler-row .t-col-hrs input { text-align: center; }
+.traveler-row .t-col-total { font-weight: 700; color: var(--rom-text); text-align: right; white-space: nowrap; }
 
-.tv-row-total {
-  margin-left: auto; font-size: 14px; font-weight: 700;
-  color: var(--rom-accent); font-variant-numeric: tabular-nums; white-space: nowrap;
+/* Service cells */
+.svc-cell {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 10px; border-radius: 6px;
+  background: var(--rom-surface-alt);
+  border: 1px solid transparent;
+  transition: background .12s, border-color .12s;
 }
+.svc-cell:hover { background: #dfe7f5; }
+.svc-cell--on { background: var(--rom-accent-bg); border-color: var(--rom-accent); }
 
-/* Four service tiles */
-.tv-services {
-  display: grid; grid-template-columns: repeat(4, 1fr);
+.svc-row {
+  display: flex; align-items: center; gap: 7px; cursor: pointer;
 }
-.tv-svc {
-  padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;
-  border-right: 1px solid var(--rom-border);
-  background: var(--rom-bg); transition: background .12s;
+.svc-row input[type="checkbox"] {
+  margin: 0; width: 15px; height: 15px; cursor: pointer;
+  accent-color: var(--rom-accent); flex-shrink: 0;
 }
-.tv-svc:last-child { border-right: none; }
-.tv-svc--on { background: var(--rom-accent-bg); }
+.svc-cost {
+  font-size: 13px; font-weight: 700; color: var(--rom-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.svc-cell--on .svc-cost { color: var(--rom-accent-dark); }
 
-.tv-svc-check {
-  display: flex; align-items: center; gap: 7px;
-  font-size: 12px; font-weight: 600; color: var(--rom-text-muted); cursor: pointer;
+.svc-rate-row {
+  display: flex; align-items: center; gap: 5px;
+  padding-left: 22px;
 }
-.tv-svc--on .tv-svc-check { color: var(--rom-text); }
-.tv-svc-check input[type="checkbox"] { accent-color: var(--rom-accent); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
-
-.tv-svc-cost {
-  font-size: 18px; font-weight: 700; color: var(--rom-text-faint);
-  font-variant-numeric: tabular-nums; line-height: 1;
-}
-.tv-svc--on .tv-svc-cost { color: var(--rom-accent-dark); }
-
-.tv-svc-rate { display: flex; align-items: center; gap: 5px; }
-.tv-rate-input {
-  width: 68px; padding: 4px 6px; text-align: right;
+.svc-rate-input {
+  width: 66px; padding: 3px 6px; font-size: 12px; text-align: right;
   border: 1px solid var(--rom-border); border-radius: 4px;
-  font-size: 12px; background: var(--rom-surface); color: var(--rom-text);
+  background: var(--rom-surface); color: var(--rom-text);
 }
-.tv-rate-input:focus { outline: 1px solid var(--rom-accent); outline-offset: -1px; }
-.tv-rate-input--override { font-weight: 700; border-color: var(--rom-accent); }
-.tv-rate-unit { font-size: 10px; color: var(--rom-text-faint); }
+.svc-rate-input:focus { outline: 1px solid var(--rom-accent); outline-offset: -1px; }
+.svc-rate-input--override { font-weight: 700; border-color: var(--rom-accent); }
+.svc-unit { font-size: 10px; color: var(--rom-text-muted); }
 
 /* ─── Per-diem chip (always shows the peak-month rate) ────────── */
 .per-diem-chip {
