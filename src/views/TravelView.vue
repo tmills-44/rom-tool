@@ -269,6 +269,7 @@
                       <th class="t-col-svc">Car</th>
                       <th class="t-col-svc">Airfare</th>
                       <th class="t-col-svc">Misc</th>
+                      <th class="t-col-svc">Labor</th>
                       <th class="t-col-total">Total</th>
                       <th class="t-col-del"></th>
                     </tr>
@@ -379,6 +380,15 @@
                               @change="rom.updateTraveler(entity.id, trip.id, tr.id, { miscRate: +$event.target.value })" />
                             <span class="svc-unit">flat</span>
                           </div>
+                        </div>
+                      </td>
+                      <td class="t-col-svc">
+                        <div class="svc-cell" :class="{ 'svc-cell--on': tr.laborCat }" :title="tr.laborCat ? `${tr.travelHours ?? trip.defaultTravelHours ?? 0} hrs × rate` : 'Select a pay category to calculate travel labor'">
+                          <span class="svc-row">
+                            <span class="svc-cost" :style="tr.laborCat ? '' : 'opacity:.4'">
+                              {{ tr.laborCat ? fmt(rom.travelLaborCost(tr)) : '—' }}
+                            </span>
+                          </span>
                         </div>
                       </td>
                       <td class="t-col-total">{{ fmt(rom.travelerCost(trip, tr) + rom.travelLaborCost(tr)) }}</td>
