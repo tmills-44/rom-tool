@@ -2041,7 +2041,7 @@ export const useRomStore = defineStore('rom', () => {
 
   function resetAll() {
     resetCount.value++
-    Object.assign(project, { sponsor: '', roomName: '', date: new Date().toISOString().split('T')[0], projectEngineer: '', anticipatedFYFunds: 5_000_000, templateId: null, templateName: null })
+    Object.assign(project, { sponsor: '', roomName: '', date: new Date().toISOString().split('T')[0], projectEngineer: '', govLead: '', building: '', cityBase: '', pmSupportLead: '', anticipatedFYFunds: 5_000_000, templateId: null, templateName: null })
     lineItems.splice(0, lineItems.length)
     Object.keys(wbs).forEach(k => delete wbs[k]); Object.assign(wbs, deepClone(DEFAULT_WBS))
     Object.keys(travel).forEach(k => delete travel[k]); Object.assign(travel, emptyTravelData())
