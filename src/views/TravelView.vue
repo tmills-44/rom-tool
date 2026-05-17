@@ -853,7 +853,7 @@ onMounted(() => {
 
 .trip-field { display: flex; flex-direction: column; gap: 4px; }
 .trip-field label { font-size: 10px; font-weight: 600; color: var(--rom-text-muted); text-transform: uppercase; letter-spacing: .04em; }
-.trip-field--sm { min-width: 100px; }
+.trip-field--sm { min-width: 120px; }
 .trip-field--wide { flex: 1; min-width: 180px; }
 .trip-field--action { }
 
@@ -925,7 +925,7 @@ onMounted(() => {
 .trip-row--status { margin-top: -4px; }
 
 .gsa-rate-input {
-  width: 80px; padding: 5px 8px;
+  width: 100px; padding: 5px 8px;
   border: 1px solid var(--rom-border); border-radius: 5px;
   background: var(--rom-surface); color: var(--rom-text);
   font-size: 13px; font-weight: 600; text-align: right;
@@ -1008,7 +1008,7 @@ onMounted(() => {
 .default-field i { font-size: 13px; color: #8a6508; }
 .default-field label { color: #5f5e5a; }
 .default-field input {
-  width: 60px; padding: 2px 4px;
+  width: 86px; padding: 2px 6px;
   border: 1px solid #b8860b; border-radius: 3px;
   font-weight: 700; text-align: center;
   color: var(--rom-accent-dark, #1248a0);
@@ -1054,9 +1054,9 @@ onMounted(() => {
 }
 .t-col-name  { min-width: 150px; }
 .t-col-cat   { width: 160px; }
-.t-col-qty   { width: 72px;  text-align: center !important; }
-.t-col-days  { width: 72px;  text-align: center !important; }
-.t-col-hrs   { width: 82px;  text-align: center !important; }
+.t-col-qty   { width: 84px;  text-align: center !important; }
+.t-col-days  { width: 84px;  text-align: center !important; }
+.t-col-hrs   { width: 94px;  text-align: center !important; }
 .t-col-svc   { width: 150px; }
 .t-col-total { width: 90px;  text-align: right !important; }
 .t-col-del   { width: 40px; }
@@ -1113,7 +1113,7 @@ onMounted(() => {
   padding-left: 22px;
 }
 .svc-rate-input {
-  width: 66px; padding: 3px 6px; font-size: 12px; text-align: right;
+  width: 82px; padding: 3px 6px; font-size: 12px; text-align: right;
   border: 1px solid var(--rom-border); border-radius: 4px;
   background: var(--rom-surface); color: var(--rom-text);
 }
