@@ -1043,11 +1043,7 @@ onMounted(() => {
 
 /* ─── Travelers table ──────────────────────────────────────────── */
 .travelers-wrap { padding: 10px 14px 0; overflow-x: auto; }
-.travelers-table {
-  width: 100%; border-collapse: collapse; font-size: 13px;
-  table-layout: fixed;  /* enforces column widths */
-  min-width: 1100px;    /* table scrolls horizontally on small screens */
-}
+.travelers-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .travelers-table th {
   text-align: left; padding: 8px 10px;
   font-size: 10px; font-weight: 700; text-transform: uppercase;
@@ -1056,14 +1052,14 @@ onMounted(() => {
   background: var(--rom-surface);
   white-space: nowrap;
 }
-.t-col-name  { width: 180px; }
-.t-col-cat   { width: 185px; }
-.t-col-qty   { width: 90px;  text-align: center !important; }
-.t-col-days  { width: 90px;  text-align: center !important; }
-.t-col-hrs   { width: 100px; text-align: center !important; }
-.t-col-svc   { width: 160px; }
-.t-col-total { width: 100px; text-align: right !important; }
-.t-col-del   { width: 44px; }
+.t-col-name  { min-width: 130px; }
+.t-col-cat   { width: 145px; }
+.t-col-qty   { width: 66px;  text-align: center !important; }
+.t-col-days  { width: 66px;  text-align: center !important; }
+.t-col-hrs   { width: 72px;  text-align: center !important; }
+.t-col-svc   { width: 110px; }
+.t-col-total { width: 82px;  text-align: right !important; }
+.t-col-del   { width: 36px; }
 
 .cat-select {
   width: 100%; padding: 5px 7px; font-size: 12px;
@@ -1113,17 +1109,16 @@ onMounted(() => {
 .svc-cell--on .svc-cost { color: var(--rom-accent-dark); }
 
 .svc-rate-row {
-  display: flex; align-items: center; gap: 5px;
-  padding-left: 22px;
+  display: flex; align-items: center; gap: 4px;
 }
 .svc-rate-input {
-  width: 100px; padding: 5px 8px; font-size: 13px; text-align: right;
+  flex: 1; min-width: 0; padding: 5px 7px; font-size: 12px; text-align: right;
   border: 1px solid var(--rom-border); border-radius: 4px;
   background: var(--rom-surface); color: var(--rom-text);
 }
 .svc-rate-input:focus { outline: 1px solid var(--rom-accent); outline-offset: -1px; }
 .svc-rate-input--override { font-weight: 700; border-color: var(--rom-accent); }
-.svc-unit { font-size: 10px; color: var(--rom-text-muted); }
+.svc-unit { font-size: 10px; color: var(--rom-text-muted); white-space: nowrap; }
 
 /* ─── Per-diem chip (always shows the peak-month rate) ────────── */
 .per-diem-chip {
