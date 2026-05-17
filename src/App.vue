@@ -441,6 +441,17 @@ document.addEventListener('focus', e => {
   if (e.target.matches('input[type="number"]')) e.target.select()
 }, true)
 
+// Arrow keys always step by 1 regardless of the input's step attribute
+document.addEventListener('keydown', e => {
+  if (!e.target.matches('input[type="number"]')) return
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+  e.preventDefault()
+  const val = parseFloat(e.target.value) || 0
+  e.target.value = e.key === 'ArrowUp' ? val + 1 : val - 1
+  e.target.dispatchEvent(new Event('input', { bubbles: true }))
+  e.target.dispatchEvent(new Event('change', { bubbles: true }))
+}, true)
+
 onMounted(async () => {
   if (!rom.project.templateId) showPicker.value = true
 
