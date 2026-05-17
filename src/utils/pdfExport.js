@@ -179,8 +179,8 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
   doc.text('Labor', margin, y)
   y += 10
 
-  // Gather hours-by-title from this scope's lineItems
-  const lines = rom.lineItems.filter(l => l.coaId === scope.id)
+  // Gather hours-by-title from this scope's lineItems (visible entities only)
+  const lines = rom.lineItems.filter(l => l.coaId === scope.id && rom.enabledEntities.includes(l.entity))
   const hoursByCat = {}
   lines.forEach(l => {
     const h = (l.days || 0) * (l.hoursPerDay || 0)
@@ -484,7 +484,7 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
   }
 
   // Task notes — render a compact table of any line-level notes for this scope
-  const noteLines = rom.lineItems.filter(l => l.coaId === scope.id && String(l.notes || '').trim())
+  const noteLines = rom.lineItems.filter(l => l.coaId === scope.id && rom.enabledEntities.includes(l.entity) && String(l.notes || '').trim())
   if (noteLines.length) {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...MUTED)
     doc.text('TASK NOTES', margin, y); y += 10

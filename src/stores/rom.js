@@ -755,27 +755,39 @@ export const useRomStore = defineStore('rom', () => {
   // Global UI pref — whether to show per-row tracking indicators (check / alert / empty)
   const showRowStatus = ref(saved?.showRowStatus ?? true)
 
-  // ── Undo / redo stacks for lineItems ─────────────────────────────────
+  // ── Undo / redo stacks (lineItems + overheadByCoa) ───────────────────
   const undoStack = ref([])
   const redoStack = ref([])
   const MAX_HISTORY = 50
 
+  function _captureSnapshot() {
+    return JSON.stringify({ l: lineItems, oh: deepClone(overheadByCoa) })
+  }
+  function _applySnapshot(raw) {
+    const snap = JSON.parse(raw)
+    // Support old format (plain array) and new format ({ l, oh })
+    const lines = Array.isArray(snap) ? snap : snap.l
+    const oh    = Array.isArray(snap) ? null  : snap.oh
+    lineItems.splice(0, lineItems.length, ...lines)
+    if (oh) {
+      Object.keys(overheadByCoa).forEach(k => delete overheadByCoa[k])
+      Object.assign(overheadByCoa, deepClone(oh))
+    }
+  }
   function snapshotLines() {
-    undoStack.value.push(JSON.stringify(lineItems))
+    undoStack.value.push(_captureSnapshot())
     if (undoStack.value.length > MAX_HISTORY) undoStack.value.shift()
     redoStack.value = []
   }
   function undo() {
     if (!undoStack.value.length) return
-    redoStack.value.push(JSON.stringify(lineItems))
-    const prev = JSON.parse(undoStack.value.pop())
-    lineItems.splice(0, lineItems.length, ...prev)
+    redoStack.value.push(_captureSnapshot())
+    _applySnapshot(undoStack.value.pop())
   }
   function redo() {
     if (!redoStack.value.length) return
-    undoStack.value.push(JSON.stringify(lineItems))
-    const next = JSON.parse(redoStack.value.pop())
-    lineItems.splice(0, lineItems.length, ...next)
+    undoStack.value.push(_captureSnapshot())
+    _applySnapshot(redoStack.value.pop())
   }
   const canUndo = computed(() => undoStack.value.length > 0)
   const canRedo = computed(() => redoStack.value.length > 0)
@@ -789,7 +801,13 @@ export const useRomStore = defineStore('rom', () => {
   function catsForRole(role)          { return laborCats.filter(c => c.role === role) }
   function updateLaborCatRate(catId, rate) {
     const c = laborCats.find(c => c.id === catId)
-    if (c) c.defaultRate = +rate || 0
+    if (!c) return
+    const oldRate = c.defaultRate
+    c.defaultRate = +rate || 0
+    // Propagate to existing lines that still carry the old default (not manually overridden)
+    lineItems.forEach(l => {
+      if (l.laborCat === catId && l.rate === oldRate) l.rate = c.defaultRate
+    })
   }
   function updateLaborCatLabel(catId, label) {
     const c = laborCats.find(c => c.id === catId)
@@ -1962,6 +1980,7 @@ export const useRomStore = defineStore('rom', () => {
     const oh = overheadByCoa[coaId]
     if (!oh || !Array.isArray(oh.items)) return
     if (!dragId || dragId === dropId) return
+    snapshotLines()
     const dragIdx = oh.items.findIndex(i => i.id === dragId)
     if (dragIdx < 0) return
     const [moved] = oh.items.splice(dragIdx, 1)

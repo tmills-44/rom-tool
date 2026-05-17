@@ -436,6 +436,13 @@ window.addEventListener('storage', e => {
   if (e.key === 'rom-tool-state-v14' && e.newValue) tabConflict.value = true
 })
 
+// Warn before closing/refreshing if there are unsaved line items or project data
+window.addEventListener('beforeunload', e => {
+  if (rom.lineItems.length > 0 || rom.travelTotal > 0 || rom.materialTotal > 0) {
+    e.preventDefault()
+  }
+})
+
 // Page load timestamp — stamped once on mount so the user can verify they're on a fresh build
 const pageLoadedAt   = ref('')   // e.g. "2:34 PM"
 const pageLoadedFull = ref('')   // e.g. "May 15, 2026 · 2:34:07 PM"

@@ -189,7 +189,7 @@ function phaseRoleTable(rom, scope, t) {
 
 // ── Labor / Travel / Material detail tables ────────────────────────────
 function laborDetailTable(rom, scope, t) {
-  const lines = rom.lineItems.filter(l => l.coaId === scope.id).map(l => {
+  const lines = rom.lineItems.filter(l => l.coaId === scope.id && rom.enabledEntities.includes(l.entity)).map(l => {
     const entity = rom.ENTITIES.find(e => e.id === l.entity)
     const phase  = rom.LIFECYCLE_PHASES.find(p => p.id === l.phaseId)
     const role   = rom.ROLES.find(r => r.id === l.role)
@@ -226,7 +226,7 @@ function laborDetailTable(rom, scope, t) {
 
 function travelDetailTable(rom, scope, t) {
   const rows = []
-  rom.ENTITIES.forEach(e => {
+  rom.visibleEntities.forEach(e => {
     (rom.travel[e.id] ?? []).filter(trip => trip.coaId === scope.id).forEach(trip => {
       const trs = trip.travelers ?? []
       if (trs.length === 0) return
@@ -495,7 +495,7 @@ function buildScopeSummaryHTML(rom, scope, logo) {
   }).join('')
 
   // Labor hours by title group
-  const lines = rom.lineItems.filter(l => l.coaId === scope.id)
+  const lines = rom.lineItems.filter(l => l.coaId === scope.id && rom.enabledEntities.includes(l.entity))
   const hoursByCat = {}
   lines.forEach(l => { hoursByCat[l.laborCat] = (hoursByCat[l.laborCat] || 0) + (l.days || 0) * (l.hoursPerDay || 0) })
   const groupRows = SUMMARY_LABOR_GROUPS.map(g => {

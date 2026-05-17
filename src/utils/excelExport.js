@@ -143,7 +143,7 @@ function buildScopeSheet(XLSX, rom, scope) {
   const laborTop = rows.length
   rows.push(['LABOR DETAIL'])
   rows.push(['Entity', 'Phase', 'Role', 'Task', 'Labor Cat', 'Days', 'Hrs/Day', 'Total Hrs', 'Rate ($/hr)', 'Cost ($)'])
-  rom.lineItems.filter(l => l.coaId === scope.id).forEach(l => {
+  rom.lineItems.filter(l => l.coaId === scope.id && rom.enabledEntities.includes(l.entity)).forEach(l => {
     const entity = rom.ENTITIES.find(e => e.id === l.entity)
     const phase  = rom.LIFECYCLE_PHASES.find(p => p.id === l.phaseId)
     const role   = rom.ROLES.find(r => r.id === l.role)
@@ -166,7 +166,7 @@ function buildScopeSheet(XLSX, rom, scope) {
     'Traveler', 'Pay Cat', 'Qty', 'Days', 'Travel Hrs',
     'Hotel', 'Car', 'Airfare', 'Misc', 'Row Cost ($)',
   ])
-  rom.ENTITIES.forEach(e => {
+  rom.visibleEntities.forEach(e => {
     (rom.travel[e.id] ?? [])
       .filter(trip => trip.coaId === scope.id)
       .forEach(trip => {
