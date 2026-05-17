@@ -323,6 +323,8 @@
       <span class="stat stat-loaded">Loaded total <strong>{{ fmt(rom.totalLoadedCost) }}</strong></span>
       <span v-if="rom.saveError" class="stat stat-save-error" title="Auto-save failed — storage quota may be exceeded"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Save failed</span>
       <span v-else class="stat stat-saved"><i class="ti ti-device-floppy" aria-hidden="true"></i> Auto-saved</span>
+      <span v-if="ratesLoadFailed" class="stat stat-warn" :title="ratesStatus.errors.join('\n')"><i class="ti ti-alert-triangle" aria-hidden="true"></i> GSA rates failed to load</span>
+      <span v-if="tabConflict" class="stat stat-warn" title="Another browser tab saved this document — your data may be out of sync. Reload or download a backup."><i class="ti ti-layers-intersect" aria-hidden="true"></i> Multiple tabs open <button class="stat-dismiss" @click="tabConflict = false">×</button></span>
     </footer>
 
     </div><!-- /.main-col -->
@@ -423,9 +425,16 @@ const showReset       = ref(false)
 const showLoadConfirm = ref(false)
 const pendingLoadFile = ref(null)
 const loadError       = ref('')
-const ratesStatus   = reactive({ conus: '', oconus: '', errors: [] })
-const ratesLoadedAt   = ref('')   // e.g. "May 15 · 2:34 PM"
-const ratesChipDetail = ref('')   // tooltip detail
+const ratesStatus     = reactive({ conus: '', oconus: '', errors: [] })
+const ratesLoadedAt   = ref('')
+const ratesChipDetail = ref('')
+const ratesLoadFailed = ref(false)
+
+// Tab-conflict detection — fires in OTHER tabs when this key is written
+const tabConflict = ref(false)
+window.addEventListener('storage', e => {
+  if (e.key === 'rom-tool-state-v14' && e.newValue) tabConflict.value = true
+})
 
 // Page load timestamp — stamped once on mount so the user can verify they're on a fresh build
 const pageLoadedAt   = ref('')   // e.g. "2:34 PM"
@@ -464,7 +473,7 @@ onMounted(async () => {
   ratesLoadedAt.value   = fmtTime(new Date())
   ratesChipDetail.value = 'Rates loading…'
 
-  // Load rate files from public/rates/ — silently skips if files not yet uploaded
+  // Load rate files from public/rates/ — warns if files are present but fail to parse
   try {
     const { conus, oconus, errors } = await loadAllRates()
     ratesStatus.errors = errors
@@ -479,8 +488,11 @@ onMounted(async () => {
     }
     const detail = [ratesStatus.conus, ratesStatus.oconus].filter(Boolean).join(' · ')
     ratesChipDetail.value = detail || 'No rate files found'
-  } catch {
-    // Files not present yet — normal on first run
+    if (errors.length) ratesLoadFailed.value = true
+  } catch (e) {
+    ratesLoadFailed.value = true
+    ratesStatus.errors = [String(e)]
+    ratesChipDetail.value = 'Rate files failed to load'
   }
 })
 
@@ -1467,6 +1479,9 @@ body {
 .stat-loaded strong { color: #7dd3fc; font-size: 13px; }
 .stat-saved { opacity: .5; font-size: 10px; }
 .stat-save-error { font-size: 10px; color: #f5a623; opacity: .9; }
+.stat-warn { font-size: 10px; color: #f5a623; opacity: .95; display: inline-flex; align-items: center; gap: 4px; }
+.stat-dismiss { background: none; border: none; color: inherit; cursor: pointer; font-size: 12px; padding: 0 0 0 2px; line-height: 1; opacity: .7; }
+.stat-dismiss:hover { opacity: 1; }
 .stat-build { opacity: .35; font-size: 10px; font-variant-numeric: tabular-nums; margin-left: auto; }
 
 /* ─── Modal backdrop ─────────────────────────────────────────────── */

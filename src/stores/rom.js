@@ -846,6 +846,8 @@ export const useRomStore = defineStore('rom', () => {
     if (!arr) return
     const i = arr.findIndex(t => t.id === taskId)
     if (i >= 0) arr.splice(i, 1)
+    // Clear the taskId from any engineering lines that referenced this task
+    lineItems.forEach(l => { if (l.taskId === taskId) l.taskId = '' })
   }
   function updateTask(role, phaseId, taskId, patch) {
     const t = wbs[role]?.[phaseId]?.find(t => t.id === taskId)
@@ -937,7 +939,8 @@ export const useRomStore = defineStore('rom', () => {
       hotel:   t.hotel   ?? true,
       car:     t.rentalCar ?? false,
       airfare: t.airfare ?? false,
-      misc:    false,
+      misc:         false,
+      firstLastDay: true,
       // Carry the old single-trip rates into the per-row rate fields so cost math is preserved
       lodgingRate: t.lodgingRate ?? 0,
       mieRate:     t.mieRate     ?? 0,
