@@ -925,7 +925,7 @@ onMounted(() => {
 .trip-row--status { margin-top: -4px; }
 
 .gsa-rate-input {
-  width: 100px; padding: 5px 8px;
+  width: 120px; padding: 6px 9px;
   border: 1px solid var(--rom-border); border-radius: 5px;
   background: var(--rom-surface); color: var(--rom-text);
   font-size: 13px; font-weight: 600; text-align: right;
@@ -1008,7 +1008,7 @@ onMounted(() => {
 .default-field i { font-size: 13px; color: #8a6508; }
 .default-field label { color: #5f5e5a; }
 .default-field input {
-  width: 86px; padding: 2px 6px;
+  width: 110px; padding: 4px 8px;
   border: 1px solid #b8860b; border-radius: 3px;
   font-weight: 700; text-align: center;
   color: var(--rom-accent-dark, #1248a0);
@@ -1043,7 +1043,11 @@ onMounted(() => {
 
 /* ─── Travelers table ──────────────────────────────────────────── */
 .travelers-wrap { padding: 10px 14px 0; overflow-x: auto; }
-.travelers-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.travelers-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  table-layout: fixed;  /* enforces column widths */
+  min-width: 1100px;    /* table scrolls horizontally on small screens */
+}
 .travelers-table th {
   text-align: left; padding: 8px 10px;
   font-size: 10px; font-weight: 700; text-transform: uppercase;
@@ -1052,14 +1056,14 @@ onMounted(() => {
   background: var(--rom-surface);
   white-space: nowrap;
 }
-.t-col-name  { min-width: 150px; }
-.t-col-cat   { width: 160px; }
-.t-col-qty   { width: 84px;  text-align: center !important; }
-.t-col-days  { width: 84px;  text-align: center !important; }
-.t-col-hrs   { width: 94px;  text-align: center !important; }
-.t-col-svc   { width: 150px; }
-.t-col-total { width: 90px;  text-align: right !important; }
-.t-col-del   { width: 40px; }
+.t-col-name  { width: 180px; }
+.t-col-cat   { width: 185px; }
+.t-col-qty   { width: 90px;  text-align: center !important; }
+.t-col-days  { width: 90px;  text-align: center !important; }
+.t-col-hrs   { width: 100px; text-align: center !important; }
+.t-col-svc   { width: 160px; }
+.t-col-total { width: 100px; text-align: right !important; }
+.t-col-del   { width: 44px; }
 
 .cat-select {
   width: 100%; padding: 5px 7px; font-size: 12px;
@@ -1075,7 +1079,7 @@ onMounted(() => {
 }
 .traveler-row td input[type="text"],
 .traveler-row td input[type="number"] {
-  width: 100%; padding: 5px 7px; font-size: 12px;
+  width: 100%; padding: 7px 9px; font-size: 13px;
   border: 1px solid var(--rom-border); border-radius: 4px;
   background: var(--rom-surface); color: var(--rom-text);
 }
@@ -1113,7 +1117,7 @@ onMounted(() => {
   padding-left: 22px;
 }
 .svc-rate-input {
-  width: 82px; padding: 3px 6px; font-size: 12px; text-align: right;
+  width: 100px; padding: 5px 8px; font-size: 13px; text-align: right;
   border: 1px solid var(--rom-border); border-radius: 4px;
   background: var(--rom-surface); color: var(--rom-text);
 }
