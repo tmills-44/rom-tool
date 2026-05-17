@@ -526,21 +526,26 @@ function openBreakdownAt(evt, entityId, trip, tr) {
   const rect   = btn.getBoundingClientRect()
   const cardW  = 420
   const margin = 8
-  const estH   = 440  // estimated card height — used to decide whether to flip above
 
   // Horizontal: align right edge of card to right edge of button
   let right = window.innerWidth - rect.right - margin
   right = Math.max(margin, Math.min(right, window.innerWidth - cardW - margin))
 
-  // Vertical: open below unless that would clip the bottom; then flip above
-  let top
-  if (rect.bottom + estH + margin > window.innerHeight) {
-    top = Math.max(margin, rect.top - estH - margin)
+  // Vertical: measure actual available space below vs above, then set
+  // max-height to exactly that space so the card can never overflow
+  const spaceBelow = window.innerHeight - rect.bottom - margin * 2
+  const spaceAbove = rect.top - margin * 2
+  let style
+
+  if (spaceBelow >= 180 || spaceBelow >= spaceAbove) {
+    // Open below — max-height = space from button to bottom of viewport
+    style = { position: 'fixed', top: (rect.bottom + margin) + 'px', right: right + 'px', maxHeight: spaceBelow + 'px' }
   } else {
-    top = rect.bottom + margin
+    // Flip above — max-height = space from top of viewport to button
+    style = { position: 'fixed', bottom: (window.innerHeight - rect.top + margin) + 'px', right: right + 'px', maxHeight: spaceAbove + 'px' }
   }
 
-  openBreakdown.value = { entityId, tripId: trip.id, travelerId: tr.id, style: { position: 'fixed', top: top + 'px', right: right + 'px' } }
+  openBreakdown.value = { entityId, tripId: trip.id, travelerId: tr.id, style }
 }
 
 // ── US States list ───────────────────────────────────────────────────
@@ -1261,7 +1266,6 @@ onMounted(() => {
   box-shadow: 0 8px 32px rgba(0,0,0,.18);
   padding: 20px 24px;
   width: 420px;
-  max-height: calc(100vh - 40px);
   overflow-y: auto;
   display: flex; flex-direction: column; gap: 16px;
   position: fixed;
