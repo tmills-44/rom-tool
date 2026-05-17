@@ -441,7 +441,7 @@
 
     <!-- Hotel / M&IE day-by-day breakdown popup -->
     <div v-if="openBreakdown && bdTrip && bdTr" class="breakdown-overlay" @click.self="openBreakdown = null">
-      <div class="breakdown-card" :style="openBreakdown.style">
+      <div class="breakdown-card">
         <div class="breakdown-header">
           <span class="breakdown-title">Hotel &amp; M&amp;IE Breakdown</span>
           <button class="breakdown-close" @click="openBreakdown = null">×</button>
@@ -522,30 +522,7 @@ const bdTr = computed(() => {
 })
 
 function openBreakdownAt(evt, entityId, trip, tr) {
-  const btn    = evt.currentTarget
-  const rect   = btn.getBoundingClientRect()
-  const cardW  = 420
-  const margin = 8
-
-  // Horizontal: align right edge of card to right edge of button
-  let right = window.innerWidth - rect.right - margin
-  right = Math.max(margin, Math.min(right, window.innerWidth - cardW - margin))
-
-  // Vertical: measure actual available space below vs above, then set
-  // max-height to exactly that space so the card can never overflow
-  const spaceBelow = window.innerHeight - rect.bottom - margin * 2
-  const spaceAbove = rect.top - margin * 2
-  let style
-
-  if (spaceBelow >= 180 || spaceBelow >= spaceAbove) {
-    // Open below — max-height = space from button to bottom of viewport
-    style = { position: 'fixed', top: (rect.bottom + margin) + 'px', right: right + 'px', maxHeight: spaceBelow + 'px' }
-  } else {
-    // Flip above — max-height = space from top of viewport to button
-    style = { position: 'fixed', bottom: (window.innerHeight - rect.top + margin) + 'px', right: right + 'px', maxHeight: spaceAbove + 'px' }
-  }
-
-  openBreakdown.value = { entityId, tripId: trip.id, travelerId: tr.id, style }
+  openBreakdown.value = { entityId, tripId: trip.id, travelerId: tr.id }
 }
 
 // ── US States list ───────────────────────────────────────────────────
@@ -1258,17 +1235,20 @@ onMounted(() => {
 /* ─── Breakdown popup overlay & card ──────────────────────────── */
 .breakdown-overlay {
   position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.35);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
 }
 .breakdown-card {
   background: var(--rom-surface);
   border: 1px solid var(--rom-border);
   border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  box-shadow: 0 12px 48px rgba(0,0,0,.22);
   padding: 20px 24px;
   width: 420px;
+  max-height: calc(100vh - 80px);
   overflow-y: auto;
   display: flex; flex-direction: column; gap: 16px;
-  position: fixed;
 }
 .breakdown-header {
   display: flex; align-items: center; justify-content: space-between;
