@@ -308,9 +308,16 @@
     <!-- Shipping section -->
     <div class="section-card shipping-card">
       <div class="section-header">
-        <h3>Shipping &amp; Freight</h3>
+        <button class="bom-toggle" @click="shippingVisible = !shippingVisible" type="button">
+          <i class="ti" :class="shippingVisible ? 'ti-chevron-down' : 'ti-chevron-right'" aria-hidden="true"></i>
+          <h3>Shipping &amp; Freight</h3>
+        </button>
+        <span v-if="!shippingVisible && rom.shippingCost > 0" class="shipping-collapsed-total">
+          {{ fmt(rom.shippingCost) }}
+        </span>
       </div>
 
+      <template v-if="shippingVisible">
       <!-- Row 1: Shipping percentage -->
       <div class="shipping-row">
         <label class="ship-label">Shipping %</label>
@@ -360,6 +367,7 @@
         <span class="shipping-total-label">Total Shipping</span>
         <strong class="shipping-total-val">{{ fmt(rom.shippingCost) }}</strong>
       </div>
+      </template>
     </div>
 
   </div>
@@ -380,6 +388,7 @@ const totalColumns = computed(() => 7)
 
 // Track which parent rows have their sub-component table expanded.
 const bomVisible      = ref(false)
+const shippingVisible = ref(true)
 const expandedItemIds = ref(new Set())
 function isExpanded(id)   { return expandedItemIds.value.has(id) }
 function toggleExpand(id) {
@@ -839,7 +848,13 @@ function pickClass(t) {
 .subtotal-row td:nth-child(4) { text-align: right; }
 
 /* Shipping card */
-.shipping-card .section-header { border-bottom: none; }
+.shipping-collapsed-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rom-accent);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
 .shipping-row {
   display: flex;
   align-items: center;
