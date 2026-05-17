@@ -265,7 +265,7 @@
                       <th class="t-col-qty">Travelers</th>
                       <th class="t-col-days">Days</th>
                       <th class="t-col-hrs">Travel hrs</th>
-                      <th class="t-col-svc">Hotel + M&amp;IE</th>
+                      <th class="t-col-svc">Hotel/M&amp;IE</th>
                       <th class="t-col-svc">Car</th>
                       <th class="t-col-svc">Airfare</th>
                       <th class="t-col-svc">Misc</th>
@@ -969,7 +969,7 @@ onMounted(() => {
 .t-col-qty   { width: 60px;  text-align: center !important; }
 .t-col-days  { width: 70px;  text-align: center !important; }
 .t-col-hrs   { width: 80px;  text-align: center !important; }
-.t-col-svc   { width: 140px; text-align: center !important; }
+.t-col-svc   { width: 110px; text-align: center !important; }
 .t-col-total { width: 90px;  text-align: right !important; }
 .t-col-del   { width: 36px; }
 
@@ -1002,7 +1002,7 @@ onMounted(() => {
   background: var(--rom-surface-alt);
   border: 1px solid transparent;
   transition: background .12s;
-  min-width: 130px;
+  min-width: 95px;
 }
 .svc-cell:hover { background: #dfe7f5; }
 .svc-cell--on { background: var(--rom-accent-bg); border-color: var(--rom-accent); }
