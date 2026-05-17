@@ -316,7 +316,7 @@
                               @change="rom.updateTraveler(entity.id, trip.id, tr.id, { hotel: $event.target.checked })" />
                             <span class="svc-cost">{{ tr.hotel ? fmt(hotelCost(trip, tr)) : '—' }}</span>
                             <button v-if="tr.hotel" class="breakdown-btn"
-                              @click.stop.prevent="openBreakdown = { entityId: entity.id, trip, tr }"
+                              @click.stop.prevent="openBreakdownAt($event, entity.id, trip, tr)"
                               title="View day-by-day breakdown">
                               <i class="ti ti-info-circle"></i>
                             </button>
@@ -441,7 +441,7 @@
 
     <!-- Hotel / M&IE day-by-day breakdown popup -->
     <div v-if="openBreakdown" class="breakdown-overlay" @click.self="openBreakdown = null">
-      <div class="breakdown-card">
+      <div class="breakdown-card" :style="openBreakdown.style">
         <div class="breakdown-header">
           <span class="breakdown-title">Hotel &amp; M&amp;IE Breakdown</span>
           <button class="breakdown-close" @click="openBreakdown = null">×</button>
@@ -506,7 +506,20 @@ const currentMonth = new Date().toLocaleString('en-US', { month: 'short' })
 
 const gsaError      = reactive({})
 const stateCities   = reactive({})
-const openBreakdown = ref(null)   // { entityId, trip, tr } when popup is open
+const openBreakdown = ref(null)   // { entityId, trip, tr, style } when popup is open
+
+function openBreakdownAt(evt, entityId, trip, tr) {
+  const btn  = evt.currentTarget
+  const rect = btn.getBoundingClientRect()
+  const cardW = 420
+  const margin = 8
+  // Anchor to upper-right of the svc-cell: align right edge of card with right edge of button, just below it
+  let right = window.innerWidth - rect.right - margin
+  let top   = rect.bottom + margin
+  // Clamp so card stays on screen
+  right = Math.max(margin, Math.min(right, window.innerWidth - cardW - margin))
+  openBreakdown.value = { entityId, trip, tr, style: { position: 'fixed', top: top + 'px', right: right + 'px' } }
+}
 
 // ── US States list ───────────────────────────────────────────────────
 const US_STATES = [
@@ -1218,8 +1231,6 @@ onMounted(() => {
 /* ─── Breakdown popup overlay & card ──────────────────────────── */
 .breakdown-overlay {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0,0,0,.35);
-  display: flex; align-items: center; justify-content: center;
 }
 .breakdown-card {
   background: var(--rom-surface);
@@ -1227,8 +1238,9 @@ onMounted(() => {
   border-radius: 10px;
   box-shadow: 0 8px 32px rgba(0,0,0,.18);
   padding: 20px 24px;
-  min-width: 380px; max-width: 540px; width: 100%;
+  width: 420px;
   display: flex; flex-direction: column; gap: 16px;
+  position: fixed;
 }
 .breakdown-header {
   display: flex; align-items: center; justify-content: space-between;
