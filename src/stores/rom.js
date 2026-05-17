@@ -994,10 +994,9 @@ export const useRomStore = defineStore('rom', () => {
     const days = Math.max(0, tr.days || 0)
     let c = 0
     if (tr.hotel) {
-      const nights  = Math.max(0, days - 1)
       const lodging = travelerRate(trip, tr, 'lodgingRate', 'lodgingRate')
       const mie     = travelerRate(trip, tr, 'mieRate', 'mieRate')
-      c += lodging * nights
+      c += lodging * days
       // First & last day rule (GSA): first and last day of travel = 75% M&IE.
       // Enabled by default (firstLastDay ?? true). Uncheck to use full rates.
       const useFLD = (tr.firstLastDay ?? true) && days > 0

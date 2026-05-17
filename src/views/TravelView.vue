@@ -440,7 +440,7 @@
     </div>
 
     <!-- Hotel / M&IE day-by-day breakdown popup -->
-    <div v-if="openBreakdown" class="breakdown-overlay" @click.self="openBreakdown = null">
+    <div v-if="openBreakdown && bdTrip && bdTr" class="breakdown-overlay" @click.self="openBreakdown = null">
       <div class="breakdown-card" :style="openBreakdown.style">
         <div class="breakdown-header">
           <span class="breakdown-title">Hotel &amp; M&amp;IE Breakdown</span>
@@ -457,14 +457,14 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in breakdownDays(openBreakdown.trip, openBreakdown.tr)" :key="row.day"
+            <tr v-for="row in breakdownDays(bdTrip, bdTr)" :key="row.day"
                 :class="{ 'bd-row--part': row.partial }">
               <td class="bd-day">{{ row.label }}</td>
               <td class="bd-num">
                 {{ fmt(row.mie) }}
                 <span v-if="row.partial" class="bd-pct">75%</span>
               </td>
-              <td class="bd-num">{{ row.lodging > 0 ? fmt(row.lodging) : '—' }}</td>
+              <td class="bd-num">{{ fmt(row.lodging) }}</td>
               <td class="bd-num bd-day-total">{{ fmt(row.mie + row.lodging) }}</td>
             </tr>
           </tbody>
@@ -472,20 +472,20 @@
             <tr class="bd-subtotal">
               <td>Per traveler</td>
               <td class="bd-num" colspan="2"></td>
-              <td class="bd-num">{{ fmt(breakdownDays(openBreakdown.trip, openBreakdown.tr).reduce((s,r) => s + r.mie + r.lodging, 0)) }}</td>
+              <td class="bd-num">{{ fmt(breakdownDays(bdTrip, bdTr).reduce((s,r) => s + r.mie + r.lodging, 0)) }}</td>
             </tr>
-            <tr v-if="(openBreakdown.tr.qty || 1) > 1" class="bd-total">
-              <td>Total (× {{ openBreakdown.tr.qty }} travelers)</td>
+            <tr v-if="(bdTr.qty || 1) > 1" class="bd-total">
+              <td>Total (× {{ bdTr.qty }} travelers)</td>
               <td class="bd-num" colspan="2"></td>
-              <td class="bd-num">{{ fmt(hotelCost(openBreakdown.trip, openBreakdown.tr)) }}</td>
+              <td class="bd-num">{{ fmt(hotelCost(bdTrip, bdTr)) }}</td>
             </tr>
           </tfoot>
         </table>
 
         <label class="fld-checkbox">
           <input type="checkbox"
-            :checked="openBreakdown.tr.firstLastDay ?? true"
-            @change="rom.updateTraveler(openBreakdown.entityId, openBreakdown.trip.id, openBreakdown.tr.id, { firstLastDay: $event.target.checked })" />
+            :checked="bdTr.firstLastDay ?? true"
+            @change="rom.updateTraveler(openBreakdown.entityId, bdTrip.id, bdTr.id, { firstLastDay: $event.target.checked })" />
           Apply first &amp; last day travel rule <span class="fld-hint">(75% M&amp;IE on travel days)</span>
         </label>
       </div>
@@ -506,19 +506,28 @@ const currentMonth = new Date().toLocaleString('en-US', { month: 'short' })
 
 const gsaError      = reactive({})
 const stateCities   = reactive({})
-const openBreakdown = ref(null)   // { entityId, trip, tr, style } when popup is open
+const openBreakdown = ref(null)   // { entityId, tripId, travelerId, style } when popup is open
+
+// Always look up the live store objects so the popup reacts to changes (e.g. firstLastDay checkbox)
+const bdTrip = computed(() => {
+  if (!openBreakdown.value) return null
+  const { entityId, tripId } = openBreakdown.value
+  return (rom.travel[entityId] ?? []).find(t => t.id === tripId) ?? null
+})
+const bdTr = computed(() => {
+  if (!bdTrip.value) return null
+  return (bdTrip.value.travelers ?? []).find(t => t.id === openBreakdown.value.travelerId) ?? null
+})
 
 function openBreakdownAt(evt, entityId, trip, tr) {
   const btn  = evt.currentTarget
   const rect = btn.getBoundingClientRect()
   const cardW = 420
   const margin = 8
-  // Anchor to upper-right of the svc-cell: align right edge of card with right edge of button, just below it
   let right = window.innerWidth - rect.right - margin
   let top   = rect.bottom + margin
-  // Clamp so card stays on screen
   right = Math.max(margin, Math.min(right, window.innerWidth - cardW - margin))
-  openBreakdown.value = { entityId, trip, tr, style: { position: 'fixed', top: top + 'px', right: right + 'px' } }
+  openBreakdown.value = { entityId, tripId: trip.id, travelerId: tr.id, style: { position: 'fixed', top: top + 'px', right: right + 'px' } }
 }
 
 // ── US States list ───────────────────────────────────────────────────
@@ -584,7 +593,7 @@ function breakdownDays(trip, tr) {
     const isLast  = i === days && days > 1
     const partial = useFLD && (isFirst || isLast)
     const mieAmt  = partial ? mie * 0.75 : mie
-    const lodgingAmt = i < days ? lodging : 0
+    const lodgingAmt = lodging
     let label = `Day ${i}`
     if (isFirst && days > 1) label += ' — First'
     if (isLast)              label += ' — Last'
@@ -615,8 +624,7 @@ function effMisc(trip, tr)    { return tr.miscRate    != null ? tr.miscRate    :
 function hotelCost(trip, tr) {
   const qty    = Math.max(1, tr.qty || 1)
   const days   = Math.max(0, tr.days || 0)
-  const nights = Math.max(0, days - 1)
-  return qty * (effLodging(trip, tr) * nights + effMie(trip, tr) * days)
+  return qty * (effLodging(trip, tr) * days + effMie(trip, tr) * days)
 }
 function carCost(trip, tr) {
   const qty  = Math.max(1, tr.qty || 1)
