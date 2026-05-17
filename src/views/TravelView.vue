@@ -315,6 +315,11 @@
                             <input type="checkbox" :checked="tr.hotel"
                               @change="rom.updateTraveler(entity.id, trip.id, tr.id, { hotel: $event.target.checked })" />
                             <span class="svc-cost">{{ tr.hotel ? fmt(hotelCost(trip, tr)) : '—' }}</span>
+                            <button v-if="tr.hotel" class="breakdown-btn"
+                              @click.stop.prevent="openBreakdown = { entityId: entity.id, trip, tr }"
+                              title="View day-by-day breakdown">
+                              <i class="ti ti-info-circle"></i>
+                            </button>
                           </label>
                           <div v-if="tr.hotel" class="svc-rate-row">
                             <input type="number" min="0" step="1"
@@ -433,11 +438,64 @@
         </div>
       </div>
     </div>
+
+    <!-- Hotel / M&IE day-by-day breakdown popup -->
+    <div v-if="openBreakdown" class="breakdown-overlay" @click.self="openBreakdown = null">
+      <div class="breakdown-card">
+        <div class="breakdown-header">
+          <span class="breakdown-title">Hotel &amp; M&amp;IE Breakdown</span>
+          <button class="breakdown-close" @click="openBreakdown = null">×</button>
+        </div>
+
+        <table class="breakdown-table">
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th class="bd-num">M&amp;IE</th>
+              <th class="bd-num">Lodging</th>
+              <th class="bd-num">Daily Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in breakdownDays(openBreakdown.trip, openBreakdown.tr)" :key="row.day"
+                :class="{ 'bd-row--part': row.partial }">
+              <td class="bd-day">{{ row.label }}</td>
+              <td class="bd-num">
+                {{ fmt(row.mie) }}
+                <span v-if="row.partial" class="bd-pct">75%</span>
+              </td>
+              <td class="bd-num">{{ row.lodging > 0 ? fmt(row.lodging) : '—' }}</td>
+              <td class="bd-num bd-day-total">{{ fmt(row.mie + row.lodging) }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="bd-subtotal">
+              <td>Per traveler</td>
+              <td class="bd-num" colspan="2"></td>
+              <td class="bd-num">{{ fmt(breakdownDays(openBreakdown.trip, openBreakdown.tr).reduce((s,r) => s + r.mie + r.lodging, 0)) }}</td>
+            </tr>
+            <tr v-if="(openBreakdown.tr.qty || 1) > 1" class="bd-total">
+              <td>Total (× {{ openBreakdown.tr.qty }} travelers)</td>
+              <td class="bd-num" colspan="2"></td>
+              <td class="bd-num">{{ fmt(hotelCost(openBreakdown.trip, openBreakdown.tr)) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <label class="fld-checkbox">
+          <input type="checkbox"
+            :checked="openBreakdown.tr.firstLastDay ?? true"
+            @change="rom.updateTraveler(openBreakdown.entityId, openBreakdown.trip.id, openBreakdown.tr.id, { firstLastDay: $event.target.checked })" />
+          Apply first &amp; last day travel rule <span class="fld-hint">(75% M&amp;IE on travel days)</span>
+        </label>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, onMounted } from 'vue'
+import { computed, reactive, ref, onMounted } from 'vue'
 import { useRomStore } from '../stores/rom'
 import SearchSelect from '../components/SearchSelect.vue'
 
@@ -446,8 +504,9 @@ const rom = useRomStore()
 const MONTHS       = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep']
 const currentMonth = new Date().toLocaleString('en-US', { month: 'short' })
 
-const gsaError    = reactive({})
-const stateCities = reactive({})   // local cache of cities built from gsaRateMap per state
+const gsaError      = reactive({})
+const stateCities   = reactive({})
+const openBreakdown = ref(null)   // { entityId, trip, tr } when popup is open
 
 // ── US States list ───────────────────────────────────────────────────
 const US_STATES = [
@@ -499,6 +558,27 @@ const totalPersons = computed(() =>
 const totalHours   = computed(() =>
   allTrips.value.reduce((s, t) => s + (t.travelers || []).reduce(
     (a, tr) => a + (tr.travelHours ?? t.defaultTravelHours ?? 0) * (tr.qty || 1), 0), 0))
+
+// Per-day M&IE + lodging breakdown for the popup
+function breakdownDays(trip, tr) {
+  const days    = Math.max(0, tr.days || 0)
+  const mie     = effMie(trip, tr)
+  const lodging = effLodging(trip, tr)
+  const useFLD  = (tr.firstLastDay ?? true) && days > 0
+  const rows    = []
+  for (let i = 1; i <= days; i++) {
+    const isFirst = i === 1
+    const isLast  = i === days && days > 1
+    const partial = useFLD && (isFirst || isLast)
+    const mieAmt  = partial ? mie * 0.75 : mie
+    const lodgingAmt = i < days ? lodging : 0
+    let label = `Day ${i}`
+    if (isFirst && days > 1) label += ' — First'
+    if (isLast)              label += ' — Last'
+    rows.push({ day: i, label, mie: mieAmt, lodging: lodgingAmt, partial })
+  }
+  return rows
+}
 
 function tripLaborTotal(trip) {
   return (trip.travelers || []).reduce((s, tr) => s + rom.travelLaborCost(tr), 0)
@@ -1136,4 +1216,83 @@ onMounted(() => {
   font-size: 18px; font-weight: 800;
   color: var(--rom-accent-dark);
 }
+
+/* ─── Breakdown info button ────────────────────────────────────── */
+.breakdown-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; margin-left: 4px;
+  border: none; background: transparent; padding: 0;
+  color: var(--rom-text-faint); cursor: pointer; font-size: 13px;
+  border-radius: 3px; flex-shrink: 0;
+  transition: color .12s;
+}
+.breakdown-btn:hover { color: var(--rom-accent); }
+
+/* ─── Breakdown popup overlay & card ──────────────────────────── */
+.breakdown-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.35);
+  display: flex; align-items: center; justify-content: center;
+}
+.breakdown-card {
+  background: var(--rom-surface);
+  border: 1px solid var(--rom-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  padding: 20px 24px;
+  min-width: 380px; max-width: 540px; width: 100%;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.breakdown-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.breakdown-title {
+  font-size: 14px; font-weight: 700; color: var(--rom-text);
+}
+.breakdown-close {
+  background: none; border: none; font-size: 18px; cursor: pointer;
+  color: var(--rom-text-muted); line-height: 1; padding: 0 4px;
+}
+.breakdown-close:hover { color: var(--rom-danger); }
+
+/* Day-by-day table */
+.breakdown-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.breakdown-table th {
+  text-align: left; padding: 5px 8px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--rom-text-muted); border-bottom: 2px solid var(--rom-border);
+}
+.breakdown-table td {
+  padding: 6px 8px; border-bottom: 1px solid var(--rom-border);
+  color: var(--rom-text);
+}
+.bd-num { text-align: right; font-variant-numeric: tabular-nums; }
+.bd-day { color: var(--rom-text-muted); font-size: 12px; }
+.bd-pct {
+  font-size: 9px; font-weight: 700; margin-left: 4px;
+  padding: 1px 4px; border-radius: 3px;
+  background: var(--rom-accent-bg); color: var(--rom-accent-dark);
+}
+.bd-row--part .bd-day { font-style: italic; }
+.bd-day-total { font-weight: 700; }
+.bd-subtotal td { background: var(--rom-surface-alt); font-weight: 600; padding-top: 8px; }
+.bd-total td {
+  background: var(--rom-accent-bg); font-weight: 700;
+  color: var(--rom-accent-dark); border-bottom: none;
+}
+
+/* First/last day checkbox */
+.fld-checkbox {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 500; color: var(--rom-text);
+  cursor: pointer;
+  padding: 10px 12px;
+  background: var(--rom-surface-alt);
+  border: 1px solid var(--rom-border);
+  border-radius: 6px;
+}
+.fld-checkbox input[type="checkbox"] { accent-color: var(--rom-accent); width: 15px; height: 15px; cursor: pointer; }
+.fld-hint { font-size: 11px; color: var(--rom-text-muted); font-weight: 400; margin-left: 2px; }
 </style>

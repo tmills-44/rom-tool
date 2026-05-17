@@ -973,10 +973,20 @@ export const useRomStore = defineStore('rom', () => {
     const days = Math.max(0, tr.days || 0)
     let c = 0
     if (tr.hotel) {
-      // Lodging + M&IE per day. Lodging multiplied by nights (days-1) so a 1-day trip is M&IE only.
-      const nights = Math.max(0, days - 1)
-      c += travelerRate(trip, tr, 'lodgingRate', 'lodgingRate') * nights
-      c += travelerRate(trip, tr, 'mieRate',     'mieRate')     * days
+      const nights  = Math.max(0, days - 1)
+      const lodging = travelerRate(trip, tr, 'lodgingRate', 'lodgingRate')
+      const mie     = travelerRate(trip, tr, 'mieRate', 'mieRate')
+      c += lodging * nights
+      // First & last day rule (GSA): first and last day of travel = 75% M&IE.
+      // Enabled by default (firstLastDay ?? true). Uncheck to use full rates.
+      const useFLD = (tr.firstLastDay ?? true) && days > 0
+      if (useFLD) {
+        const middleDays = Math.max(0, days - 2)
+        const partDays   = days === 1 ? 1 : 2   // just "first" when 1-day trip
+        c += mie * (middleDays + partDays * 0.75)
+      } else {
+        c += mie * days
+      }
     }
     if (tr.car)     c += travelerRate(trip, tr, 'carRate',     'defaultCarRate')     * days
     if (tr.airfare) c += travelerRate(trip, tr, 'airfareRate', 'defaultAirfareRate')
@@ -1070,7 +1080,7 @@ export const useRomStore = defineStore('rom', () => {
       qty: 1,
       days: 0,
       travelHours: trip.defaultTravelHours ?? 4,
-      hotel: false, car: false, airfare: false, misc: false,
+      hotel: false, car: false, airfare: false, misc: false, firstLastDay: true,
       // Per-row rate overrides — initialized from trip defaults at create time.
       // Editing these per row sticks for that row; changes to trip defaults
       // only affect new travelers added after the change (matches Labor pattern).
