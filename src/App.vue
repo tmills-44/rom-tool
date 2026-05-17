@@ -322,6 +322,7 @@
       <span class="stat">Overhead <strong>{{ fmtCompact(rom.totalOverhead) }}</strong></span>
       <span class="stat stat-loaded">Loaded total <strong>{{ fmt(rom.totalLoadedCost) }}</strong></span>
       <span class="stat stat-saved"><i class="ti ti-device-floppy" aria-hidden="true"></i> Auto-saved</span>
+      <span class="stat stat-build">build {{ BUILD }}</span>
     </footer>
 
     </div><!-- /.main-col -->
@@ -413,6 +414,7 @@ import MaterialView from './views/MaterialView.vue'
 import OverheadView from './views/OverheadView.vue'
 import SummaryView from './views/SummaryView.vue'
 import AdminView from './views/AdminView.vue'
+import { BUILD } from './buildNumber.js'
 
 const rom = useRomStore()
 
@@ -1437,6 +1439,7 @@ body {
 .stat-loaded { font-size: 12px; font-weight: 500; }
 .stat-loaded strong { color: #7dd3fc; font-size: 13px; }
 .stat-saved { opacity: .5; font-size: 10px; }
+.stat-build { opacity: .35; font-size: 10px; font-variant-numeric: tabular-nums; margin-left: auto; }
 
 /* ─── Modal backdrop ─────────────────────────────────────────────── */
 .modal-backdrop {
