@@ -38,7 +38,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -80,15 +80,21 @@ function onFocus() {
   nextTick(() => inputEl.value?.select())
 }
 
+let blurTimer = null
 function onBlur() {
-  // Short delay so mousedown on option fires first
-  setTimeout(() => {
+  // Increased to 200ms (from 150ms) to give more margin on slow systems.
+  // The timer is tracked so it can be cleared if the component unmounts.
+  blurTimer = setTimeout(() => {
+    blurTimer = null
     open.value = false
     // Restore the label for the current value (in case user typed partial text)
     const match = normalized.value.find(o => o.value === props.modelValue)
     query.value = match?.label ?? ''
-  }, 150)
+  }, 200)
 }
+
+// Clear any pending blur timer on unmount to avoid setting state on a dead component
+onUnmounted(() => { if (blurTimer) clearTimeout(blurTimer) })
 
 function toggleOpen() {
   if (open.value) { close() } else { inputEl.value?.focus() }

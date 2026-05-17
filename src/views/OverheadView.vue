@@ -408,13 +408,13 @@ function placeholderFor(idx) {
 .oh-section--off { opacity: 0.55; }
 .oh-section--off .oh-row:hover { background: transparent; }
 
-/* Contract Fee summary row */
-.oh-row--fee {
-  background: var(--rom-header-bg) !important;
+/* Contract Fee summary row — higher specificity avoids needing !important */
+.oh-section .oh-row--fee {
+  background: var(--rom-header-bg);
   border-top: 2px solid var(--rom-accent);
   padding-top: 14px; padding-bottom: 14px;
 }
-.oh-row--fee:hover { background: var(--rom-header-bg) !important; }
+.oh-section .oh-row--fee:hover { background: var(--rom-header-bg); }
 .oh-fee-label { font-size: 14px; color: #fff; text-transform: uppercase; letter-spacing: .06em; }
 .oh-fee-hint  { font-size: 11px; color: rgba(255,255,255,.6); font-style: italic; }
 .oh-computed--fee {

@@ -32,7 +32,8 @@
       <select
         id="baseline-template-select"
         class="baseline-picker-select"
-        v-model="baselineDropdownValue"
+        :value="rom.material.activeTemplate"
+        @change="pickClass(rom.MATERIAL_TEMPLATES.find(t => t.id === $event.target.value))"
       >
         <option v-for="t in rom.MATERIAL_TEMPLATES" :key="t.id" :value="t.id">
           {{ t.label }}
@@ -333,7 +334,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRomStore } from '../stores/rom'
 
 const rom = useRomStore()
@@ -379,20 +380,11 @@ function fmt(n) {
   return '$' + Math.round(n || 0).toLocaleString()
 }
 
-// v-model binding for the baseline-template dropdown. Getter returns the
-// store's active template id; setter routes through pickClass which gates
-// destructive actions behind confirm() dialogs. If the user cancels, the
-// setter doesn't update the store, so the next render syncs the <select>
-// back to the previous value automatically.
-const baselineDropdownValue = computed({
-  get: () => rom.material.activeTemplate,
-  set: (newId) => {
-    const t = rom.MATERIAL_TEMPLATES.find(t => t.id === newId)
-    pickClass(t)
-  },
-})
+// Add a watch so the BOM expand state clears intentionally on scope switch,
+// preventing stale IDs from a previous scope persisting in the set.
+watch(() => rom.activeCoaId, () => { expandedItemIds.value = new Set() })
 
-// Handler invoked by the dropdown setter. Picking a class (A-D) loads
+// Handler invoked by the baseline dropdown @change. Picking a class (A-D) loads
 // that class's MEL into the active scope. Picking "Custom (empty)" wipes
 // the WHOLE TOOL (every scope's BOM, engineering, travel, project info,
 // overhead) — effectively a "start from scratch" button.

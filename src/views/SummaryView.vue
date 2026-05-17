@@ -45,9 +45,10 @@
         <thead>
           <tr>
             <th class="col-label">Line item</th>
-            <th v-for="c in includedScopes" :key="c.id" class="amt col-scope">
+            <th v-for="c in includedScopes" :key="c.id" class="amt col-scope" :class="{ 'col-scope--zero': rom.coaTotals(c.id).totalLoaded === 0 }">
               <div>{{ c.name.split(' — ')[0] || c.name }}</div>
               <div class="th-sub" v-if="c.name.includes(' — ')">{{ c.name.split(' — ').slice(1).join(' — ') }}</div>
+              <div v-if="rom.coaTotals(c.id).totalLoaded === 0" class="th-zero-badge">$0 — empty</div>
             </th>
             <th class="amt col-total">Total</th>
             <th class="amt col-pct">% loaded</th>
@@ -132,9 +133,9 @@
           <!-- Grand row -->
           <tr class="break-grand-row">
             <td>Loaded total</td>
-            <td v-for="c in includedScopes" :key="c.id" class="amt">{{ fmt(rom.coaTotals(c.id).totalLoaded) }}</td>
+            <td v-for="c in includedScopes" :key="c.id" class="amt" :class="{ 'col-scope--zero': rom.coaTotals(c.id).totalLoaded === 0 }">{{ fmt(rom.coaTotals(c.id).totalLoaded) }}</td>
             <td class="amt col-total">{{ fmt(rom.totalLoadedForQuote) }}</td>
-            <td class="amt col-pct col-pct--grand">100%</td>
+            <td class="amt col-pct col-pct--grand">{{ pct(rom.totalLoadedForQuote) }}</td>
           </tr>
 
         </tbody>
@@ -271,5 +272,15 @@ function fmt(n) { return n ? '$' + Math.round(n).toLocaleString() : '—' }
   min-width: 70px;
 }
 .col-pct--grand { color: #fff; font-weight: 700; font-size: 14px; }
+
+/* Empty ($0) scope column — muted/italic to signal it has no data */
+.col-scope--zero { opacity: 0.55; font-style: italic; }
+.th-zero-badge {
+  margin-top: 3px;
+  font-size: 9px; font-weight: 600;
+  color: var(--rom-text-faint);
+  text-transform: uppercase; letter-spacing: .04em;
+  font-style: normal;
+}
 
 </style>

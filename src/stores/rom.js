@@ -2044,6 +2044,9 @@ export const useRomStore = defineStore('rom', () => {
     localStorage.removeItem(STORAGE_KEY)
   }
 
+  // Tracks whether the last auto-save failed (e.g. localStorage quota exceeded)
+  const saveError = ref(false)
+
   watch([project, wbs, lineItems, travel, material, overheadByCoa, enabledEntities, selectedTabId, gsaRateMap, laborCats, showRates, showRowStatus, coas, activeCoaId], () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -2058,7 +2061,11 @@ export const useRomStore = defineStore('rom', () => {
         coas: deepClone(coas),
         activeCoaId: activeCoaId.value,
       }))
-    } catch {}
+      saveError.value = false
+    } catch {
+      // localStorage quota exceeded or unavailable — flag it so the UI can warn
+      saveError.value = true
+    }
   }, { deep: true })
 
   return {
@@ -2098,5 +2105,6 @@ export const useRomStore = defineStore('rom', () => {
     oconusMap, oconusCountries, oconusByCountry, loadOCONUSRates, lookupOCONUSRate,
     addTravelLine, updateTravelLine, removeTravelLine,
     snapshots, saveSnapshot, restoreSnapshot, deleteSnapshot,
+    saveError,
   }
 })

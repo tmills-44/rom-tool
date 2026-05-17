@@ -80,7 +80,7 @@
             <button class="btn btn-save btn-save--main" @click="downloadQuoteFile" data-tooltip="Save quote to file">
               <i class="ti ti-device-floppy" aria-hidden="true"></i> Save
             </button>
-            <button class="btn btn-save btn-save--caret" @click="saveMenuOpen = !saveMenuOpen" title="Save / load options" :aria-expanded="saveMenuOpen">
+            <button class="btn btn-save btn-save--caret" @click="saveMenuOpen = !saveMenuOpen" title="More save options" data-tooltip="More save options" :aria-expanded="saveMenuOpen">
               <i class="ti ti-chevron-down" aria-hidden="true"></i>
             </button>
             <div v-if="saveMenuOpen" class="save-menu">
@@ -321,7 +321,8 @@
       <span class="stat">Material <strong>{{ fmtCompact(rom.materialTotal) }}</strong></span>
       <span class="stat">Overhead <strong>{{ fmtCompact(rom.totalOverhead) }}</strong></span>
       <span class="stat stat-loaded">Loaded total <strong>{{ fmt(rom.totalLoadedCost) }}</strong></span>
-      <span class="stat stat-saved"><i class="ti ti-device-floppy" aria-hidden="true"></i> Auto-saved</span>
+      <span v-if="rom.saveError" class="stat stat-save-error" title="Auto-save failed — storage quota may be exceeded"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Save failed</span>
+      <span v-else class="stat stat-saved"><i class="ti ti-device-floppy" aria-hidden="true"></i> Auto-saved</span>
     </footer>
 
     </div><!-- /.main-col -->
@@ -562,8 +563,11 @@ const validationWarnings = computed(() => {
 function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 function fmtCompact(n) {
   if (!n) return '$0'
+  // Handle negative numbers
+  if (n < 0) return '-$' + fmtCompact(Math.abs(n)).slice(1)
   if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M'
   if (n >= 1_000)     return '$' + (n / 1_000).toFixed(1) + 'k'
+  // Values between 1 and 999 — no K suffix
   return '$' + Math.round(n)
 }
 
@@ -847,6 +851,14 @@ function doReset() {
 
 /* Small inline pill colors that were tuned for light bg */
 :root[data-theme="dark"] .oh-info-pill--withoh { background: #3a2d12; color: #fac775; }
+
+/* Technician role colors — amber badge/chip in light, muted amber in dark */
+:root[data-theme="dark"] .role-badge--technician  { background: #3a2d12; color: #f5c97a; }
+:root[data-theme="dark"] .role-chip--technician.active { background: #b8860b; border-color: #b8860b; }
+:root[data-theme="dark"] .role-pick-btn--technician { border-color: #b8860b; color: #f5c97a; background: #3a2d12; }
+:root[data-theme="dark"] .role-pick-btn--technician:hover { background: #b8860b; }
+:root[data-theme="dark"] .role-pill--technician  { background: #3a2d12; color: #f5c97a; }
+:root[data-theme="dark"] .role-select--technician { background: #3a2d12; color: #f5c97a; }
 
 /* Travel service-block "MIE" row also uses an alt surface */
 :root[data-theme="dark"] .service-block--mie { background: #243049; }
@@ -1438,6 +1450,7 @@ body {
 .stat-loaded { font-size: 12px; font-weight: 500; }
 .stat-loaded strong { color: #7dd3fc; font-size: 13px; }
 .stat-saved { opacity: .5; font-size: 10px; }
+.stat-save-error { font-size: 10px; color: #f5a623; opacity: .9; }
 .stat-build { opacity: .35; font-size: 10px; font-variant-numeric: tabular-nums; margin-left: auto; }
 
 /* ─── Modal backdrop ─────────────────────────────────────────────── */

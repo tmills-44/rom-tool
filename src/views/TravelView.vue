@@ -641,9 +641,6 @@ function onOconusLocationSelect(entityId, trip, location) {
 }
 
 
-// Travel month is no longer user-selectable — the app always uses the peak (most expensive)
-// month's lodging rate so quotes are conservative. peakMonth/monthLabel/onMonthChange removed.
-
 // ── On mount: pre-fetch city lists for states already on trips ────────
 onMounted(() => {
   const statesToFetch = new Set()

@@ -251,6 +251,7 @@
                           :value="parseFloat((line.days || 0).toFixed(1))"
                           class="cell-num"
                           @change="onDaysChange(line, $event)"
+                          @input="e => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 365) { e.target.value = 365; onDaysChange(line, { target: { value: '365' } }) } }"
                         />
                       </td>
 
@@ -480,14 +481,14 @@ function visibleLines(eid, pid) {
 }
 
 // Per-row completeness — 'complete' | 'partial' | 'empty'
+// Only cost-relevant fields (days, hoursPerDay, rate) determine partial/complete.
+// Role and task labels are descriptive only and do not affect the status.
 function lineStatus(line) {
-  const hasCat   = !!line.laborCat
-  const hasTask  = !!line.taskId
   const hasDays  = (line.days || 0) > 0
   const hasHrs   = (line.hoursPerDay || 0) > 0
   const hasRate  = (line.rate || 0) > 0
-  const filled = [hasCat, hasTask, hasDays, hasHrs, hasRate].filter(Boolean).length
-  if (filled === 5) return 'complete'
+  const filled = [hasDays, hasHrs, hasRate].filter(Boolean).length
+  if (filled === 3) return 'complete'
   if (filled === 0) return 'empty'
   return 'partial'
 }

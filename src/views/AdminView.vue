@@ -408,7 +408,9 @@ import { useRomStore } from '../stores/rom'
 
 const rom = useRomStore()
 
-const ADMIN_PASSWORD = '8888'
+// Admin password — can be overridden at build time via the VITE_ADMIN_PASSWORD env variable.
+// Set VITE_ADMIN_PASSWORD=yourpassword in your .env file to use a custom password.
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '8888'
 const UNLOCK_KEY = 'rom-admin-unlocked'
 
 const unlocked  = ref(sessionStorage.getItem(UNLOCK_KEY) === '1')
@@ -594,11 +596,11 @@ function focusNewTaskInput() {
 }
 
 function resetRates() {
-  if (!confirm('Reset all labor-category rates to factory defaults? Existing line items keep their current rates.')) return
+  if (!confirm('Reset all labor rates and categories to factory defaults?\n\nExisting line items keep their current rates — only the dropdown defaults are restored.')) return
   rom.resetLaborCats()
 }
 function resetWbs() {
-  if (!confirm('Reset the entire task list to factory defaults? This removes any custom tasks you added.')) return
+  if (!confirm('Reset all WBS phase/task structure to factory defaults?\n\nThis removes any custom tasks you added. Engineering line items that reference custom tasks will keep their saved taskId text, but those tasks will no longer appear in the dropdown.')) return
   rom.resetWbs()
 }
 </script>

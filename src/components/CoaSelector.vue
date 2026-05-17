@@ -111,8 +111,8 @@ function pick(id) {
 function startEdit(id) {
   editingId.value = id
   nextTick(() => {
-    // Focus the input once it's rendered
-    const el = Array.isArray(editInput.value) ? editInput.value[0] : editInput.value
+    // Focus the input once it's rendered — editInput is a single ref(null)
+    const el = editInput.value
     if (el) { el.focus(); el.select?.() }
   })
 }

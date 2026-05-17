@@ -79,7 +79,7 @@
             </div>
             <div class="row-info">
               <div class="row-name">{{ snap.name }}</div>
-              <div class="row-desc">{{ formatDate(snap.date) }}<template v-if="snapTotal(snap)"> · {{ snapTotal(snap) }}</template></div>
+              <div class="row-desc">{{ formatDate(snap.date) }}<template v-if="snapTotal(snap) != null"> · {{ snapTotal(snap) }}</template></div>
             </div>
             <i class="ti ti-chevron-right row-chev" aria-hidden="true"></i>
           </button>
@@ -137,8 +137,8 @@ function snapTotal(snap) {
   try {
     const lines = snap.state?.lineItems ?? []
     const total = lines.reduce((s, l) => s + (l.days || 0) * (l.hoursPerDay || 0) * (l.rate || 0), 0)
-    return total ? '$' + Math.round(total).toLocaleString() + ' labor' : ''
-  } catch { return '' }
+    return total ? '$' + Math.round(total).toLocaleString() + ' labor' : null
+  } catch { return null }
 }
 
 function formatDate(iso) {
