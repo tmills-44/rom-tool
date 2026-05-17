@@ -461,8 +461,10 @@
                 :class="{ 'bd-row--part': row.partial }">
               <td class="bd-day">{{ row.label }}</td>
               <td class="bd-num">
-                {{ fmt(row.mie) }}
-                <span v-if="row.partial" class="bd-pct">75%</span>
+                <span class="bd-mie-wrap">
+                  <span v-if="row.partial" class="bd-pct">75%</span>
+                  <span>{{ fmt(row.mie) }}</span>
+                </span>
               </td>
               <td class="bd-num">{{ fmt(row.lodging) }}</td>
               <td class="bd-num bd-day-total">{{ fmt(row.mie + row.lodging) }}</td>
@@ -520,13 +522,24 @@ const bdTr = computed(() => {
 })
 
 function openBreakdownAt(evt, entityId, trip, tr) {
-  const btn  = evt.currentTarget
-  const rect = btn.getBoundingClientRect()
-  const cardW = 420
+  const btn    = evt.currentTarget
+  const rect   = btn.getBoundingClientRect()
+  const cardW  = 420
   const margin = 8
+  const estH   = 440  // estimated card height — used to decide whether to flip above
+
+  // Horizontal: align right edge of card to right edge of button
   let right = window.innerWidth - rect.right - margin
-  let top   = rect.bottom + margin
   right = Math.max(margin, Math.min(right, window.innerWidth - cardW - margin))
+
+  // Vertical: open below unless that would clip the bottom; then flip above
+  let top
+  if (rect.bottom + estH + margin > window.innerHeight) {
+    top = Math.max(margin, rect.top - estH - margin)
+  } else {
+    top = rect.bottom + margin
+  }
+
   openBreakdown.value = { entityId, tripId: trip.id, travelerId: tr.id, style: { position: 'fixed', top: top + 'px', right: right + 'px' } }
 }
 
@@ -1248,6 +1261,8 @@ onMounted(() => {
   box-shadow: 0 8px 32px rgba(0,0,0,.18);
   padding: 20px 24px;
   width: 420px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   display: flex; flex-direction: column; gap: 16px;
   position: fixed;
 }
@@ -1277,9 +1292,10 @@ onMounted(() => {
   color: var(--rom-text);
 }
 .bd-num { text-align: right; font-variant-numeric: tabular-nums; }
+.bd-mie-wrap { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; width: 100%; }
 .bd-day { color: var(--rom-text-muted); font-size: 12px; }
 .bd-pct {
-  font-size: 9px; font-weight: 700; margin-left: 4px;
+  font-size: 9px; font-weight: 700; flex-shrink: 0;
   padding: 1px 4px; border-radius: 3px;
   background: var(--rom-accent-bg); color: var(--rom-accent-dark);
 }
