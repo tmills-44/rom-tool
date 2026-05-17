@@ -396,12 +396,20 @@
                 <button class="add-traveler-btn" @click="rom.addTraveler(entity.id, trip.id)">
                   <i class="ti ti-plus" aria-hidden="true"></i> Add traveler
                 </button>
-                <div class="trip-total-pill">
-                  <div v-if="tripLaborTotal(trip) > 0" class="trip-labor-line">
-                    <span class="trip-labor-label">Travel Labor</span>
-                    <span class="trip-labor-value">{{ fmt(tripLaborTotal(trip)) }}</span>
-                  </div>
-                  <div class="trip-grand-line">
+                <div class="trip-equation">
+                  <template v-if="tripLaborTotal(trip) > 0">
+                    <div class="trip-eq-block">
+                      <span class="trip-eq-label">Travel Labor</span>
+                      <span class="trip-eq-value">{{ fmt(tripLaborTotal(trip)) }}</span>
+                    </div>
+                    <span class="trip-eq-op">+</span>
+                    <div class="trip-eq-block">
+                      <span class="trip-eq-label">Travel</span>
+                      <span class="trip-eq-value">{{ fmt(rom.tripCost(trip) - tripLaborTotal(trip)) }}</span>
+                    </div>
+                    <span class="trip-eq-op">=</span>
+                  </template>
+                  <div class="trip-eq-block trip-eq-block--total">
                     <span class="trip-total-label">Trip Total</span>
                     <span class="trip-total-value">{{ fmt(rom.tripCost(trip)) }}</span>
                   </div>
@@ -1097,25 +1105,28 @@ onMounted(() => {
 }
 .add-traveler-btn:hover { background: var(--rom-accent-dark); border-color: var(--rom-accent-dark); }
 .add-traveler-btn .ti { font-size: 14px; }
-.trip-total-pill {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+.trip-equation {
+  display: flex; align-items: center; gap: 10px;
 }
-.trip-labor-line {
-  display: flex; align-items: baseline; gap: 8px;
+.trip-eq-block {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
 }
-.trip-labor-label {
+.trip-eq-label {
   font-size: 10px; font-weight: 600;
   color: var(--rom-text-muted);
   text-transform: uppercase; letter-spacing: .04em;
 }
-.trip-labor-value {
-  font-size: 13px; font-weight: 700;
-  color: var(--rom-text-muted);
+.trip-eq-value {
+  font-size: 14px; font-weight: 700;
+  color: var(--rom-text);
   font-variant-numeric: tabular-nums;
 }
-.trip-grand-line {
-  display: flex; align-items: baseline; gap: 8px;
+.trip-eq-op {
+  font-size: 16px; font-weight: 400;
+  color: var(--rom-text-muted);
+  padding-top: 12px;
 }
+.trip-eq-block--total { margin-left: 2px; }
 .trip-total-label {
   font-size: 11px; font-weight: 700;
   color: var(--rom-text-muted);
