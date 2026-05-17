@@ -803,7 +803,7 @@ export const useRomStore = defineStore('rom', () => {
     const c = laborCats.find(c => c.id === catId)
     if (!c) return
     const oldRate = c.defaultRate
-    c.defaultRate = +rate || 0
+    c.defaultRate = Math.max(0, Math.min(9999, +rate || 0))
     // Propagate to existing lines that still carry the old default (not manually overridden)
     lineItems.forEach(l => {
       if (l.laborCat === catId && l.rate === oldRate) l.rate = c.defaultRate
@@ -1116,7 +1116,14 @@ export const useRomStore = defineStore('rom', () => {
     const trip = (travel[entityId] ?? []).find(t => t.id === tripId)
     if (!trip || !Array.isArray(trip.travelers)) return
     const tr = trip.travelers.find(t => t.id === travelerId)
-    if (tr) Object.assign(tr, patch)
+    if (!tr) return
+    const RATE_FIELDS = ['lodgingRate', 'mieRate', 'carRate', 'airfareRate', 'miscRate']
+    RATE_FIELDS.forEach(f => {
+      if (patch[f] !== undefined) patch = { ...patch, [f]: Math.max(0, Math.min(99999, +patch[f] || 0)) }
+    })
+    if (patch.qty  !== undefined) patch = { ...patch, qty:  Math.max(1, Math.min(999, +patch.qty  || 1)) }
+    if (patch.days !== undefined) patch = { ...patch, days: Math.max(0, Math.min(365, +patch.days || 0)) }
+    Object.assign(tr, patch)
   }
   function removeTraveler(entityId, tripId, travelerId) {
     const trip = (travel[entityId] ?? []).find(t => t.id === tripId)
@@ -1659,7 +1666,13 @@ export const useRomStore = defineStore('rom', () => {
     // Hard cap: no single line may exceed 365 days.
     if (patch.days !== undefined) {
       const d = +patch.days || 0
-      patch = { ...patch, days: d < 0 ? 0 : (d > 365 ? 365 : d) }
+      patch = { ...patch, days: Math.max(0, Math.min(365, d)) }
+    }
+    if (patch.hoursPerDay !== undefined) {
+      patch = { ...patch, hoursPerDay: Math.max(0, Math.min(24, +patch.hoursPerDay || 0)) }
+    }
+    if (patch.rate !== undefined) {
+      patch = { ...patch, rate: Math.max(0, Math.min(9999, +patch.rate || 0)) }
     }
     // Days no longer auto-fill on taskId change — user fills manually,
     // or loads via one of the baseline templates.

@@ -233,6 +233,7 @@
                         <select v-else
                           :value="line.taskId"
                           class="cell-select cell-select--task"
+                          :title="tasksForLine(line, phase.id).find(t => t.id === line.taskId)?.label || ''"
                           @change="onTaskChange(line, $event.target.value)"
                         >
                           <option value="">— Select task —</option>

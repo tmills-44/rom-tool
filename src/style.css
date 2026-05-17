@@ -229,3 +229,21 @@ body {
 .confirm-actions .btn-secondary:hover { background: var(--rom-accent-hover); }
 .confirm-actions .btn-danger { background: var(--rom-danger); color: #fff; border-color: var(--rom-danger); }
 .confirm-actions .btn-danger:hover { background: #791f1f; }
+
+/* ─── Print: always render in light mode regardless of OS theme ────── */
+@media print {
+  :root {
+    --rom-bg:          #f7f5ee;
+    --rom-surface:     #ffffff;
+    --rom-surface-alt: #f7f5ee;
+    --rom-border:      #d8d6cd;
+    --rom-readonly:    #f3f2ec;
+    --rom-text:        #1a1a1a;
+    --rom-text-muted:  #6f6f6a;
+    --rom-text-faint:  #b4b2a9;
+    --rom-header-bg:   #1a3560;
+    --rom-header-text: #ffffff;
+  }
+  .statusbar, .topbar-right, .sidebar { display: none !important; }
+  body { background: #fff; }
+}
