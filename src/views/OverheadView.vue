@@ -518,13 +518,13 @@ function placeholderFor(idx) {
   border-radius: 4px;
   background: var(--rom-surface);
   color: var(--rom-text);
-  padding: 4px 6px;
-  font-size: 13px;
+  padding: 3px 5px;
+  font-size: 12px;
   text-align: right;
 }
 .oh-input:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
-.oh-input--pct { width: 64px; }
-.oh-input--wide { width: 130px; }
+.oh-input--pct { width: 56px; }
+.oh-input--wide { width: 100px; }
 .oh-prefix { font-size: 13px; color: var(--rom-text-muted); }
 .oh-suffix { font-size: 12px; color: var(--rom-text-muted); }
 

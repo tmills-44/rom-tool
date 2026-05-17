@@ -810,7 +810,7 @@ function resetWbs() {
 
 .cell-input {
   width: 100%;
-  padding: 5px 8px; font-size: 12px;
+  padding: 3px 6px; font-size: 12px;
   border: 1px solid var(--rom-border); border-radius: 4px;
   background: var(--rom-surface); color: var(--rom-text);
   font-family: inherit;

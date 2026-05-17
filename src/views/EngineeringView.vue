@@ -858,10 +858,10 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .row-status--partial  { color: #d97706; }
 .row-status--empty    { color: var(--rom-text-faint, #b4b2a9); }
 .col-role  { width: 52px; }
-.col-cat   { width: 120px; }
-.col-task  { min-width: 200px; }
-.col-days  { width: 120px; }
-.col-hpd   { width: 140px; }
+.col-cat   { width: 100px; }
+.col-task  { min-width: 180px; }
+.col-days  { width: 96px; }
+.col-hpd   { width: 110px; }
 .col-hpd-head {
   display: inline-flex; align-items: center; gap: 6px;
 }
@@ -882,8 +882,8 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
   outline-offset: -1px;
   border-color: transparent;
 }
-.col-hrs   { width: 130px; }
-.col-rate  { width: 100px; }
+.col-hrs   { width: 100px; }
+.col-rate  { width: 86px; }
 .col-total { width: 110px; font-weight: 700; color: var(--rom-accent-dark); text-align: right; white-space: nowrap; }
 .col-del   { width: 36px; }
 

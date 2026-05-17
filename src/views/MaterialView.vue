@@ -787,8 +787,8 @@ function pickClass(t) {
 .cell-input {
   border: 1px solid var(--rom-border);
   border-radius: 5px;
-  padding: 5px 8px;
-  font-size: 13px;
+  padding: 3px 6px;
+  font-size: 12px;
   color: var(--rom-text);
   background: var(--rom-surface);
   width: 100%;
