@@ -136,10 +136,10 @@
             @change="rom.updateOverheadItem(rom.activeCoaId, item.id, { base: $event.target.value })"
             title="Which base is this percentage applied to?">
             <option value="unloaded">× Unloaded</option>
+            <option value="withOverhead">× Unloaded + Overhead</option>
             <option value="labor">× Labor only</option>
             <option value="travel">× Travel only</option>
             <option value="material">× Material only</option>
-            <option value="withOverhead">× Unloaded + Overhead</option>
           </select>
           <div class="oh-computed">{{ fmt(computeItemCost(item)) }}</div>
           <button class="oh-row-del" type="button"
