@@ -1679,8 +1679,12 @@ export const useRomStore = defineStore('rom', () => {
     if (!oh?.overheadEnabled) return 0
     const items = oh.items ?? []
     return items.reduce((s, it) => {
-      if (!it.enabled || it.base !== 'unloaded') return s
-      return s + unloadedProjectTotal.value * (it.pct || 0)
+      if (!it.enabled || it.base === 'withOverhead') return s
+      if (it.base === 'unloaded')  return s + unloadedProjectTotal.value  * (it.pct || 0)
+      if (it.base === 'labor')     return s + engineeringTotal.value      * (it.pct || 0)
+      if (it.base === 'travel')    return s + travelTotal.value           * (it.pct || 0)
+      if (it.base === 'material')  return s + materialTotal.value         * (it.pct || 0)
+      return s
     }, 0)
   })
   const projectWithOverhead = computed(() => unloadedProjectTotal.value + projectOverheadTotal.value)
@@ -2073,10 +2077,14 @@ export const useRomStore = defineStore('rom', () => {
     const items    = Array.isArray(oh.items) ? oh.items : []
     const masterOn = !!oh.overheadEnabled
 
-    // Sum all enabled 'unloaded'-base items
+    // Sum all enabled 'unloaded'-base items (includes labor/travel/material sub-bases)
     const ohTotal = items.reduce((s, it) => {
-      if (!masterOn || !it.enabled || it.base !== 'unloaded') return s
-      return s + unloaded * (it.pct || 0)
+      if (!masterOn || !it.enabled || it.base === 'withOverhead') return s
+      if (it.base === 'unloaded')  return s + unloaded * (it.pct || 0)
+      if (it.base === 'labor')     return s + labor    * (it.pct || 0)
+      if (it.base === 'travel')    return s + trips    * (it.pct || 0)
+      if (it.base === 'material')  return s + mat      * (it.pct || 0)
+      return s
     }, 0)
     const withOh = unloaded + ohTotal
     // Sum all enabled 'withOverhead'-base items (typically just SCR)
@@ -2090,6 +2098,9 @@ export const useRomStore = defineStore('rom', () => {
       const it = items[idx]
       if (!masterOn || !it?.enabled) return 0
       if (it.base === 'unloaded')     return unloaded * (it.pct || 0)
+      if (it.base === 'labor')        return labor    * (it.pct || 0)
+      if (it.base === 'travel')       return trips    * (it.pct || 0)
+      if (it.base === 'material')     return mat      * (it.pct || 0)
       if (it.base === 'withOverhead') return withOh   * (it.pct || 0)
       return 0
     }

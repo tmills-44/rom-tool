@@ -136,6 +136,9 @@
             @change="rom.updateOverheadItem(rom.activeCoaId, item.id, { base: $event.target.value })"
             title="Which base is this percentage applied to?">
             <option value="unloaded">× Unloaded</option>
+            <option value="labor">× Labor only</option>
+            <option value="travel">× Travel only</option>
+            <option value="material">× Material only</option>
             <option value="withOverhead">× Unloaded + Overhead</option>
           </select>
           <div class="oh-computed">{{ fmt(computeItemCost(item)) }}</div>
@@ -200,12 +203,11 @@ function pctDisplay(v) { return ((v || 0) * 100).toFixed(1) }
 // and the item's base (unloaded vs unloaded + overhead).
 function computeItemCost(item) {
   if (!rom.overhead?.overheadEnabled || !item.enabled) return 0
-  if (item.base === 'unloaded') {
-    return rom.unloadedProjectTotal * (item.pct || 0)
-  }
-  if (item.base === 'withOverhead') {
-    return rom.projectWithOverhead * (item.pct || 0)
-  }
+  if (item.base === 'unloaded')     return rom.unloadedProjectTotal * (item.pct || 0)
+  if (item.base === 'labor')        return rom.engineeringTotal     * (item.pct || 0)
+  if (item.base === 'travel')       return rom.travelTotal          * (item.pct || 0)
+  if (item.base === 'material')     return rom.materialTotal        * (item.pct || 0)
+  if (item.base === 'withOverhead') return rom.projectWithOverhead  * (item.pct || 0)
   return 0
 }
 
