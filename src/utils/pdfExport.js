@@ -315,19 +315,6 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
     y += 12
   }
 
-  // ── Estimate type badge (bottom-right) ──────────────────────────────
-  const ESTIMATE_LABELS = { rom: 'ROM ±30%', budgetary: 'Budgetary ±15%', definitive: 'Definitive ±5%' }
-  const estLabel = ESTIMATE_LABELS[rom.project.estimateType || 'rom'] || 'ROM ±30%'
-  const badgeW = 90; const badgeH = 14
-  const badgeX = colR - badgeW; const badgeY = y
-  const BADGE_COLORS = { rom: [253,230,138], budgetary: [147,197,253], definitive: [167,243,208] }
-  const BADGE_TEXT   = { rom: [120,53,15],   budgetary: [30,58,138],   definitive: [6,78,59]    }
-  const bClr = BADGE_COLORS[rom.project.estimateType || 'rom'] || BADGE_COLORS.rom
-  const bTxt = BADGE_TEXT[rom.project.estimateType || 'rom']   || BADGE_TEXT.rom
-  doc.setFillColor(...bClr)
-  doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 3, 3, 'F')
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...bTxt)
-  doc.text(estLabel, badgeX + badgeW / 2, badgeY + 9.5, { align: 'center' })
 }
 
 // Helper formatter for the summary (uses comma'd dollars, no rounding to thousands)
@@ -645,21 +632,6 @@ function renderCoverPage({ doc, rom, autoTable, logoData, included }) {
   const leftY  = piCol(leftRows,  margin, margin + colW + 20)
   const rightY = piCol(rightRows, margin + colW + 20, margin)
   y = Math.max(leftY, rightY) + 28
-
-  // ── Estimate type badge ──────────────────────────────────────────────────
-  const ESTIMATE_LABELS_CV = { rom: 'ROM ±30%', budgetary: 'Budgetary ±15%', definitive: 'Definitive ±5%' }
-  const BADGE_COLORS_CV = { rom: [253,230,138], budgetary: [147,197,253], definitive: [167,243,208] }
-  const BADGE_TEXT_CV   = { rom: [120,53,15],   budgetary: [30,58,138],   definitive: [6,78,59]    }
-  const et      = rom.project.estimateType || 'rom'
-  const bClr    = BADGE_COLORS_CV[et] || BADGE_COLORS_CV.rom
-  const bTxt    = BADGE_TEXT_CV[et]   || BADGE_TEXT_CV.rom
-  const estLbl  = ESTIMATE_LABELS_CV[et] || 'ROM ±30%'
-  const badgeW = 110; const badgeH = 16
-  doc.setFillColor(...bClr)
-  doc.roundedRect(margin, y - badgeH, badgeW, badgeH, 3, 3, 'F')
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...bTxt)
-  doc.text(estLbl, margin + badgeW / 2, y - 4, { align: 'center' })
-  y += 10
 
   // ── Section heading ──────────────────────────────────────────────────────
   doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...TEXT)

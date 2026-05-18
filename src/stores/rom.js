@@ -523,7 +523,6 @@ export const useRomStore = defineStore('rom', () => {
     govLead: '', building: '', cityBase: '',
     pmSupportLead: '',
     revision: '',         // e.g. "Rev A", "Rev B"
-    estimateType: 'rom',  // 'rom' | 'budgetary' | 'definitive'
     escalationPct:   0,   // annual labor escalation %
     escalationYears: 0,   // years to apply escalation
     anticipatedFYFunds: 5_000_000,
@@ -536,7 +535,6 @@ export const useRomStore = defineStore('rom', () => {
     if (!('cityBase'       in project)) project.cityBase       = ''
     if (!('pmSupportLead'  in project)) project.pmSupportLead  = ''
     if (!('revision'       in project)) project.revision       = ''
-    if (!('estimateType'   in project)) project.estimateType   = 'rom'
     if (!('escalationPct'  in project)) project.escalationPct  = 0
     if (!('escalationYears'in project)) project.escalationYears= 0
     if (!project.includeFields || typeof project.includeFields !== 'object') {

@@ -547,12 +547,6 @@ function buildScopeSummarySheet(XLSX, rom, scope) {
     rows.push([`Escalated Labor (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs)`, t.labor * escFactor])
   }
 
-  // Estimate type (always — one cell below grand total block)
-  const ESTIMATE_LABELS = { rom: 'ROM ±30%', budgetary: 'Budgetary ±15%', definitive: 'Definitive ±5%' }
-  const estTypeRow = rows.length + 1
-  rows.push([])
-  rows.push([ESTIMATE_LABELS[rom.project.estimateType || 'rom'] || 'ROM ±30%'])
-
   const ws = XLSX.utils.aoa_to_sheet(rows)
 
   // ── Style presets for the summary (minimal — matches PDF aesthetics) ──
@@ -611,11 +605,6 @@ function buildScopeSummarySheet(XLSX, rom, scope) {
     setStyle(ws, addr(escRow, 0), escStyle)
     setStyle(ws, addr(escRow, 1), escNumStyle)
   }
-  // Estimate type badge
-  const EBADGE_COLORS = { rom: 'B45309', budgetary: '1D4ED8', definitive: '065F46' }
-  const etColor = EBADGE_COLORS[rom.project.estimateType || 'rom'] || EBADGE_COLORS.rom
-  setStyle(ws, addr(estTypeRow, 0), { font: { name: 'Helvetica', sz: 9, bold: true, color: { rgb: etColor } } })
-
   ws['!cols'] = [{ wch: 28 }, { wch: 14 }, { wch: 4 }, { wch: 28 }, { wch: 14 }]
   ws['!merges'] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
@@ -803,17 +792,6 @@ function buildExcelJSSummarySheet(ws, workbook, logoId, rom, scope) {
     ws.mergeCells(curRow, 1, curRow, 5)
   }
 
-  // Estimate type badge
-  curRow += 2
-  const EJEST = { rom: ['FFB45309','FFFEF3C7'], budgetary: ['FF1D4ED8','FFDBEAFE'], definitive: ['FF065F46','FFD1FAE5'] }
-  const [etTxt, etBg] = EJEST[rom.project.estimateType || 'rom'] || EJEST.rom
-  const ESTIMATE_LABELS_EJ = { rom: 'ROM ±30%', budgetary: 'Budgetary ±15%', definitive: 'Definitive ±5%' }
-  const etCell = ws.getCell(curRow, 1)
-  etCell.value = ESTIMATE_LABELS_EJ[rom.project.estimateType || 'rom'] || 'ROM ±30%'
-  etCell.font  = { name: 'Helvetica', bold: true, size: 9, color: { argb: etTxt } }
-  etCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: etBg } }
-  etCell.alignment = { horizontal: 'center' }
-  ws.mergeCells(curRow, 1, curRow, 2)
 }
 
 export async function generateExcelSummary(rom) {

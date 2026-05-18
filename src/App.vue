@@ -205,10 +205,6 @@
               No project info yet — click Edit to fill in
             </span>
           </div>
-          <span class="estimate-badge" :class="`estimate-badge--${rom.project.estimateType || 'rom'}`"
-            :title="estimateBadgeTitle">
-            {{ estimateBadgeLabel }}
-          </span>
           <button class="info-edit" @click="projInfoOpen = !projInfoOpen"
             :title="projInfoOpen ? 'Hide project info editor' : 'Edit project info'">
             <i class="ti" :class="projInfoOpen ? 'ti-x' : 'ti-edit'" aria-hidden="true"></i>
@@ -628,14 +624,6 @@ const projectSynopsis = computed(() => {
   })
   return items
 })
-
-const ESTIMATE_TYPES = {
-  rom:        { label: 'ROM ±30%',        title: 'Rough Order of Magnitude — accuracy ±30%' },
-  budgetary:  { label: 'Budgetary ±15%',  title: 'Budgetary estimate — accuracy ±15%' },
-  definitive: { label: 'Definitive ±5%',  title: 'Definitive estimate — accuracy ±5%' },
-}
-const estimateBadgeLabel = computed(() => ESTIMATE_TYPES[rom.project.estimateType || 'rom']?.label ?? 'ROM ±30%')
-const estimateBadgeTitle = computed(() => ESTIMATE_TYPES[rom.project.estimateType || 'rom']?.title ?? '')
 
 const validationWarnings = computed(() => {
   const w = []
@@ -1533,33 +1521,6 @@ body {
 }
 :root[data-theme="dark"] .formula-toggle--on { background: #064e3b; border-color: #10b981; color: #6ee7b7; }
 
-/* Escalation inline inputs */
-.proj-field--escalation { grid-column: span 2; }
-.escalation-inputs {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  padding-top: 2px;
-}
-.esc-sep { font-size: 12px; color: var(--rom-text-muted); white-space: nowrap; }
-.esc-result {
-  font-size: 12px; font-weight: 600; color: var(--rom-accent);
-  background: var(--rom-accent-bg); border-radius: 4px; padding: 1px 7px;
-}
-/* Estimate type badge in topbar info row */
-.estimate-badge {
-  display: inline-flex; align-items: center;
-  padding: 2px 9px; border-radius: 10px;
-  font-size: 10px; font-weight: 700;
-  letter-spacing: .03em;
-  white-space: nowrap; flex-shrink: 0;
-  cursor: default;
-}
-.estimate-badge--rom        { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
-.estimate-badge--budgetary  { background: var(--rom-info-bg); color: var(--rom-info); border: 1px solid #93c5fd; }
-.estimate-badge--definitive { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
-/* dark mode overrides for estimate badges */
-:root[data-theme="dark"] .estimate-badge--rom        { background: #3a2d12; color: #fcd34d; border-color: #a16207; }
-:root[data-theme="dark"] .estimate-badge--budgetary  { background: #1e3050; color: #93c5fd; border-color: #3b82f6; }
-:root[data-theme="dark"] .estimate-badge--definitive { background: #064e3b; color: #6ee7b7; border-color: #10b981; }
 
 .val-banner {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;

@@ -5,6 +5,8 @@
     <div class="summary-strip">
       <span class="sstat"><span class="sstat-lbl">Unloaded Total</span><strong>{{ fmt(rom.unloadedProjectTotal) }}</strong></span>
       <span class="sstat-div"></span>
+      <span class="sstat"><span class="sstat-lbl">Overhead %</span><strong>{{ totalPctDisplay }}%</strong></span>
+      <span class="sstat-div"></span>
       <span class="sstat"><span class="sstat-lbl">Contract Fee</span><strong>{{ fmt(rom.contractFee) }}</strong></span>
       <span class="sstat-div"></span>
       <span class="sstat sstat--total sstat--accent"><span class="sstat-lbl">Grand Total (Loaded)</span><strong>{{ fmt(rom.totalLoadedCost) }}</strong></span>
@@ -12,33 +14,22 @@
 
     <div class="oh-body">
 
-      <!-- Estimate type + labor escalation -->
-      <div class="oh-section oh-est-row">
-        <div class="oh-est-field">
-          <label class="oh-est-label">Estimate Type</label>
-          <select class="oh-est-select"
-            :value="rom.project.estimateType"
-            @change="rom.project.estimateType = $event.target.value">
-            <option value="rom">ROM (±30%)</option>
-            <option value="budgetary">Budgetary (±15%)</option>
-            <option value="definitive">Definitive (±5%)</option>
-          </select>
-        </div>
-        <div class="oh-est-field">
-          <label class="oh-est-label">Labor Escalation</label>
-          <div class="oh-esc-inputs">
-            <input type="number" min="0" max="20" step="0.5" class="oh-esc-num"
-              :value="rom.project.escalationPct"
-              @input="rom.project.escalationPct = parseFloat($event.target.value) || 0" />
-            <span class="oh-esc-sep">% / yr ×</span>
-            <input type="number" min="0" max="10" step="1" class="oh-esc-num oh-esc-num--sm"
-              :value="rom.project.escalationYears"
-              @input="rom.project.escalationYears = parseInt($event.target.value) || 0" />
-            <span class="oh-esc-sep">yrs</span>
-            <span v-if="rom.escalationFactor > 1" class="oh-esc-result">
-              = ×{{ rom.escalationFactor.toFixed(3) }}
-            </span>
-          </div>
+      <!-- Labor escalation -->
+      <div class="oh-section oh-esc-section">
+        <span class="oh-esc-label">Labor Escalation</span>
+        <div class="oh-esc-inputs">
+          <input type="number" min="0" max="20" step="0.5" class="oh-esc-num"
+            :value="rom.project.escalationPct"
+            @input="rom.project.escalationPct = parseFloat($event.target.value) || 0" />
+          <span class="oh-esc-sep">% / yr</span>
+          <span class="oh-esc-sep oh-esc-x">×</span>
+          <input type="number" min="0" max="10" step="1" class="oh-esc-num oh-esc-num--sm"
+            :value="rom.project.escalationYears"
+            @input="rom.project.escalationYears = parseInt($event.target.value) || 0" />
+          <span class="oh-esc-sep">yrs</span>
+          <span v-if="rom.escalationFactor > 1" class="oh-esc-result">
+            = ×{{ rom.escalationFactor.toFixed(3) }}
+          </span>
         </div>
       </div>
 
@@ -189,7 +180,9 @@
           <div></div>
           <div></div>
           <div class="oh-label-wrap"><strong class="oh-fee-label">Contract Fee</strong></div>
-          <div class="oh-pct-wrap"><span class="oh-fee-hint">sum of ticked items</span></div>
+          <div class="oh-pct-wrap">
+            <span class="oh-fee-total-pct">{{ totalPctDisplay }}%</span>
+          </div>
           <div></div>
           <div class="oh-computed oh-computed--fee">{{ fmt(rom.contractFee) }}</div>
           <div></div>
@@ -211,9 +204,14 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRomStore } from '../stores/rom'
 const rom = useRomStore()
+
+const totalEnabledPct = computed(() =>
+  (rom.overhead?.items || []).filter(i => i.enabled).reduce((s, i) => s + (i.pct || 0), 0)
+)
+const totalPctDisplay = computed(() => (totalEnabledPct.value * 100).toFixed(1))
 
 // Whether the "How the base column works" help dropdown is open
 const infoOpen = ref(false)
@@ -578,32 +576,35 @@ function placeholderFor(idx) {
 }
 .totals-row--grand span:last-child { font-size: 16px; color: var(--rom-accent-dark); }
 
-/* Estimate type + escalation row */
-.oh-est-row {
-  display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap;
+/* Labor escalation row */
+.oh-esc-section {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
 }
-.oh-est-field { display: flex; flex-direction: column; gap: 4px; }
-.oh-est-label { font-size: 11px; font-weight: 600; color: var(--rom-text-muted); text-transform: uppercase; letter-spacing: .04em; }
-.oh-est-select {
-  padding: 5px 10px; font-size: 13px; font-family: inherit;
-  border: 1px solid var(--rom-border); border-radius: var(--rom-radius);
-  background: var(--rom-surface); color: var(--rom-text);
+.oh-esc-label {
+  font-size: 11px; font-weight: 600; color: var(--rom-text-muted);
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
 }
-.oh-est-select:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
-.oh-esc-inputs { display: flex; align-items: center; gap: 6px; }
+.oh-esc-inputs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .oh-esc-num {
-  width: 62px; padding: 5px 8px; font-size: 13px; text-align: right; font-family: inherit;
+  width: 62px; padding: 4px 8px; font-size: 13px; text-align: right; font-family: inherit;
   border: 1px solid var(--rom-border); border-radius: var(--rom-radius);
   background: var(--rom-surface); color: var(--rom-text);
 }
 .oh-esc-num--sm { width: 50px; }
 .oh-esc-num:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
 .oh-esc-sep { font-size: 12px; color: var(--rom-text-muted); white-space: nowrap; }
+.oh-esc-x { font-weight: 700; color: var(--rom-text-faint); }
 .oh-esc-result {
-  padding: 3px 10px; border-radius: 12px;
+  padding: 2px 10px; border-radius: 12px;
   font-size: 12px; font-weight: 700;
   background: #fef3c7; color: #92400e;
   white-space: nowrap;
 }
 :root[data-theme="dark"] .oh-esc-result { background: #3a2d12; color: #fac775; }
+
+/* Total % shown in Contract Fee row and summary strip */
+.oh-fee-total-pct {
+  font-size: 12px; font-weight: 700;
+  color: var(--rom-accent-dark);
+}
 </style>

@@ -571,13 +571,6 @@ function buildScopeSummaryHTML(rom, scope, logo) {
       <tr class="grand-row"><td>Grand Total</td><td class="r">${dollar(t.totalLoaded)}</td></tr>
       ${(rom.escalationFactor ?? 1) > 1 ? `<tr class="esc-row"><td>Escalated Labor (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs)</td><td class="r">${dollar(t.labor * (rom.escalationFactor ?? 1))}</td></tr>` : ''}
     </table>
-    ${(() => {
-      const ELABELS = { rom: 'ROM ±30%', budgetary: 'Budgetary ±15%', definitive: 'Definitive ±5%' }
-      const ECOLORS = { rom: '#92400e', budgetary: '#1e40af', definitive: '#065f46' }
-      const EBGS    = { rom: '#fef3c7', budgetary: '#dbeafe', definitive: '#d1fae5' }
-      const et = rom.project.estimateType || 'rom'
-      return `<div style="text-align:right;margin-top:6pt;"><span style="display:inline-block;padding:2pt 10pt;border-radius:8pt;background:${EBGS[et]};color:${ECOLORS[et]};font-size:8pt;font-weight:bold;">${ELABELS[et]}</span></div>`
-    })()}
   `
 }
 
