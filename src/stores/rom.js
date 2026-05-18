@@ -1358,6 +1358,18 @@ export const useRomStore = defineStore('rom', () => {
     if (i >= 0) arr.splice(i, 1)
   }
 
+  function duplicateTrip(entityId, tripId) {
+    const arr = travel[entityId]
+    if (!arr) return
+    const src = arr.find(t => t.id === tripId)
+    if (!src) return
+    const clone = JSON.parse(JSON.stringify(src))
+    clone.id = uuid()
+    clone.travelers = (clone.travelers || []).map(tr => ({ ...tr, id: uuid() }))
+    const idx = arr.findIndex(t => t.id === tripId)
+    arr.splice(idx + 1, 0, clone)
+  }
+
   function addMaterialItem(categoryId = null) {
     const catId = categoryId || material.categories[0]?.id || 'cat-misc'
     material.items.push({
@@ -2319,7 +2331,7 @@ export const useRomStore = defineStore('rom', () => {
     setActiveMaterialTemplate, MATERIAL_TEMPLATES, itemActiveQty,
     loadMELForClass,
     addMaterialComponent, updateMaterialComponent, removeMaterialComponent, bundleUnitCost,
-    addTrip, updateTrip, removeTrip, tripCost, tripExpenses, travelerCost, travelerRate, travelLaborCost,
+    addTrip, updateTrip, removeTrip, duplicateTrip, tripCost, tripExpenses, travelerCost, travelerRate, travelLaborCost,
     addTraveler, updateTraveler, removeTraveler,
     addTravelHoursItem, updateTravelHoursItem, removeTravelHoursItem,
     addMiscItem, updateMiscItem, removeMiscItem,

@@ -487,10 +487,14 @@ window.addEventListener('storage', e => {
   if (e.key === 'rom-tool-state-v14' && e.newValue) tabConflict.value = true
 })
 
-// Warn before closing/refreshing if there are unsaved line items or project data
+// Track dirty state — set on any store mutation, cleared when user saves to file
+const isDirty = ref(false)
+watch(rom, () => { isDirty.value = true }, { deep: true })
+
 window.addEventListener('beforeunload', e => {
-  if (rom.lineItems.length > 0 || rom.travelTotal > 0 || rom.materialTotal > 0) {
+  if (isDirty.value) {
     e.preventDefault()
+    e.returnValue = ''
   }
 })
 
@@ -788,6 +792,7 @@ function downloadQuoteFile() {
     document.body.appendChild(a)
     a.click()
     setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 0)
+    isDirty.value = false
   } catch (e) {
     alert('Could not save quote file: ' + e.message)
   }
@@ -964,6 +969,11 @@ function doReset() {
 /* Small inline pill colors that were tuned for light bg */
 :root[data-theme="dark"] .oh-info-pill--withoh { background: #3a2d12; color: #fac775; }
 
+/* Role badges — light tints → dark tints */
+:root[data-theme="dark"] .role-badge--engineering { background: #1e3050; color: #7db4f0; }
+:root[data-theme="dark"] .role-badge--pm          { background: #1a2e1e; color: #6ecf7e; }
+:root[data-theme="dark"] .role-badge--programming { background: #2a1a3e; color: #c490f0; }
+
 /* Technician role colors — amber badge/chip in light, muted amber in dark */
 :root[data-theme="dark"] .role-badge--technician  { background: #3a2d12; color: #f5c97a; }
 :root[data-theme="dark"] .role-chip--technician.active { background: #b8860b; border-color: #b8860b; }
@@ -990,6 +1000,14 @@ function doReset() {
 
 /* Travel service cell hover */
 :root[data-theme="dark"] .svc-cell:hover { background: #243049; }
+
+/* Hidden-rows hint (Engineering) — yellow chip on dark bg */
+:root[data-theme="dark"] .hidden-rows-hint-inline { background: #3a2d12; border-color: #7a5010; color: #fac775; }
+:root[data-theme="dark"] .hidden-rows-hint-inline strong { color: #fac775; }
+:root[data-theme="dark"] .hidden-rows-hint-inline:hover { background: #4a3518; border-color: #d97706; color: #ffe0a0; }
+
+/* Travel del-btn:hover — red tint needed on dark bg */
+:root[data-theme="dark"] .del-btn:hover { background: #4a1e1e; }
 
 /* ═══ Reset ════════════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

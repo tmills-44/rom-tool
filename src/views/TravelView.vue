@@ -66,6 +66,9 @@
               </div>
               <div class="trip-head-right">
                 <span class="trip-total">{{ fmt(rom.tripCost(trip)) }}</span>
+                <button class="dup-btn" @click="rom.duplicateTrip(entity.id, trip.id)" title="Duplicate this trip">
+                  <i class="ti ti-copy" aria-hidden="true"></i>
+                </button>
                 <button class="del-btn" @click="rom.removeTrip(entity.id, trip.id)" title="Remove trip">
                   <i class="ti ti-trash" aria-hidden="true"></i>
                 </button>
@@ -1124,6 +1127,12 @@ onMounted(() => {
 }
 .trip-head-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .trip-total { font-size: 14px; font-weight: 700; color: var(--rom-accent); }
+.dup-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border: none; border-radius: 4px;
+  background: transparent; color: var(--rom-text-faint); cursor: pointer; font-size: 13px;
+}
+.dup-btn:hover { background: var(--rom-accent-bg); color: var(--rom-accent); }
 .del-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; border: none; border-radius: 4px;

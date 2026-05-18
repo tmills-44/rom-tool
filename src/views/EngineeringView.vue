@@ -12,6 +12,21 @@
       <span class="sstat sstat--total sstat--accent"><span class="sstat-lbl">Grand Total (Loaded)</span><strong>{{ fmt(rom.totalLoadedCost) }}</strong></span>
     </div>
 
+    <!-- ── Search bar ────────────────────────────────────────────── -->
+    <div class="search-bar">
+      <i class="ti ti-search search-icon" aria-hidden="true"></i>
+      <input
+        v-model="lineSearch"
+        type="text"
+        class="search-input"
+        placeholder="Search tasks or labor categories…"
+        spellcheck="false"
+      />
+      <button v-if="lineSearch" class="search-clear" @click="lineSearch = ''" title="Clear search">
+        <i class="ti ti-x" aria-hidden="true"></i>
+      </button>
+    </div>
+
     <!-- ── Entity cards ──────────────────────────────────────────── -->
     <div class="entities-wrap">
       <div
@@ -411,7 +426,7 @@
 </template>
 
 <script setup>
-import { reactive, watch, onMounted, computed } from 'vue'
+import { reactive, ref, watch, onMounted, computed } from 'vue'
 import { useRomStore } from '../stores/rom'
 import { TASK_DEFAULTS } from '../stores/rom'
 
@@ -424,6 +439,8 @@ const rom = useRomStore()
 const addableEntityList = computed(() =>
   rom.ENTITIES.filter(e => !e.alwaysVisible)
 )
+
+const lineSearch = ref('')
 
 const PHASE_STATE_KEY    = 'rom-phase-open-state'
 const ROLE_STATE_KEY     = 'rom-phase-role-state'
@@ -485,13 +502,40 @@ function linesForPhase(eid, pid) {
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 }
 
-// ── Visible lines — respects the active role filter ──────────────────
+// ── Visible lines — respects role filter and search query ────────────
 function visibleLines(eid, pid) {
   const active = getActiveRole(eid, pid)
-  const all = linesForPhase(eid, pid)
-  if (active === 'all') return all
-  return all.filter(l => l.role === active)
+  let lines = linesForPhase(eid, pid)
+  if (active !== 'all') lines = lines.filter(l => l.role === active)
+  const q = lineSearch.value.trim().toLowerCase()
+  if (q) {
+    lines = lines.filter(l => {
+      const task = String(l.taskId || '').toLowerCase()
+      const cat  = String(rom.LABOR_CATS.find(c => c.id === l.laborCat)?.label || '').toLowerCase()
+      return task.includes(q) || cat.includes(q)
+    })
+  }
+  return lines
 }
+
+// Auto-open phases that have matching lines when searching
+const matchingPhaseKeys = computed(() => {
+  const q = lineSearch.value.trim().toLowerCase()
+  if (!q) return new Set()
+  const keys = new Set()
+  const coaId = rom.activeCoaId
+  rom.lineItems
+    .filter(l => l.coaId === coaId)
+    .forEach(l => {
+      const task = String(l.taskId || '').toLowerCase()
+      const cat  = String(rom.LABOR_CATS.find(c => c.id === l.laborCat)?.label || '').toLowerCase()
+      if (task.includes(q) || cat.includes(q)) keys.add(phaseKey(l.entity, l.phaseId))
+    })
+  return keys
+})
+watch(matchingPhaseKeys, keys => {
+  keys.forEach(k => { phaseOpenState[k] = true })
+})
 
 // Per-row completeness — 'complete' | 'partial' | 'empty'
 // Only cost-relevant fields (days, hoursPerDay, rate) determine partial/complete.
@@ -1151,4 +1195,30 @@ function fmt(n) { return '$' + Math.round(n || 0).toLocaleString() }
 .tl-role-label { color: var(--rom-text-muted); }
 .tl-role-hrs { font-weight: 600; color: var(--rom-text); }
 .tl-role-cost { color: var(--rom-accent); font-weight: 700; margin-left: 2px; }
+
+/* Search bar */
+.search-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--rom-border);
+  background: var(--rom-surface);
+}
+.search-icon { font-size: 14px; color: var(--rom-text-faint); flex-shrink: 0; }
+.search-input {
+  flex: 1; min-width: 0;
+  padding: 5px 10px;
+  font-size: 13px; font-family: inherit;
+  border: 1px solid var(--rom-border); border-radius: var(--rom-radius);
+  background: var(--rom-bg); color: var(--rom-text);
+  outline: none;
+}
+.search-input:focus { border-color: var(--rom-accent); background: var(--rom-surface); }
+.search-input::placeholder { color: var(--rom-text-faint); }
+.search-clear {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border: none; border-radius: 4px;
+  background: transparent; color: var(--rom-text-faint); cursor: pointer; font-size: 12px;
+  flex-shrink: 0;
+}
+.search-clear:hover { background: var(--rom-surface-alt); color: var(--rom-text); }
 </style>
