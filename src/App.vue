@@ -318,15 +318,6 @@
           <input type="text" :value="rom.project.revision"
             @input="rom.project.revision = $event.target.value" placeholder="e.g. Rev A" />
         </div>
-        <div class="proj-field">
-          <label><span>Estimate Type</span></label>
-          <select :value="rom.project.estimateType"
-            @change="rom.project.estimateType = $event.target.value">
-            <option value="rom">ROM (±30%)</option>
-            <option value="budgetary">Budgetary (±15%)</option>
-            <option value="definitive">Definitive (±5%)</option>
-          </select>
-        </div>
         <div class="proj-field proj-field--escalation">
           <label><span>Labor Escalation</span></label>
           <div class="escalation-inputs">
@@ -342,6 +333,15 @@
             <span class="esc-sep">yrs</span>
             <span v-if="rom.escalationFactor > 1" class="esc-result">= ×{{ rom.escalationFactor.toFixed(3) }}</span>
           </div>
+        </div>
+        <div class="proj-field">
+          <label><span>Estimate Type</span></label>
+          <select :value="rom.project.estimateType"
+            @change="rom.project.estimateType = $event.target.value">
+            <option value="rom">ROM (±30%)</option>
+            <option value="budgetary">Budgetary (±15%)</option>
+            <option value="definitive">Definitive (±5%)</option>
+          </select>
         </div>
       </div>
 
