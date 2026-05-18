@@ -10,6 +10,8 @@
  * No external library required — Word opens HTML-as-doc natively.
  */
 
+import { SUMMARY_LABOR_GROUPS } from './exportConstants.js'
+
 function entityTravelLaborForScope(rom, entityId, scopeId) {
   let t = 0
   ;(rom.travel[entityId] ?? []).forEach(trip => {
@@ -480,9 +482,6 @@ ${scopeSections}
   a.click()
   setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 0)
 }
-
-// ── Labor title groups — matches the 1-page PDF cost summary groupings ──
-import { SUMMARY_LABOR_GROUPS } from './exportConstants.js'
 
 function buildScopeSummaryHTML(rom, scope, logo) {
   const t   = rom.coaTotals(scope.id)

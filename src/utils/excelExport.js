@@ -7,6 +7,8 @@
  * SheetJS that actually writes cell styles).
  */
 
+import { SUMMARY_LABOR_GROUPS } from './exportConstants.js'
+
 const NAVY    = '1A3560'   // section headers + grand total
 const ACCENT  = '1A5FB4'   // accent text
 const LTBLUE  = 'E8F0FE'   // sub-row fills
@@ -391,7 +393,7 @@ function buildSummarySheet(XLSX, rom, included) {
   return ws
 }
 
-import { SUMMARY_LABOR_GROUPS } from './exportConstants.js'
+
 
 function buildScopeSummarySheet(XLSX, rom, scope) {
   const t   = rom.coaTotals(scope.id)

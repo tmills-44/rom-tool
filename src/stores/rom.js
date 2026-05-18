@@ -2091,24 +2091,8 @@ export const useRomStore = defineStore('rom', () => {
       return s + withOh * (it.pct || 0)
     }, 0)
 
-    // Back-compat fields for existing export code that reads by item index (default seed order)
-    const cost = (idx) => {
-      const it = items[idx]
-      if (!masterOn || !it?.enabled) return 0
-      if (it.base === 'unloaded')     return unloaded * (it.pct || 0)
-      if (it.base === 'labor')        return labor    * (it.pct || 0)
-      if (it.base === 'travel')       return trips    * (it.pct || 0)
-      if (it.base === 'material')     return mat      * (it.pct || 0)
-      if (it.base === 'withOverhead') return withOh   * (it.pct || 0)
-      return 0
-    }
-
     return {
       labor, trips, mat, unloaded,
-      scp:     cost(0),
-      glob:    cost(1),
-      govLab:  cost(2),
-      mgmtRsv: cost(3),
       ohTotal, withOh, scr,
       totalLoaded: withOh + scr,
       contractFee: ohTotal + scr,

@@ -147,11 +147,13 @@ export async function loadOCONUS() {
     const pairKey = `${country}|${location}`
 
     if (map[pairKey]) {
-      // Already seen — update only if this seasonal row has a higher lodging rate
-      if (lodging > map[pairKey].lodging) {
-        map[pairKey] = { lodging, mie }
+      // Already seen — keep the highest lodging and highest MIE independently
+      const newLodging = Math.max(map[pairKey].lodging, lodging)
+      const newMie     = Math.max(map[pairKey].mie, mie)
+      if (newLodging !== map[pairKey].lodging || newMie !== map[pairKey].mie) {
+        map[pairKey] = { lodging: newLodging, mie: newMie }
         const loc = byCountry[country]?.find(l => l.location === location)
-        if (loc) { loc.lodging = lodging; loc.mie = mie }
+        if (loc) { loc.lodging = newLodging; loc.mie = newMie }
       }
       return
     }

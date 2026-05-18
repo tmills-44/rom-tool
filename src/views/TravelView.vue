@@ -742,8 +742,9 @@ function breakdownDays(trip, tr) {
     const mieAmt  = partial ? mie * 0.75 : mie
     const lodgingAmt = lodging
     let label = `Day ${i}`
-    if (isFirst && days > 1) label += ' — First'
-    if (isLast)              label += ' — Last'
+    if (days === 1 && useFLD) label += ' — Partial (75% M&IE)'
+    else if (isFirst)         label += ' — First'
+    else if (isLast)          label += ' — Last'
     rows.push({ day: i, label, mie: mieAmt, lodging: lodgingAmt, partial })
   }
   return rows
