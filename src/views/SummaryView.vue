@@ -33,6 +33,21 @@
       </div>
     </div>
 
+    <!-- ── Escalation callout — shown when escalation is configured ── -->
+    <div v-if="rom.escalationFactor > 1" class="escalation-strip">
+      <i class="ti ti-trending-up" aria-hidden="true"></i>
+      <span>
+        Labor escalated at
+        <strong>{{ rom.project.escalationPct }}%/yr × {{ rom.project.escalationYears }} yrs</strong>
+        — multiplier ×{{ rom.escalationFactor.toFixed(3) }}
+      </span>
+      <span class="esc-totals">
+        Base labor: <strong>{{ fmt(rom.engineeringTotalForQuote) }}</strong>
+        &nbsp;→&nbsp;
+        Escalated: <strong class="esc-value">{{ fmt(rom.engineeringTotalForQuote * rom.escalationFactor) }}</strong>
+      </span>
+    </div>
+
     <!-- ── Empty state hint ─────────────────────────────────────────── -->
     <div v-if="!includedScopes.length" class="empty-banner">
       No scopes ticked for the quote. Open the Scopes dropdown and tick the ones you want.
@@ -277,6 +292,19 @@ function fmt(n) { return n ? '$' + Math.round(n).toLocaleString() : '—' }
 .hero-stats { display: flex; gap: 20px; flex-wrap: wrap; }
 .hero-stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: rgba(255,255,255,.55); margin-bottom: 2px; }
 .hero-stat-value { font-size: 16px; font-weight: 600; color: #fff; }
+
+/* Escalation callout */
+.escalation-strip {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 24px;
+  background: #fef9ec; border-bottom: 1px solid #fcd34d;
+  font-size: 12px; color: #78350f;
+}
+.escalation-strip .ti { font-size: 14px; color: #d97706; }
+.esc-totals { margin-left: auto; font-size: 12px; }
+.esc-value { color: #d97706; }
+:root[data-theme="dark"] .escalation-strip { background: #3a2d12; border-color: #a16207; color: #fcd34d; }
+:root[data-theme="dark"] .esc-value { color: #fcd34d; }
 
 /* Empty state */
 .empty-banner {

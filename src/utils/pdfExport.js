@@ -128,6 +128,7 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
   // Project-info pairs — drop any field the user has un-ticked
   const leftCandidates  = [
     ['date',            'Date'],
+    ['revision',        'Revision'],
     ['projectEngineer', 'Cronos Project Lead'],
     ['govLead',         'Government Project Lead'],
     ['pmSupportLead',   'PM Support Lead'],
@@ -299,6 +300,33 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
   doc.roundedRect(boxX, boxY, boxW, 18, 2, 2, 'S')
   doc.setTextColor(...ACCENT)
   doc.text(dollarLong(t.totalLoaded), colR - 4, y, { align: 'right' })
+  y += 22
+
+  // ── Escalation note (right half, only when configured) ─────────────
+  const escFactor = rom.escalationFactor ?? 1
+  if (escFactor > 1) {
+    const escLabel  = `Escalated Labor (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs)`
+    const escAmt    = dollarLong(t.labor * escFactor)
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(...MUTED)
+    doc.text(escLabel, labelIndent, y)
+    doc.setFont('helvetica', 'bold');   doc.setFontSize(9); doc.setTextColor(...ACCENT)
+    doc.text(escAmt, colR, y, { align: 'right' })
+    y += 12
+  }
+
+  // ── Estimate type badge (bottom-right) ──────────────────────────────
+  const ESTIMATE_LABELS = { rom: 'ROM ±30%', budgetary: 'Budgetary ±15%', definitive: 'Definitive ±5%' }
+  const estLabel = ESTIMATE_LABELS[rom.project.estimateType || 'rom'] || 'ROM ±30%'
+  const badgeW = 90; const badgeH = 14
+  const badgeX = colR - badgeW; const badgeY = y
+  const BADGE_COLORS = { rom: [253,230,138], budgetary: [147,197,253], definitive: [167,243,208] }
+  const BADGE_TEXT   = { rom: [120,53,15],   budgetary: [30,58,138],   definitive: [6,78,59]    }
+  const bClr = BADGE_COLORS[rom.project.estimateType || 'rom'] || BADGE_COLORS.rom
+  const bTxt = BADGE_TEXT[rom.project.estimateType || 'rom']   || BADGE_TEXT.rom
+  doc.setFillColor(...bClr)
+  doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 3, 3, 'F')
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...bTxt)
+  doc.text(estLabel, badgeX + badgeW / 2, badgeY + 9.5, { align: 'center' })
 }
 
 // Helper formatter for the summary (uses comma'd dollars, no rounding to thousands)
@@ -345,14 +373,15 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
 
   // Project info — only include the fields the user has ticked on
   const pairs = []
-  if (includeProjectField(rom.project, 'sponsor'))         pairs.push(['Customer / Sponsor', pf(rom.project, 'sponsor')])
-  if (includeProjectField(rom.project, 'roomName'))        pairs.push(['Project / Room',     pf(rom.project, 'roomName')])
-  if (includeProjectField(rom.project, 'building'))        pairs.push(['Building',           pf(rom.project, 'building')])
-  if (includeProjectField(rom.project, 'cityBase'))        pairs.push(['City / Base',        pf(rom.project, 'cityBase')])
+  if (includeProjectField(rom.project, 'sponsor'))         pairs.push(['Customer / Sponsor',  pf(rom.project, 'sponsor')])
+  if (includeProjectField(rom.project, 'roomName'))        pairs.push(['Project / Room',      pf(rom.project, 'roomName')])
+  if (includeProjectField(rom.project, 'building'))        pairs.push(['Building',            pf(rom.project, 'building')])
+  if (includeProjectField(rom.project, 'cityBase'))        pairs.push(['City / Base',         pf(rom.project, 'cityBase')])
   if (includeProjectField(rom.project, 'projectEngineer')) pairs.push(['Cronos Project Lead', pf(rom.project, 'projectEngineer')])
-  if (includeProjectField(rom.project, 'govLead'))         pairs.push(['Government Lead',    pf(rom.project, 'govLead')])
-  if (includeProjectField(rom.project, 'pmSupportLead'))   pairs.push(['PM Support Lead',    pf(rom.project, 'pmSupportLead')])
-  if (includeProjectField(rom.project, 'date'))            pairs.push(['Date',               pf(rom.project, 'date')])
+  if (includeProjectField(rom.project, 'govLead'))         pairs.push(['Government Lead',     pf(rom.project, 'govLead')])
+  if (includeProjectField(rom.project, 'pmSupportLead'))   pairs.push(['PM Support Lead',     pf(rom.project, 'pmSupportLead')])
+  if (includeProjectField(rom.project, 'date'))            pairs.push(['Date',                pf(rom.project, 'date')])
+  if (includeProjectField(rom.project, 'revision'))        pairs.push(['Revision',            pf(rom.project, 'revision')])
   pairs.push(['Scope', scope.name])
   // Lay out as 2-pair rows: [k1, v1, k2, v2]
   const infoRows = []

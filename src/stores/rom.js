@@ -522,20 +522,28 @@ export const useRomStore = defineStore('rom', () => {
     // Fields used by the 1-page Cost Summary PDF
     govLead: '', building: '', cityBase: '',
     pmSupportLead: '',
+    revision: '',         // e.g. "Rev A", "Rev B"
+    estimateType: 'rom',  // 'rom' | 'budgetary' | 'definitive'
+    escalationPct:   0,   // annual labor escalation %
+    escalationYears: 0,   // years to apply escalation
     anticipatedFYFunds: 5_000_000,
     templateId: null, templateName: null,
   })
   // Backfill any missing newer fields — extracted so importStateFromBackup can call it too.
   function backfillProject() {
-    if (!('govLead'  in project))      project.govLead       = ''
-    if (!('building' in project))      project.building      = ''
-    if (!('cityBase' in project))      project.cityBase      = ''
-    if (!('pmSupportLead' in project)) project.pmSupportLead = ''
+    if (!('govLead'        in project)) project.govLead        = ''
+    if (!('building'       in project)) project.building       = ''
+    if (!('cityBase'       in project)) project.cityBase       = ''
+    if (!('pmSupportLead'  in project)) project.pmSupportLead  = ''
+    if (!('revision'       in project)) project.revision       = ''
+    if (!('estimateType'   in project)) project.estimateType   = 'rom'
+    if (!('escalationPct'  in project)) project.escalationPct  = 0
+    if (!('escalationYears'in project)) project.escalationYears= 0
     if (!project.includeFields || typeof project.includeFields !== 'object') {
       project.includeFields = {}
     }
     ;['sponsor', 'projectEngineer', 'govLead', 'roomName', 'cityBase',
-      'building', 'pmSupportLead', 'date'
+      'building', 'pmSupportLead', 'date', 'revision'
     ].forEach(k => {
       if (typeof project.includeFields[k] !== 'boolean') project.includeFields[k] = true
     })
@@ -2271,6 +2279,15 @@ export const useRomStore = defineStore('rom', () => {
     }
   }, { deep: true })
 
+  // Compound escalation multiplier for labor totals.
+  // escalationYears=0 or escalationPct=0 → factor of 1 (no change).
+  const escalationFactor = computed(() => {
+    const pct   = project.escalationPct   || 0
+    const years = project.escalationYears || 0
+    if (pct <= 0 || years <= 0) return 1
+    return Math.pow(1 + pct / 100, years)
+  })
+
   return {
     ENTITIES, ROLES, LIFECYCLE_PHASES, TRAVEL_CATEGORIES, TABS, TEMPLATES,
     // LABOR_CATS now refers to the reactive editable list (was a const)
@@ -2312,5 +2329,6 @@ export const useRomStore = defineStore('rom', () => {
     oconusMap, oconusCountries, oconusByCountry, loadOCONUSRates, lookupOCONUSRate,
     snapshots, saveSnapshot, restoreSnapshot, deleteSnapshot,
     saveError,
+    escalationFactor,
   }
 })

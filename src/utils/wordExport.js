@@ -76,6 +76,7 @@ function projInfoRowsHTML(rom, scope) {
     ['govLead',         'Government Project Lead'],
     ['pmSupportLead',   'PM Support Lead'],
     ['date',            'Date'],
+    ['revision',        'Revision'],
   ].filter(([k]) => includeProjectField(rom.project, k))
    .map(([k, label]) => [label, esc(rom.project?.[k] || '—')])
   if (scope?.name) candidates.push(['Scope', esc(scope.name)])
@@ -336,6 +337,10 @@ function buildScopeHTML(rom, scope, logo) {
     ${travelDetailTable(rom, scope, t)}
     <h3>Material Detail</h3>
     ${materialDetailTable(rom, scope, t)}
+    ${String(scope.description || '').trim() ? `
+    <h3>Assumptions &amp; Notes</h3>
+    <div class="scope-notes">${esc(String(scope.description)).replace(/\n/g, '<br>')}</div>
+    ` : ''}
   `
 }
 
@@ -446,6 +451,7 @@ export async function generateWord(rom) {
 
       .amt   { text-align: right; }
       .muted { color: #888780; font-style: italic; }
+      .scope-notes { font-size: 10pt; color: #1A2133; line-height: 1.5; margin-top: 6pt; white-space: pre-wrap; }
       .page-break { page-break-before: always; mso-special-character: line-break; }
     </style>
   `
@@ -490,6 +496,7 @@ function buildScopeSummaryHTML(rom, scope, logo) {
   // Left: Date, Cronos Lead, Gov Lead, PM Lead  |  Right: Sponsor, Building, Room, City
   const leftFields  = [
     ['date',            'Date'],
+    ['revision',        'Revision'],
     ['projectEngineer', 'Cronos Project Lead'],
     ['govLead',         'Government Project Lead'],
     ['pmSupportLead',   'PM Support Lead'],
@@ -563,7 +570,15 @@ function buildScopeSummaryHTML(rom, scope, logo) {
       <tr class="rule-row"><td>Total Estimate</td><td class="r">${dollar(t.unloaded)}</td></tr>
       <tr class="rule-row"><td>Contract Fee</td><td class="r">${dollar(t.ohTotal + t.scr)}</td></tr>
       <tr class="grand-row"><td>Grand Total</td><td class="r">${dollar(t.totalLoaded)}</td></tr>
+      ${(rom.escalationFactor ?? 1) > 1 ? `<tr class="esc-row"><td>Escalated Labor (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs)</td><td class="r">${dollar(t.labor * (rom.escalationFactor ?? 1))}</td></tr>` : ''}
     </table>
+    ${(() => {
+      const ELABELS = { rom: 'ROM ±30%', budgetary: 'Budgetary ±15%', definitive: 'Definitive ±5%' }
+      const ECOLORS = { rom: '#92400e', budgetary: '#1e40af', definitive: '#065f46' }
+      const EBGS    = { rom: '#fef3c7', budgetary: '#dbeafe', definitive: '#d1fae5' }
+      const et = rom.project.estimateType || 'rom'
+      return `<div style="text-align:right;margin-top:6pt;"><span style="display:inline-block;padding:2pt 10pt;border-radius:8pt;background:${EBGS[et]};color:${ECOLORS[et]};font-size:8pt;font-weight:bold;">${ELABELS[et]}</span></div>`
+    })()}
   `
 }
 
@@ -612,6 +627,9 @@ export async function generateWordSummary(rom) {
       .grand-row td      { font-weight: bold; font-size: 12pt; color: #1A5FB4;
                            border: 1.5pt solid #1A5FB4; border-top: 1.5pt solid #1A5FB4;
                            padding: 4pt 8pt; }
+
+      /* Escalation row */
+      .esc-row td { font-style: italic; font-size: 9pt; color: #92400e; border-top: none; border-bottom: 0.5pt solid #c4cede; }
 
       /* Utilities */
       .r  { text-align: right; }

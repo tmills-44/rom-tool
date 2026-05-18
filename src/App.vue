@@ -197,6 +197,10 @@
               No project info yet — click Edit to fill in
             </span>
           </div>
+          <span class="estimate-badge" :class="`estimate-badge--${rom.project.estimateType || 'rom'}`"
+            :title="estimateBadgeTitle">
+            {{ estimateBadgeLabel }}
+          </span>
           <button class="info-edit" @click="projInfoOpen = !projInfoOpen"
             :title="projInfoOpen ? 'Hide project info editor' : 'Edit project info'">
             <i class="ti" :class="projInfoOpen ? 'ti-x' : 'ti-edit'" aria-hidden="true"></i>
@@ -294,6 +298,42 @@
           </label>
           <input type="date" :value="rom.project.date"
             @input="rom.project.date = $event.target.value" />
+        </div>
+        <div class="proj-field" :class="{ 'proj-field--off': rom.project.includeFields.revision === false }">
+          <label>
+            <span>Revision</span>
+            <input type="checkbox" class="proj-include"
+              :checked="rom.project.includeFields.revision"
+              @change="rom.project.includeFields.revision = $event.target.checked"
+              title="Include this field on the printed quote" />
+          </label>
+          <input type="text" :value="rom.project.revision"
+            @input="rom.project.revision = $event.target.value" placeholder="e.g. Rev A" />
+        </div>
+        <div class="proj-field">
+          <label><span>Estimate Type</span></label>
+          <select :value="rom.project.estimateType"
+            @change="rom.project.estimateType = $event.target.value">
+            <option value="rom">ROM (±30%)</option>
+            <option value="budgetary">Budgetary (±15%)</option>
+            <option value="definitive">Definitive (±5%)</option>
+          </select>
+        </div>
+        <div class="proj-field proj-field--escalation">
+          <label><span>Labor Escalation</span></label>
+          <div class="escalation-inputs">
+            <input type="number" min="0" max="20" step="0.5"
+              :value="rom.project.escalationPct"
+              @input="rom.project.escalationPct = parseFloat($event.target.value) || 0"
+              style="width:60px" />
+            <span class="esc-sep">% / yr ×</span>
+            <input type="number" min="0" max="10" step="1"
+              :value="rom.project.escalationYears"
+              @input="rom.project.escalationYears = parseInt($event.target.value) || 0"
+              style="width:50px" />
+            <span class="esc-sep">yrs</span>
+            <span v-if="rom.escalationFactor > 1" class="esc-result">= ×{{ rom.escalationFactor.toFixed(3) }}</span>
+          </div>
         </div>
       </div>
 
@@ -593,6 +633,7 @@ const projectSynopsis = computed(() => {
     { key: 'cityBase',        label: 'City' },
     { key: 'projectEngineer', label: 'Cronos' },
     { key: 'govLead',         label: 'Gov' },
+    { key: 'revision',        label: 'Rev' },
   ]
   order.forEach(f => {
     const value = String(rom.project?.[f.key] ?? '').trim()
@@ -600,6 +641,14 @@ const projectSynopsis = computed(() => {
   })
   return items
 })
+
+const ESTIMATE_TYPES = {
+  rom:        { label: 'ROM ±30%',        title: 'Rough Order of Magnitude — accuracy ±30%' },
+  budgetary:  { label: 'Budgetary ±15%',  title: 'Budgetary estimate — accuracy ±15%' },
+  definitive: { label: 'Definitive ±5%',  title: 'Definitive estimate — accuracy ±5%' },
+}
+const estimateBadgeLabel = computed(() => ESTIMATE_TYPES[rom.project.estimateType || 'rom']?.label ?? 'ROM ±30%')
+const estimateBadgeTitle = computed(() => ESTIMATE_TYPES[rom.project.estimateType || 'rom']?.title ?? '')
 
 const validationWarnings = computed(() => {
   const w = []
@@ -723,8 +772,9 @@ function downloadQuoteFile() {
     const a    = document.createElement('a')
     a.href     = url
     const sponsor = (rom.project.sponsor || 'quote').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40)
+    const rev     = (rom.project.revision || '').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 12)
     const date    = (rom.project.date || new Date().toISOString().split('T')[0]).replace(/-/g, '')
-    a.download = `ROM_${sponsor}_${date}.rom.json`
+    a.download = `ROM_${sponsor}${rev ? '_' + rev : ''}_${date}.rom.json`
     document.body.appendChild(a)
     a.click()
     setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 0)
@@ -1463,6 +1513,33 @@ body {
 @media (max-width: 760px) {
   .proj-drawer-body { grid-template-columns: 1fr 1fr; }
 }
+/* Escalation inline inputs */
+.proj-field--escalation { grid-column: span 2; }
+.escalation-inputs {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding-top: 2px;
+}
+.esc-sep { font-size: 12px; color: var(--rom-text-muted); white-space: nowrap; }
+.esc-result {
+  font-size: 12px; font-weight: 600; color: var(--rom-accent);
+  background: var(--rom-accent-bg); border-radius: 4px; padding: 1px 7px;
+}
+/* Estimate type badge in topbar info row */
+.estimate-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 9px; border-radius: 10px;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .03em;
+  white-space: nowrap; flex-shrink: 0;
+  cursor: default;
+}
+.estimate-badge--rom        { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+.estimate-badge--budgetary  { background: var(--rom-info-bg); color: var(--rom-info); border: 1px solid #93c5fd; }
+.estimate-badge--definitive { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+/* dark mode overrides for estimate badges */
+:root[data-theme="dark"] .estimate-badge--rom        { background: #3a2d12; color: #fcd34d; border-color: #a16207; }
+:root[data-theme="dark"] .estimate-badge--budgetary  { background: #1e3050; color: #93c5fd; border-color: #3b82f6; }
+:root[data-theme="dark"] .estimate-badge--definitive { background: #064e3b; color: #6ee7b7; border-color: #10b981; }
 
 .val-banner {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
