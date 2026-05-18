@@ -516,6 +516,11 @@ function buildScopeSummarySheet(XLSX, rom, scope) {
   // Subtotals
   const totalHrsRow = rows.length
   rows.push(['Total Hours', Math.round(totalHrs)])
+  let escRow = -1
+  if ((t.escDelta ?? 0) > 0) {
+    escRow = rows.length
+    rows.push([`Escalation (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs)`, t.escDelta])
+  }
   const laborSubRow = rows.length
   rows.push(['Labor Subtotal', t.labor])
   rows.push([]) // spacer
@@ -538,14 +543,6 @@ function buildScopeSummarySheet(XLSX, rom, scope) {
   rows.push(['Contract Fee', t.ohTotal + t.scr])
   const grandRow = rows.length
   rows.push(['Grand Total', t.totalLoaded])
-
-  // Escalation row (only when configured)
-  const escFactor = rom.escalationFactor ?? 1
-  let escRow = -1
-  if (escFactor > 1) {
-    escRow = rows.length
-    rows.push([`Escalated Labor (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs)`, t.labor * escFactor])
-  }
 
   const ws = XLSX.utils.aoa_to_sheet(rows)
 
@@ -766,6 +763,12 @@ function buildExcelJSSummarySheet(ws, workbook, logoId, rom, scope) {
     dataRow(g.title, Math.round(hrs))
   })
   dataRow('Total Hours',    Math.round(totalHrs), { bold: true, topBorder: dk, numFmt: '0' })
+  if ((t.escDelta ?? 0) > 0) {
+    dataRow(`Escalation (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs)`, t.escDelta, {
+      numFmt: dolFmt,
+      color: { argb: 'FFB45309' },
+    })
+  }
   dataRow('Labor Subtotal', t.labor,              { bold: true, topBorder: dk, numFmt: dolFmt })
   curRow++ // spacer
 
@@ -781,16 +784,6 @@ function buildExcelJSSummarySheet(ws, workbook, logoId, rom, scope) {
   dataRow('Total Estimate', t.unloaded,           { bold: true, topBorder: dk, numFmt: dolFmt })
   dataRow('Contract Fee',   t.ohTotal + t.scr,    { bold: true, topBorder: dk, numFmt: dolFmt })
   dataRow('Grand Total',    t.totalLoaded,        { bold: true, sz: 11, color: acc, allBorder: acc, numFmt: dolFmt, height: 18 })
-
-  // Escalation row
-  const ejEscFactor = rom.escalationFactor ?? 1
-  if (ejEscFactor > 1) {
-    curRow++
-    const escCell = ws.getCell(curRow, 1)
-    escCell.value = `Escalated Labor (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs): $${Math.round(t.labor * ejEscFactor).toLocaleString()}`
-    escCell.font  = { name: 'Helvetica', italic: true, size: 9, color: { argb: 'FFB45309' } }
-    ws.mergeCells(curRow, 1, curRow, 5)
-  }
 
 }
 

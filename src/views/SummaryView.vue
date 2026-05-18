@@ -37,14 +37,14 @@
     <div v-if="rom.escalationFactor > 1" class="escalation-strip">
       <i class="ti ti-trending-up" aria-hidden="true"></i>
       <span>
-        Labor escalated at
+        Labor escalation
         <strong>{{ rom.project.escalationPct }}%/yr × {{ rom.project.escalationYears }} yrs</strong>
-        — multiplier ×{{ rom.escalationFactor.toFixed(3) }}
+        (×{{ rom.escalationFactor.toFixed(3) }}) — included in all totals
       </span>
       <span class="esc-totals">
-        Base labor: <strong>{{ fmt(rom.engineeringTotalForQuote) }}</strong>
-        &nbsp;→&nbsp;
-        Escalated: <strong class="esc-value">{{ fmt(rom.engineeringTotalForQuote * rom.escalationFactor) }}</strong>
+        Base: <strong>{{ fmt(rom.engineeringTotalForQuote) }}</strong>
+        &nbsp;+&nbsp;
+        <strong class="esc-value">+{{ fmt(rom.engineeringTotalForQuote * (rom.escalationFactor - 1)) }}</strong>
       </span>
     </div>
 

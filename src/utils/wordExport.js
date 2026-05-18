@@ -553,6 +553,7 @@ function buildScopeSummaryHTML(rom, scope, logo) {
       <tr class="col-hdr"><td>Title</td><td class="r">Hours</td></tr>
       ${groupRows}
       <tr class="rule-row"><td>Total Hours</td><td class="r">${Math.round(totalHrs)}</td></tr>
+      ${(t.escDelta ?? 0) > 0 ? `<tr><td>Escalation (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs)</td><td class="r">${dollar(t.escDelta)}</td></tr>` : ''}
       <tr class="rule-row"><td>Labor Subtotal</td><td class="r">${dollar(t.labor)}</td></tr>
     </table>
 
@@ -569,7 +570,6 @@ function buildScopeSummaryHTML(rom, scope, logo) {
       <tr class="rule-row"><td>Total Estimate</td><td class="r">${dollar(t.unloaded)}</td></tr>
       <tr class="rule-row"><td>Contract Fee</td><td class="r">${dollar(t.ohTotal + t.scr)}</td></tr>
       <tr class="grand-row"><td>Grand Total</td><td class="r">${dollar(t.totalLoaded)}</td></tr>
-      ${(rom.escalationFactor ?? 1) > 1 ? `<tr class="esc-row"><td>Escalated Labor (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs)</td><td class="r">${dollar(t.labor * (rom.escalationFactor ?? 1))}</td></tr>` : ''}
     </table>
   `
 }

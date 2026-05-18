@@ -247,6 +247,9 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
     rowWithRule('Engineering Labor', dollarLong(t.labor - scopeTravelLabor))
     rowWithRule('Travel Labor',      dollarLong(scopeTravelLabor))
   }
+  if (t.escDelta > 0) {
+    rowWithRule(`Escalation (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs)`, dollarLong(t.escDelta))
+  }
   rowWithRule('Labor Subtotal', dollarLong(t.labor), true)
   y += 10
 
@@ -302,18 +305,6 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
   doc.setTextColor(...ACCENT)
   doc.text(dollarLong(t.totalLoaded), colR - 4, y, { align: 'right' })
   y += 22
-
-  // ── Escalation note (right half, only when configured) ─────────────
-  const escFactor = rom.escalationFactor ?? 1
-  if (escFactor > 1) {
-    const escLabel  = `Escalated Labor (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs)`
-    const escAmt    = dollarLong(t.labor * escFactor)
-    doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(...MUTED)
-    doc.text(escLabel, labelIndent, y)
-    doc.setFont('helvetica', 'bold');   doc.setFontSize(9); doc.setTextColor(...ACCENT)
-    doc.text(escAmt, colR, y, { align: 'right' })
-    y += 12
-  }
 
 }
 
@@ -667,10 +658,10 @@ function renderCoverPage({ doc, rom, autoTable, logoData, included }) {
   // ── Escalation note (if configured) ─────────────────────────────────────
   const escFactor = rom.escalationFactor ?? 1
   if (escFactor > 1) {
+    const allDelta = included.reduce((s, c) => s + (rom.coaTotals(c.id).escDelta ?? 0), 0)
     doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(...MUTED)
-    const allLaborBase = included.reduce((s, c) => s + rom.coaTotals(c.id).labor, 0)
     doc.text(
-      `Escalated labor (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs): ${fmt(allLaborBase * escFactor)}`,
+      `Includes labor escalation ${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs (+${fmt(allDelta)})`,
       margin, y
     )
     y += 18

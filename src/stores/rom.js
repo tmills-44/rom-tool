@@ -1689,7 +1689,7 @@ export const useRomStore = defineStore('rom', () => {
   // Overhead helpers — compute from the items[] array on the active scope.
   // 'unloaded' base items multiply by the unloaded project total. 'withOverhead'
   // items (typically SCR) multiply by unloaded + sum of enabled unloaded items.
-  const unloadedProjectTotal = computed(() => engineeringTotal.value + travelTotal.value + materialTotal.value)
+  const unloadedProjectTotal = computed(() => engineeringTotal.value * escalationFactor.value + travelTotal.value + materialTotal.value)
   const projectOverheadTotal = computed(() => {
     const oh = overhead.value
     if (!oh?.overheadEnabled) return 0
@@ -2086,7 +2086,10 @@ export const useRomStore = defineStore('rom', () => {
   }
   function coaTotals(coaId) {
     const oh = overheadByCoa[coaId] ?? defaultOverhead()
-    const labor    = laborTotalFor(coaId)
+    const laborBase = laborTotalFor(coaId)
+    const escF      = escalationFactor.value
+    const labor     = laborBase * escF
+    const escDelta  = labor - laborBase
     const trips    = travelTotalFor(coaId)
     const mat      = materialTotalFor(coaId)
     const unloaded = labor + trips + mat
@@ -2110,11 +2113,11 @@ export const useRomStore = defineStore('rom', () => {
     }, 0)
 
     return {
-      labor, trips, mat, unloaded,
+      laborBase, escDelta, labor, trips, mat, unloaded,
       ohTotal, withOh, scr,
       totalLoaded: withOh + scr,
       contractFee: ohTotal + scr,
-      items,                         // raw items, used by exports when showLineItems is true
+      items,
       showLineItems: oh.showLineItems !== false,
     }
   }

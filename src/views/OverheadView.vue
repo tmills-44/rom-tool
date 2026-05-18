@@ -16,20 +16,32 @@
 
       <!-- Labor escalation -->
       <div class="oh-section oh-esc-section">
-        <span class="oh-esc-label">Labor Escalation</span>
-        <div class="oh-esc-inputs">
-          <input type="number" min="0" max="20" step="0.5" class="oh-esc-num"
-            :value="rom.project.escalationPct"
-            @input="rom.project.escalationPct = parseFloat($event.target.value) || 0" />
-          <span class="oh-esc-sep">% / yr</span>
-          <span class="oh-esc-sep oh-esc-x">×</span>
-          <input type="number" min="0" max="10" step="1" class="oh-esc-num oh-esc-num--sm"
-            :value="rom.project.escalationYears"
-            @input="rom.project.escalationYears = parseInt($event.target.value) || 0" />
-          <span class="oh-esc-sep">yrs</span>
-          <span v-if="rom.escalationFactor > 1" class="oh-esc-result">
-            = ×{{ rom.escalationFactor.toFixed(3) }}
+        <div class="oh-esc-header">
+          <span class="oh-section-head" style="margin:0">Labor Escalation</span>
+          <span v-if="rom.escalationFactor > 1" class="oh-esc-badge">
+            ×{{ rom.escalationFactor.toFixed(3) }} &nbsp;·&nbsp; +{{ fmt(escalationDelta) }} added to labor
           </span>
+        </div>
+        <div class="oh-esc-inputs">
+          <div class="oh-esc-field">
+            <label class="oh-esc-field-lbl">Annual rate</label>
+            <div class="oh-esc-input-row">
+              <input type="number" min="0" max="20" step="0.5" class="oh-esc-num"
+                :value="rom.project.escalationPct"
+                @input="rom.project.escalationPct = parseFloat($event.target.value) || 0" />
+              <span class="oh-esc-unit">%</span>
+            </div>
+          </div>
+          <span class="oh-esc-x">×</span>
+          <div class="oh-esc-field">
+            <label class="oh-esc-field-lbl">Years</label>
+            <div class="oh-esc-input-row">
+              <input type="number" min="0" max="10" step="1" class="oh-esc-num oh-esc-num--sm"
+                :value="rom.project.escalationYears"
+                @input="rom.project.escalationYears = parseInt($event.target.value) || 0" />
+              <span class="oh-esc-unit">yrs</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -212,6 +224,8 @@ const totalEnabledPct = computed(() =>
   (rom.overhead?.items || []).filter(i => i.enabled).reduce((s, i) => s + (i.pct || 0), 0)
 )
 const totalPctDisplay = computed(() => (totalEnabledPct.value * 100).toFixed(1))
+
+const escalationDelta = computed(() => rom.engineeringTotal * (rom.escalationFactor - 1))
 
 // Whether the "How the base column works" help dropdown is open
 const infoOpen = ref(false)
@@ -576,31 +590,29 @@ function placeholderFor(idx) {
 }
 .totals-row--grand span:last-child { font-size: 16px; color: var(--rom-accent-dark); }
 
-/* Labor escalation row */
-.oh-esc-section {
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-}
-.oh-esc-label {
-  font-size: 11px; font-weight: 600; color: var(--rom-text-muted);
-  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
-}
-.oh-esc-inputs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.oh-esc-num {
-  width: 62px; padding: 4px 8px; font-size: 13px; text-align: right; font-family: inherit;
-  border: 1px solid var(--rom-border); border-radius: var(--rom-radius);
-  background: var(--rom-surface); color: var(--rom-text);
-}
-.oh-esc-num--sm { width: 50px; }
-.oh-esc-num:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
-.oh-esc-sep { font-size: 12px; color: var(--rom-text-muted); white-space: nowrap; }
-.oh-esc-x { font-weight: 700; color: var(--rom-text-faint); }
-.oh-esc-result {
+/* Labor escalation section */
+.oh-esc-section { display: flex; flex-direction: column; gap: 10px; }
+.oh-esc-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.oh-esc-badge {
   padding: 2px 10px; border-radius: 12px;
-  font-size: 12px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   background: #fef3c7; color: #92400e;
   white-space: nowrap;
 }
-:root[data-theme="dark"] .oh-esc-result { background: #3a2d12; color: #fac775; }
+:root[data-theme="dark"] .oh-esc-badge { background: #3a2d12; color: #fac775; }
+.oh-esc-inputs { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.oh-esc-field { display: flex; flex-direction: column; gap: 4px; }
+.oh-esc-field-lbl { font-size: 10px; font-weight: 600; color: var(--rom-text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.oh-esc-input-row { display: flex; align-items: center; gap: 5px; }
+.oh-esc-num {
+  width: 64px; padding: 5px 8px; font-size: 13px; text-align: right; font-family: inherit;
+  border: 1px solid var(--rom-border); border-radius: var(--rom-radius);
+  background: var(--rom-surface); color: var(--rom-text);
+}
+.oh-esc-num--sm { width: 52px; }
+.oh-esc-num:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
+.oh-esc-unit { font-size: 12px; color: var(--rom-text-muted); }
+.oh-esc-x { font-size: 16px; font-weight: 300; color: var(--rom-text-faint); padding-bottom: 4px; }
 
 /* Total % shown in Contract Fee row and summary strip */
 .oh-fee-total-pct {
