@@ -525,22 +525,22 @@ export const useRomStore = defineStore('rom', () => {
     anticipatedFYFunds: 5_000_000,
     templateId: null, templateName: null,
   })
-  // Backfill any missing newer fields when loading older saved state
-  if (!('govLead'  in project))      project.govLead       = ''
-  if (!('building' in project))      project.building      = ''
-  if (!('cityBase' in project))      project.cityBase      = ''
-  if (!('pmSupportLead' in project)) project.pmSupportLead = ''
-  // Per-field include flags — control whether each project info field is
-  // required at export time AND whether it appears on the printed document.
-  // Default everything to true so older saved state still works the same way.
-  if (!project.includeFields || typeof project.includeFields !== 'object') {
-    project.includeFields = {}
+  // Backfill any missing newer fields — extracted so importStateFromBackup can call it too.
+  function backfillProject() {
+    if (!('govLead'  in project))      project.govLead       = ''
+    if (!('building' in project))      project.building      = ''
+    if (!('cityBase' in project))      project.cityBase      = ''
+    if (!('pmSupportLead' in project)) project.pmSupportLead = ''
+    if (!project.includeFields || typeof project.includeFields !== 'object') {
+      project.includeFields = {}
+    }
+    ;['sponsor', 'projectEngineer', 'govLead', 'roomName', 'cityBase',
+      'building', 'pmSupportLead', 'date'
+    ].forEach(k => {
+      if (typeof project.includeFields[k] !== 'boolean') project.includeFields[k] = true
+    })
   }
-  ;['sponsor', 'projectEngineer', 'govLead', 'roomName', 'cityBase',
-    'building', 'pmSupportLead', 'date'
-  ].forEach(k => {
-    if (typeof project.includeFields[k] !== 'boolean') project.includeFields[k] = true
-  })
+  backfillProject()
 
   // ── Courses of Action ──────────────────────────────────────────────
   // Each COA is a self-contained scenario the user can flip between.
@@ -2122,6 +2122,16 @@ export const useRomStore = defineStore('rom', () => {
     }
   }
 
+  // ── Overhead master toggles ───────────────────────────────────────
+  function setOverheadEnabled(coaId, value) {
+    const oh = overheadByCoa[coaId]
+    if (oh) oh.overheadEnabled = value
+  }
+  function setShowLineItems(coaId, value) {
+    const oh = overheadByCoa[coaId]
+    if (oh) oh.showLineItems = value
+  }
+
   // ── Overhead item mutations ───────────────────────────────────────
   function addOverheadItem(coaId, opts = {}) {
     const oh = overheadByCoa[coaId]
@@ -2230,6 +2240,13 @@ export const useRomStore = defineStore('rom', () => {
     if (payload.selectedTabId) selectedTabId.value = payload.selectedTabId
     if (typeof payload.showRates    === 'boolean') showRates.value     = payload.showRates
     if (typeof payload.showRowStatus === 'boolean') showRowStatus.value = payload.showRowStatus
+    // Apply the same backfill logic that runs at store init, so old backups
+    // get missing fields filled in rather than leaving computed getters with undefined.
+    backfillProject()
+    if (!material.manualAmounts) material.manualAmounts = {}
+    if (material.shipperCost === undefined) material.shipperCost = 0
+    Object.values(overheadByCoa).forEach(backfillOverhead)
+    coas.forEach(c => { if (!overheadByCoa[c.id]) overheadByCoa[c.id] = defaultOverhead() })
   }
 
   function resetAll() {
@@ -2296,6 +2313,7 @@ export const useRomStore = defineStore('rom', () => {
     overheadByCoa, laborTotalFor, laborHoursFor, travelTotalFor, travelExpensesFor, travelLaborFor,
     travelLaborByRole, travelLaborHoursForRole, coaTotals, totalLoadedForQuote,
     roleCostForCoa, phaseCostForCoa, entityCostForCoa,
+    setOverheadEnabled, setShowLineItems,
     addOverheadItem, removeOverheadItem, updateOverheadItem, reorderOverheadItem,
     addCoa, removeCoa, renameCoa, toggleCoaIncluded, setActiveCoa, duplicateCoa,
     exportStateForBackup, importStateFromBackup,

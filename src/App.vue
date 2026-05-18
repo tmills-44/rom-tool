@@ -325,6 +325,7 @@
       <span v-else class="stat stat-saved"><i class="ti ti-device-floppy" aria-hidden="true"></i> Auto-saved</span>
       <span v-if="ratesLoadFailed" class="stat stat-warn" :title="ratesStatus.errors.join('\n')"><i class="ti ti-alert-triangle" aria-hidden="true"></i> GSA rates failed to load</span>
       <span v-if="tabConflict" class="stat stat-warn" title="Another browser tab saved this document — your data may be out of sync. Reload or download a backup."><i class="ti ti-layers-intersect" aria-hidden="true"></i> Multiple tabs open <button class="stat-dismiss" @click="tabConflict = false">×</button></span>
+      <span v-if="needRefresh" class="stat stat-update"><i class="ti ti-refresh" aria-hidden="true"></i> New version available <button class="stat-update-btn" @click="updateServiceWorker()">Reload now</button></span>
       <button class="stat-clear-cache" title="Clear app cache and reload to get the latest version" @click="clearCacheAndReload"><i class="ti ti-refresh" aria-hidden="true"></i> Reload app</button>
     </footer>
 
@@ -418,6 +419,7 @@ import OverheadView from './views/OverheadView.vue'
 import SummaryView from './views/SummaryView.vue'
 import AdminView from './views/AdminView.vue'
 import { BUILD } from './buildNumber.js'
+import { useRegisterSW } from 'virtual:pwa-register/vue'
 
 const rom = useRomStore()
 
@@ -443,6 +445,8 @@ window.addEventListener('beforeunload', e => {
     e.preventDefault()
   }
 })
+
+const { needRefresh, updateServiceWorker } = useRegisterSW()
 
 async function clearCacheAndReload() {
   if ('serviceWorker' in navigator) {
@@ -1503,6 +1507,13 @@ body {
 .stat-dismiss { background: none; border: none; color: inherit; cursor: pointer; font-size: 12px; padding: 0 0 0 2px; line-height: 1; opacity: .7; }
 .stat-dismiss:hover { opacity: 1; }
 .stat-build { opacity: .35; font-size: 10px; font-variant-numeric: tabular-nums; margin-left: auto; }
+.stat-update { font-size: 10px; color: #ffd166; opacity: .95; display: inline-flex; align-items: center; gap: 5px; }
+.stat-update-btn {
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+  border-radius: 3px; color: #fff; cursor: pointer; font-family: inherit;
+  font-size: 10px; padding: 1px 6px; transition: background .15s;
+}
+.stat-update-btn:hover { background: rgba(255,255,255,.28); }
 .stat-clear-cache {
   background: none; border: none; cursor: pointer; font-family: inherit;
   font-size: 10px; color: rgba(255,255,255,.35); padding: 0; margin-left: 12px;

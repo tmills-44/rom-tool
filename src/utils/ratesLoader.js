@@ -134,25 +134,30 @@ export async function loadOCONUS() {
   const countries = new Set()
 
   // State Dept files often have multiple rows per location (seasonal rates).
-  // We keep the first non-zero rate per country+location pair.
-  const seen = new Set()
-
+  // Keep the highest lodging rate per location — safest for cost estimation.
   rows.forEach(row => {
     const country  = String(row[countryKey]  ?? '').trim()
     const location = String(row[locationKey] ?? '').trim()
     if (!country || !location) return
 
-    const pairKey = `${country}|${location}`
-    if (seen.has(pairKey)) return
-    seen.add(pairKey)
-
     const lodging = numVal(row, lodgingKey)
     const mie     = numVal(row, mieKey)
     if (!lodging && !mie) return
 
+    const pairKey = `${country}|${location}`
+
+    if (map[pairKey]) {
+      // Already seen — update only if this seasonal row has a higher lodging rate
+      if (lodging > map[pairKey].lodging) {
+        map[pairKey] = { lodging, mie }
+        const loc = byCountry[country]?.find(l => l.location === location)
+        if (loc) { loc.lodging = lodging; loc.mie = mie }
+      }
+      return
+    }
+
     countries.add(country)
     map[pairKey] = { lodging, mie }
-
     if (!byCountry[country]) byCountry[country] = []
     byCountry[country].push({ location, lodging, mie })
   })

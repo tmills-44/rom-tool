@@ -17,7 +17,7 @@
         <label class="oh-master-toggle">
           <input type="checkbox"
             :checked="rom.overhead.overheadEnabled"
-            @change="rom.overhead.overheadEnabled = $event.target.checked" />
+            @change="rom.setOverheadEnabled(rom.activeCoaId, $event.target.checked)" />
           <span class="oh-master-text">
             <strong>Apply overhead to this scope</strong>
             <span class="oh-master-sub">Untick to zero out all contract fee items below.</span>
@@ -32,7 +32,7 @@
           <label class="oh-display-opt">
             <input type="radio" name="oh-display"
               :checked="rom.overhead.showLineItems !== false"
-              @change="rom.overhead.showLineItems = true" />
+              @change="rom.setShowLineItems(rom.activeCoaId, true)" />
             <span class="oh-display-text">
               <strong>Show all line items for contract fee</strong>
               <span class="oh-display-sub">Each overhead row appears on the printed PDF / Excel / Word with its own dollar amount.</span>
@@ -41,7 +41,7 @@
           <label class="oh-display-opt">
             <input type="radio" name="oh-display"
               :checked="rom.overhead.showLineItems === false"
-              @change="rom.overhead.showLineItems = false" />
+              @change="rom.setShowLineItems(rom.activeCoaId, false)" />
             <span class="oh-display-text">
               <strong>Only show contract fee total on quote</strong>
               <span class="oh-display-sub">The breakdown stays in this tool. Customer-facing docs show only the rolled-up Contract Fee.</span>

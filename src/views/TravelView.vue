@@ -854,7 +854,22 @@ function effHotelDaily(trip, tr) {
 function hotelCost(trip, tr) {
   const qty  = Math.max(1, tr.qty || 1)
   const days = Math.max(0, tr.days || 0)
-  return qty * effHotelDaily(trip, tr) * days
+  // Override paths — no FLD, just flat rate × days
+  if (tr?.hotelDailyRate != null)    return qty * tr.hotelDailyRate    * days
+  if (trip?.hotelDailyTotal != null) return qty * trip.hotelDailyTotal * days
+  // Split lodging + M&IE path — mirror travelerCost() in the store
+  const lodging = tr?.lodgingRate ?? trip?.lodgingRate ?? 0
+  const mie     = tr?.mieRate     ?? trip?.mieRate     ?? 0
+  const useFLD  = (tr?.firstLastDay ?? true) && days > 0
+  let c = lodging * days
+  if (useFLD) {
+    const middleDays = Math.max(0, days - 2)
+    const partDays   = days === 1 ? 1 : 2
+    c += mie * (middleDays + partDays * 0.75)
+  } else {
+    c += mie * days
+  }
+  return c * qty
 }
 function carCost(trip, tr) {
   const qty  = Math.max(1, tr.qty || 1)
