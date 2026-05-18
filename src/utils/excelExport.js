@@ -206,7 +206,7 @@ function buildScopeSheet(XLSX, rom, scope) {
             tr.name || '', cat?.label || '',
             tr.qty || 1, tr.days || 0, tr.travelHours || 0,
             tr.hotel ? 'Yes' : '', tr.car ? 'Yes' : '', tr.airfare ? 'Yes' : '', tr.misc ? 'Yes' : '',
-            rom.travelerCost(trip, tr) + rom.travelLaborCost(tr),
+            rom.travelerCost(trip, tr) + rom.travelLaborCost(trip, tr),
           ])
         })
       })

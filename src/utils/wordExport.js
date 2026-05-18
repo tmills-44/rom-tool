@@ -270,7 +270,7 @@ function travelDetailTable(rom, scope, t) {
           <td class="amt">${tr.qty || 1}</td>
           <td class="amt">${tr.days || 0}</td>
           <td class="amt">${tr.travelHours || 0}</td>
-          <td class="amt">${dollar(rom.travelerCost(trip, tr) + rom.travelLaborCost(tr))}</td>
+          <td class="amt">${dollar(rom.travelerCost(trip, tr) + rom.travelLaborCost(trip, tr))}</td>
         </tr>`)
       })
     })
