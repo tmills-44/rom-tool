@@ -12,6 +12,36 @@
 
     <div class="oh-body">
 
+      <!-- Estimate type + labor escalation -->
+      <div class="oh-section oh-est-row">
+        <div class="oh-est-field">
+          <label class="oh-est-label">Estimate Type</label>
+          <select class="oh-est-select"
+            :value="rom.project.estimateType"
+            @change="rom.project.estimateType = $event.target.value">
+            <option value="rom">ROM (±30%)</option>
+            <option value="budgetary">Budgetary (±15%)</option>
+            <option value="definitive">Definitive (±5%)</option>
+          </select>
+        </div>
+        <div class="oh-est-field">
+          <label class="oh-est-label">Labor Escalation</label>
+          <div class="oh-esc-inputs">
+            <input type="number" min="0" max="20" step="0.5" class="oh-esc-num"
+              :value="rom.project.escalationPct"
+              @input="rom.project.escalationPct = parseFloat($event.target.value) || 0" />
+            <span class="oh-esc-sep">% / yr ×</span>
+            <input type="number" min="0" max="10" step="1" class="oh-esc-num oh-esc-num--sm"
+              :value="rom.project.escalationYears"
+              @input="rom.project.escalationYears = parseInt($event.target.value) || 0" />
+            <span class="oh-esc-sep">yrs</span>
+            <span v-if="rom.escalationFactor > 1" class="oh-esc-result">
+              = ×{{ rom.escalationFactor.toFixed(3) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
       <!-- Master toggle: turn off all overhead for this scope at once -->
       <div class="oh-section oh-master">
         <label class="oh-master-toggle">
@@ -547,4 +577,33 @@ function placeholderFor(idx) {
   font-size: 14px; font-weight: 700; color: var(--rom-accent-dark);
 }
 .totals-row--grand span:last-child { font-size: 16px; color: var(--rom-accent-dark); }
+
+/* Estimate type + escalation row */
+.oh-est-row {
+  display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap;
+}
+.oh-est-field { display: flex; flex-direction: column; gap: 4px; }
+.oh-est-label { font-size: 11px; font-weight: 600; color: var(--rom-text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.oh-est-select {
+  padding: 5px 10px; font-size: 13px; font-family: inherit;
+  border: 1px solid var(--rom-border); border-radius: var(--rom-radius);
+  background: var(--rom-surface); color: var(--rom-text);
+}
+.oh-est-select:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
+.oh-esc-inputs { display: flex; align-items: center; gap: 6px; }
+.oh-esc-num {
+  width: 62px; padding: 5px 8px; font-size: 13px; text-align: right; font-family: inherit;
+  border: 1px solid var(--rom-border); border-radius: var(--rom-radius);
+  background: var(--rom-surface); color: var(--rom-text);
+}
+.oh-esc-num--sm { width: 50px; }
+.oh-esc-num:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
+.oh-esc-sep { font-size: 12px; color: var(--rom-text-muted); white-space: nowrap; }
+.oh-esc-result {
+  padding: 3px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 700;
+  background: #fef3c7; color: #92400e;
+  white-space: nowrap;
+}
+:root[data-theme="dark"] .oh-esc-result { background: #3a2d12; color: #fac775; }
 </style>

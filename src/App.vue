@@ -318,31 +318,6 @@
           <input type="text" :value="rom.project.revision"
             @input="rom.project.revision = $event.target.value" placeholder="e.g. Rev A" />
         </div>
-        <div class="proj-field proj-field--escalation">
-          <label><span>Labor Escalation</span></label>
-          <div class="escalation-inputs">
-            <input type="number" min="0" max="20" step="0.5"
-              :value="rom.project.escalationPct"
-              @input="rom.project.escalationPct = parseFloat($event.target.value) || 0"
-              style="width:60px" />
-            <span class="esc-sep">% / yr ×</span>
-            <input type="number" min="0" max="10" step="1"
-              :value="rom.project.escalationYears"
-              @input="rom.project.escalationYears = parseInt($event.target.value) || 0"
-              style="width:50px" />
-            <span class="esc-sep">yrs</span>
-            <span v-if="rom.escalationFactor > 1" class="esc-result">= ×{{ rom.escalationFactor.toFixed(3) }}</span>
-          </div>
-        </div>
-        <div class="proj-field">
-          <label><span>Estimate Type</span></label>
-          <select :value="rom.project.estimateType"
-            @change="rom.project.estimateType = $event.target.value">
-            <option value="rom">ROM (±30%)</option>
-            <option value="budgetary">Budgetary (±15%)</option>
-            <option value="definitive">Definitive (±5%)</option>
-          </select>
-        </div>
       </div>
 
     <!-- ── Validation banner ─────────────────────────────────────── -->
