@@ -1350,11 +1350,6 @@ export const useRomStore = defineStore('rom', () => {
     if (i >= 0) arr.splice(i, 1)
   }
 
-  // keep old line-based mutations as no-ops so old refs don't crash
-  function addTravelLine()    {}
-  function updateTravelLine() {}
-  function removeTravelLine() {}
-
   function addMaterialItem(categoryId = null) {
     const catId = categoryId || material.categories[0]?.id || 'cat-misc'
     material.items.push({
@@ -2293,7 +2288,7 @@ export const useRomStore = defineStore('rom', () => {
   }, { deep: true })
 
   return {
-    ENTITIES, ROLES, LIFECYCLE_PHASES, TRAVEL_CATEGORIES, TABS, TEMPLATES, TASK_DEFAULTS,
+    ENTITIES, ROLES, LIFECYCLE_PHASES, TRAVEL_CATEGORIES, TABS, TEMPLATES,
     // LABOR_CATS now refers to the reactive editable list (was a const)
     LABOR_CATS: laborCats,
     project, wbs, lineItems, travel, material, overhead, laborCats,
@@ -2331,7 +2326,6 @@ export const useRomStore = defineStore('rom', () => {
     gsaRateMap, importGSARates, lookupGSARate, clearGSARates,
     loadCONUSRates,
     oconusMap, oconusCountries, oconusByCountry, loadOCONUSRates, lookupOCONUSRate,
-    addTravelLine, updateTravelLine, removeTravelLine,
     snapshots, saveSnapshot, restoreSnapshot, deleteSnapshot,
     saveError,
   }

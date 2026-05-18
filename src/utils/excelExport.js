@@ -391,16 +391,7 @@ function buildSummarySheet(XLSX, rom, included) {
   return ws
 }
 
-// ── Labor title groups — matches the 1-page PDF cost summary groupings ──
-const SUMMARY_LABOR_GROUPS = [
-  { title: 'Engineering',        catIds: ['eng1', 'eng2', 'eng3'] },
-  { title: 'Programming',        catIds: ['prog1', 'prog2', 'prog3'] },
-  { title: 'Project Management', catIds: ['pm1'] },
-  { title: 'Project Support',    catIds: ['pm2'] },
-  { title: 'Procurement',        catIds: ['proc'] },
-  { title: 'Warehouse',          catIds: ['wh'] },
-  { title: 'Technician',         catIds: ['tech1', 'tech2', 'tech3'] },
-]
+import { SUMMARY_LABOR_GROUPS } from './exportConstants.js'
 
 function buildScopeSummarySheet(XLSX, rom, scope) {
   const t   = rom.coaTotals(scope.id)

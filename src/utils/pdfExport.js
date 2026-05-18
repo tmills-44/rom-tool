@@ -93,17 +93,7 @@ function travelHrsByCat(rom, scopeId) {
   return out
 }
 
-// Labor categories grouped by job title for the 1-page Cost Summary.
-// Maps the labor-cat IDs in the store to the title rows in the summary table.
-const LABOR_TITLE_GROUPS = [
-  { title: 'Engineering',         catIds: ['eng1', 'eng2', 'eng3']    },
-  { title: 'Programming',         catIds: ['prog1', 'prog2', 'prog3'] },
-  { title: 'Project Management',  catIds: ['pm1']                     },
-  { title: 'Project Support',     catIds: ['pm2']                     },
-  { title: 'Procurement',         catIds: ['proc']                    },
-  { title: 'Warehouse',           catIds: ['wh']                      },
-  { title: 'Technician',          catIds: ['tech1', 'tech2', 'tech3'] },
-]
+import { SUMMARY_LABOR_GROUPS as LABOR_TITLE_GROUPS } from './exportConstants.js'
 
 // ── Render one scope's 1-page Cost Summary (matches the legacy format) ───
 function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc }) {
@@ -250,6 +240,11 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
   }
   rowWithRule('Total Hours',    String(totalHrs), true)
   y += 4
+  const scopeTravelLabor = rom.travelLaborFor(scope.id)
+  if (scopeTravelLabor > 0) {
+    rowWithRule('Engineering Labor', dollarLong(t.labor - scopeTravelLabor))
+    rowWithRule('Travel Labor',      dollarLong(scopeTravelLabor))
+  }
   rowWithRule('Labor Subtotal', dollarLong(t.labor), true)
   y += 10
 

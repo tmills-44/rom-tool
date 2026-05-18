@@ -570,7 +570,7 @@ const materialTabStatus = computed(() => {
   if (items.length === 0 && manualAmt === 0) return 'empty'
   if (items.length === 0) return 'partial'
   const allComplete = items.every(i =>
-    !!i.description && (i.qty || 0) > 0 && (i.unitCost || 0) > 0
+    !!i.description && (i.qty || 0) > 0 && ((i.unitCost || 0) > 0 || rom.bundleUnitCost(i) > 0)
   )
   return allComplete ? 'complete' : 'partial'
 })
