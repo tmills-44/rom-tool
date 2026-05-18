@@ -111,8 +111,16 @@
               <button class="export-menu-item" @click="exportExcel(); exportMenuOpen = false">
                 <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
                 <div>
-                  <div class="export-menu-title">Excel</div>
-                  <div class="export-menu-sub">Workbook with a Summary tab + one tab per scope</div>
+                  <div class="export-menu-title">
+                    Excel
+                    <button class="formula-toggle" :class="{ 'formula-toggle--on': excelFormulas }"
+                      @click.stop="excelFormulas = !excelFormulas"
+                      :title="excelFormulas ? 'Formulas ON — click to export as static values' : 'Formulas OFF — click to export with live formulas'">
+                      <i class="ti ti-math-function" aria-hidden="true"></i>
+                      {{ excelFormulas ? 'FX' : 'FX' }}
+                    </button>
+                  </div>
+                  <div class="export-menu-sub">{{ excelFormulas ? 'Live formulas — edit quantities, costs recalculate' : 'Static values — Summary tab + one tab per scope' }}</div>
                 </div>
               </button>
               <button class="export-menu-item" @click="exportPDF('separate'); exportMenuOpen = false">
@@ -672,9 +680,10 @@ function fmtCompact(n) {
   return '$' + Math.round(n)
 }
 
+const excelFormulas = ref(false)
 function exportExcel() {
   runExportWithCheck(async () => {
-    try { await generateExcel(rom) }
+    try { await generateExcel(rom, { withFormulas: excelFormulas.value }) }
     catch (e) { alert('Excel export error: ' + e.message) }
   })
 }
@@ -771,10 +780,11 @@ function downloadQuoteFile() {
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
-    const sponsor = (rom.project.sponsor || 'quote').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40)
-    const rev     = (rom.project.revision || '').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 12)
-    const date    = (rom.project.date || new Date().toISOString().split('T')[0]).replace(/-/g, '')
-    a.download = `ROM_${sponsor}${rev ? '_' + rev : ''}_${date}.rom.json`
+    const project = rom.project || {}
+    const name  = (project.roomName || project.sponsor || 'quote').replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'quote'
+    const rev   = (project.revision || '').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 12)
+    const date  = (project.date && /^\d{4}-\d{2}-\d{2}$/.test(project.date)) ? project.date : new Date().toISOString().slice(0, 10)
+    a.download = `CostEstimate_${name}${rev ? '_' + rev : ''}_${date}.rom.json`
     document.body.appendChild(a)
     a.click()
     setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 0)
@@ -1513,6 +1523,23 @@ body {
 @media (max-width: 760px) {
   .proj-drawer-body { grid-template-columns: 1fr 1fr; }
 }
+/* Formula toggle chip inside the Excel export menu item */
+.formula-toggle {
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-left: 8px; padding: 1px 7px;
+  font-size: 10px; font-weight: 700;
+  border: 1px solid var(--rom-border); border-radius: 8px;
+  background: var(--rom-surface); color: var(--rom-text-muted);
+  cursor: pointer; font-family: inherit; vertical-align: middle;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.formula-toggle i { font-size: 11px; }
+.formula-toggle:hover { border-color: var(--rom-accent); color: var(--rom-accent); }
+.formula-toggle--on {
+  background: #d1fae5; border-color: #10b981; color: #065f46;
+}
+:root[data-theme="dark"] .formula-toggle--on { background: #064e3b; border-color: #10b981; color: #6ee7b7; }
+
 /* Escalation inline inputs */
 .proj-field--escalation { grid-column: span 2; }
 .escalation-inputs {

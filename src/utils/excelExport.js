@@ -8,6 +8,7 @@
  */
 
 import { SUMMARY_LABOR_GROUPS } from './exportConstants.js'
+import { buildExportFilename }  from './exportFilename.js'
 
 const NAVY    = '1A3560'   // section headers + grand total
 const ACCENT  = '1A5FB4'   // accent text
@@ -112,7 +113,11 @@ function addr(row, col) {
   return s + (row + 1)
 }
 
-function buildScopeSheet(XLSX, rom, scope) {
+function setFormula(ws, cellAddr, formula, style) {
+  ws[cellAddr] = { t: 'n', f: formula, s: style }
+}
+
+function buildScopeSheet(XLSX, rom, scope, withFormulas = false) {
   const t  = rom.coaTotals(scope.id)
   const oh = rom.overheadByCoa?.[scope.id] || {}
 
@@ -321,6 +326,55 @@ function buildScopeSheet(XLSX, rom, scope) {
   ws['!rows'] = []
   ws['!rows'][0] = { hpt: 22 }   // title
   ws['!rows'][7] = { hpt: 26 }   // hero
+
+  // ── Formula mode: replace computed cells with live formulas ──────────────
+  // Users can edit Days / Hrs/Day / Rate in labor rows, or Qty / Unit Cost in
+  // material rows, and the cost cells recalculate automatically.
+  if (withFormulas) {
+    const laborLines = rom.lineItems.filter(l => l.coaId === scope.id && rom.enabledEntities.includes(l.entity))
+    const matItems   = rom.material.items.filter(i => i.coaId === scope.id)
+
+    // Labor detail rows  (header = laborTop+1, data starts at laborTop+2)
+    // Columns: F=Days(5) G=Hrs/Day(6) H=TotalHrs(7) I=Rate(8) J=Cost(9)
+    laborLines.forEach((_, i) => {
+      const r0  = laborTop + 2 + i          // 0-based row in array
+      const r1  = r0 + 1                    // 1-based row in Excel formula refs
+      // Total Hrs = Days × Hrs/Day
+      setFormula(ws, addr(r0, 7), `F${r1}*G${r1}`, { ...styleCell, alignment: { horizontal: 'right' } })
+      // Cost = Days × Hrs/Day × Rate
+      setFormula(ws, addr(r0, 9), `F${r1}*G${r1}*I${r1}`, styleCurrency)
+    })
+    // Labor total row: SUM of Cost column
+    const laborTotalR0 = laborTop + 2 + laborLines.length
+    const laborTotalR1 = laborTotalR0 + 1
+    if (laborLines.length > 0) {
+      const dataStart = laborTop + 3   // 1-based start of data
+      const dataEnd   = laborTotalR1 - 1
+      setFormula(ws, addr(laborTotalR0, 7), `SUM(H${dataStart}:H${dataEnd})`, { ...styleCell, alignment: { horizontal: 'right' } })
+      setFormula(ws, addr(laborTotalR0, 9), `SUM(J${dataStart}:J${dataEnd})`, styleCurrency)
+    }
+
+    // Material detail rows  (header = matTop+1, data starts at matTop+2)
+    // Columns: B=Qty(1) C=UnitCost(2) D=Extended(3)
+    matItems.forEach((_, i) => {
+      const r0 = matTop + 2 + i
+      const r1 = r0 + 1
+      setFormula(ws, addr(r0, 3), `B${r1}*C${r1}`, styleCurrency)
+    })
+    // Hardware Subtotal = SUM of Extended column
+    if (matItems.length > 0) {
+      const hwSubR0 = matTop + 2 + matItems.length
+      const hwSubR1 = hwSubR0 + 1
+      const dStart  = matTop + 3
+      const dEnd    = hwSubR1 - 1
+      setFormula(ws, addr(hwSubR0, 3), `SUM(D${dStart}:D${dEnd})`, styleCurrency)
+      // Shipping = Hardware Subtotal × shipping %
+      const shipPct  = (rom.material.shippingPct || 0)
+      setFormula(ws, addr(hwSubR0 + 1, 3), `D${hwSubR1}*${shipPct}`, styleCurrency)
+      // Material Total = HW subtotal + Shipping
+      setFormula(ws, addr(hwSubR0 + 2, 3), `D${hwSubR1}+D${hwSubR1 + 1}`, { ...styleSubRowR })
+    }
+  }
 
   return ws
 }
@@ -785,15 +839,14 @@ export async function generateExcelSummary(rom) {
   const url    = URL.createObjectURL(blob)
   const a      = document.createElement('a')
   a.href       = url
-  const sponsor = (rom.project.sponsor || 'Quote').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40)
-  const dateStr = new Date().toISOString().slice(0, 10)
-  a.download   = `ROM_${sponsor}_CostSummary_${dateStr}.xlsx`
+  a.download   = buildExportFilename(rom, { tag: 'Summary', ext: 'xlsx' })
   document.body.appendChild(a)
   a.click()
   setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 0)
 }
 
-export async function generateExcel(rom) {
+export async function generateExcel(rom, options = {}) {
+  const withFormulas = !!options.withFormulas
   // xlsx-js-style is a fork of SheetJS that actually writes cell styles
   const XLSX = await import('xlsx-js-style')
   const wb   = XLSX.utils.book_new()
@@ -808,10 +861,9 @@ export async function generateExcel(rom) {
   const usedNames = new Set(['summary'])
   included.forEach(scope => {
     const sheetName = safeSheetName(scope.name, usedNames)
-    XLSX.utils.book_append_sheet(wb, buildScopeSheet(XLSX, rom, scope), sheetName)
+    XLSX.utils.book_append_sheet(wb, buildScopeSheet(XLSX, rom, scope, withFormulas), sheetName)
   })
 
-  const sponsor = (rom.project.sponsor || 'Quote').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40)
-  const dateStr = new Date().toISOString().slice(0, 10)
-  XLSX.writeFile(wb, `ROM_${sponsor}_${dateStr}.xlsx`)
+  const tag = withFormulas ? 'Formulas' : ''
+  XLSX.writeFile(wb, buildExportFilename(rom, { tag, ext: 'xlsx' }))
 }

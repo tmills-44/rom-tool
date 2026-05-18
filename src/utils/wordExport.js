@@ -11,6 +11,7 @@
  */
 
 import { SUMMARY_LABOR_GROUPS } from './exportConstants.js'
+import { buildExportFilename } from './exportFilename.js'
 
 function entityTravelLaborForScope(rom, entityId, scopeId) {
   let t = 0
@@ -481,9 +482,7 @@ ${scopeSections}
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
-  const sponsor = (rom.project.sponsor || 'Quote').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40)
-  const dateStr = new Date().toISOString().slice(0, 10)
-  a.download = `ROM_${sponsor}_${dateStr}.doc`
+  a.download = buildExportFilename(rom, { ext: 'doc' })
   document.body.appendChild(a)
   a.click()
   setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 0)
@@ -654,9 +653,7 @@ export async function generateWordSummary(rom) {
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
-  const sponsor = (rom.project.sponsor || 'Quote').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40)
-  const dateStr = new Date().toISOString().slice(0, 10)
-  a.download = `ROM_${sponsor}_CostSummary_${dateStr}.doc`
+  a.download = buildExportFilename(rom, { tag: 'Summary', ext: 'doc' })
   document.body.appendChild(a)
   a.click()
   setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 0)

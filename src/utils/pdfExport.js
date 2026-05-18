@@ -94,6 +94,7 @@ function travelHrsByCat(rom, scopeId) {
 }
 
 import { SUMMARY_LABOR_GROUPS as LABOR_TITLE_GROUPS } from './exportConstants.js'
+import { buildExportFilename } from './exportFilename.js'
 
 // ── Render one scope's 1-page Cost Summary (matches the legacy format) ───
 function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc }) {
@@ -573,6 +574,153 @@ function renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc }
   }
 }
 
+// ── Combined PDF cover page — title, project info, scope summary table ───────
+function renderCoverPage({ doc, rom, autoTable, logoData, included }) {
+  const W      = doc.internal.pageSize.getWidth()
+  const H      = doc.internal.pageSize.getHeight()
+  const margin = 40
+  const inner  = W - margin * 2
+  let y        = margin
+
+  function table(opts) { autoTable(doc, opts); return doc.lastAutoTable.finalY }
+
+  // ── Navy header band ─────────────────────────────────────────────────────
+  doc.setFillColor(...NAVY)
+  doc.rect(0, 0, W, 80, 'F')
+
+  // Logo inside band
+  if (logoData) {
+    const lw = 80; const lh = Math.round(lw * (210 / 290))
+    doc.addImage(logoData, 'PNG', margin, (80 - lh) / 2, lw, lh)
+  }
+
+  // Title & subtitle right-aligned inside band
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(...WHITE)
+  doc.text('COST ESTIMATE', W - margin, 36, { align: 'right' })
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(180, 210, 255)
+  doc.text(`${included.length} scope${included.length === 1 ? '' : 's'} · Combined document`, W - margin, 56, { align: 'right' })
+
+  y = 96
+
+  // ── Project info (two columns) ───────────────────────────────────────────
+  const leftCandidates = [
+    ['date',            'Date'],
+    ['revision',        'Revision'],
+    ['projectEngineer', 'Cronos Project Lead'],
+    ['govLead',         'Government Project Lead'],
+    ['pmSupportLead',   'PM Support Lead'],
+  ]
+  const rightCandidates = [
+    ['sponsor',  'Sponsor'],
+    ['roomName', 'Project / Room'],
+    ['building', 'Building'],
+    ['cityBase', 'City / Base'],
+  ]
+  const leftRows  = leftCandidates
+    .filter(([k]) => includeProjectField(rom.project, k))
+    .map(([k, label]) => [label, pf(rom.project, k, '')])
+  const rightRows = rightCandidates
+    .filter(([k]) => includeProjectField(rom.project, k))
+    .map(([k, label]) => [label, pf(rom.project, k, '')])
+
+  const colW = inner / 2 - 10
+  const cellPad = { top: 3, bottom: 3, left: 6, right: 6 }
+  function piCol(body, leftX, rightX) {
+    return table({
+      startY: y, body,
+      margin: { left: leftX, right: rightX },
+      tableWidth: colW,
+      styles:       { fontSize: 10, cellPadding: cellPad },
+      columnStyles: { 0: { fontStyle: 'bold', textColor: TEXT, cellWidth: colW * 0.5 }, 1: { textColor: TEXT } },
+      theme: 'plain',
+      didDrawCell(data) {
+        if (data.row.index < data.table.body.length) {
+          const p = data.cell
+          doc.setDrawColor(...NAVY).setLineWidth(0.5)
+          doc.line(p.x, p.y + p.height, p.x + p.width, p.y + p.height)
+        }
+      },
+    })
+  }
+  const leftY  = piCol(leftRows,  margin, margin + colW + 20)
+  const rightY = piCol(rightRows, margin + colW + 20, margin)
+  y = Math.max(leftY, rightY) + 28
+
+  // ── Estimate type badge ──────────────────────────────────────────────────
+  const ESTIMATE_LABELS_CV = { rom: 'ROM ±30%', budgetary: 'Budgetary ±15%', definitive: 'Definitive ±5%' }
+  const BADGE_COLORS_CV = { rom: [253,230,138], budgetary: [147,197,253], definitive: [167,243,208] }
+  const BADGE_TEXT_CV   = { rom: [120,53,15],   budgetary: [30,58,138],   definitive: [6,78,59]    }
+  const et      = rom.project.estimateType || 'rom'
+  const bClr    = BADGE_COLORS_CV[et] || BADGE_COLORS_CV.rom
+  const bTxt    = BADGE_TEXT_CV[et]   || BADGE_TEXT_CV.rom
+  const estLbl  = ESTIMATE_LABELS_CV[et] || 'ROM ±30%'
+  const badgeW = 110; const badgeH = 16
+  doc.setFillColor(...bClr)
+  doc.roundedRect(margin, y - badgeH, badgeW, badgeH, 3, 3, 'F')
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...bTxt)
+  doc.text(estLbl, margin + badgeW / 2, y - 4, { align: 'center' })
+  y += 10
+
+  // ── Section heading ──────────────────────────────────────────────────────
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...TEXT)
+  doc.text('Scope Summary', margin, y)
+  y += 14
+
+  // ── Scope rollup table ───────────────────────────────────────────────────
+  const sum = (fn) => included.reduce((s, c) => s + fn(rom.coaTotals(c.id)), 0)
+  const rollupRows = included.map(c => {
+    const t = rom.coaTotals(c.id)
+    return [c.name, fmt(t.labor), fmt(t.trips), fmt(t.mat), fmt(t.ohTotal + t.scr), fmt(t.totalLoaded)]
+  })
+  rollupRows.push([
+    { content: 'QUOTE GRAND TOTAL', styles: { fontStyle: 'bold', fillColor: NAVY, textColor: WHITE } },
+    { content: fmt(sum(t => t.labor)),           styles: { fontStyle: 'bold', fillColor: NAVY, textColor: WHITE } },
+    { content: fmt(sum(t => t.trips)),           styles: { fontStyle: 'bold', fillColor: NAVY, textColor: WHITE } },
+    { content: fmt(sum(t => t.mat)),             styles: { fontStyle: 'bold', fillColor: NAVY, textColor: WHITE } },
+    { content: fmt(sum(t => t.ohTotal + t.scr)), styles: { fontStyle: 'bold', fillColor: NAVY, textColor: WHITE } },
+    { content: fmt(rom.totalLoadedForQuote),     styles: { fontStyle: 'bold', fillColor: NAVY, textColor: WHITE } },
+  ])
+
+  y = table({
+    startY: y, head: [['Scope', 'Labor', 'Travel', 'Material', 'Overhead', 'Loaded Total']],
+    body: rollupRows,
+    margin: { left: margin, right: margin }, tableWidth: inner,
+    headStyles:         { fillColor: ACCENT, textColor: WHITE, fontSize: 9, fontStyle: 'bold' },
+    bodyStyles:         { fontSize: 9, textColor: TEXT },
+    alternateRowStyles: { fillColor: GRAY },
+    styles:             { cellPadding: { top: 5, bottom: 5, left: 6, right: 6 } },
+    columnStyles:       { 0: { cellWidth: 180 } },
+  }) + 30
+
+  // ── Escalation note (if configured) ─────────────────────────────────────
+  const escFactor = rom.escalationFactor ?? 1
+  if (escFactor > 1) {
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(...MUTED)
+    const allLaborBase = included.reduce((s, c) => s + rom.coaTotals(c.id).labor, 0)
+    doc.text(
+      `Escalated labor (${rom.project.escalationPct}%/yr × ${rom.project.escalationYears} yrs): ${fmt(allLaborBase * escFactor)}`,
+      margin, y
+    )
+    y += 18
+  }
+
+  // ── Notes (scope.description for any scope that has them) ────────────────
+  const scopesWithNotes = included.filter(c => String(c.description || '').trim())
+  if (scopesWithNotes.length) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...MUTED)
+    doc.text('SCOPE NOTES', margin, y); y += 10
+    scopesWithNotes.forEach(c => {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...TEXT)
+      doc.text(c.name, margin, y); y += 10
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...MUTED)
+      const lines = doc.splitTextToSize(String(c.description).trim(), inner)
+      const maxLines = Math.min(lines.length, 4)  // cap at 4 lines per scope on cover
+      doc.text(lines.slice(0, maxLines), margin, y)
+      y += maxLines * 5 + 8
+    })
+  }
+}
+
 // ── Quote rollup page — sits at the end of a combined PDF ─────────────────
 function renderQuoteRollup({ doc, rom, autoTable, logoData, included }) {
   doc.addPage()
@@ -637,10 +785,7 @@ function applyFooter(doc, rom) {
 }
 
 function fileName(rom, scope) {
-  const sponsor  = (rom.project.sponsor  || 'ROM').replace(/[^a-z0-9]/gi, '_').slice(0, 30)
-  const scopePt  = scope ? '_' + (scope.name || 'Scope').replace(/[^a-z0-9]/gi, '_').slice(0, 30) : ''
-  const datePart = (rom.project.date || new Date().toISOString().split('T')[0]).replace(/-/g, '')
-  return `ROM_${sponsor}${scopePt}_${datePart}.pdf`
+  return buildExportFilename(rom, { scope, ext: 'pdf' })
 }
 
 // ── Public entry ─────────────────────────────────────────────────────────
@@ -665,9 +810,7 @@ export async function generatePDF(rom, options = {}) {
       renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc: idx === 0 })
     })
     applyFooter(doc, rom)
-    const sponsor  = (rom.project.sponsor  || 'ROM').replace(/[^a-z0-9]/gi, '_').slice(0, 30)
-    const datePart = (rom.project.date || new Date().toISOString().split('T')[0]).replace(/-/g, '')
-    doc.save(`ROM_${sponsor}_CostSummary_${datePart}.pdf`)
+    doc.save(buildExportFilename(rom, { tag: 'Summary', ext: 'pdf' }))
     return
   }
 
@@ -682,14 +825,15 @@ export async function generatePDF(rom, options = {}) {
     return
   }
 
-  // Combined mode — one doc, scope sections + final rollup
+  // Combined mode — cover page (multi-scope) + individual scope sections
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' })
-  included.forEach((scope, idx) => {
-    renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc: idx === 0 })
-  })
   if (included.length > 1) {
-    renderQuoteRollup({ doc, rom, autoTable, logoData, included })
+    renderCoverPage({ doc, rom, autoTable, logoData, included })
   }
+  included.forEach((scope, idx) => {
+    // isFirstInDoc only when there's no cover page (single scope combined === same as separate)
+    renderScopePages({ doc, rom, scope, autoTable, logoData, isFirstInDoc: included.length === 1 && idx === 0 })
+  })
   applyFooter(doc, rom)
   doc.save(fileName(rom))
 }
