@@ -224,7 +224,7 @@ function buildScopeSheet(XLSX, rom, scope) {
   rows.push(['MATERIAL DETAIL'])
   rows.push(['Description', 'Qty', 'Unit Cost ($)', 'Extended ($)'])
   rom.material.items.filter(i => i.coaId === scope.id).forEach(i => {
-    rows.push([i.description || '', i.qty || 0, i.unitCost || 0, (i.qty || 0) * (i.unitCost || 0)])
+    rows.push([i.description || '', i.qty || 0, rom.bundleUnitCost(i), (i.qty || 0) * rom.bundleUnitCost(i)])
   })
   rows.push(['Hardware Subtotal',                       '', '', rom.materialUnloadedFor(scope.id)])
   rows.push([`Shipping (${pct(rom.material.shippingPct)})`, '', '', rom.materialUnloadedFor(scope.id) * (rom.material.shippingPct || 0)])
@@ -283,7 +283,7 @@ function buildScopeSheet(XLSX, rom, scope) {
   // We don't know how many overhead lines exactly without re-counting; just walk and style.
   let rowi = ohHeader + 1
   // overhead detail = scp + (optional global) + govLab + mgmtRsv + scr + totalOverhead
-  const overheadCount = 5 + ((oh.globalPct ?? 0) > 0 ? 1 : 0)
+  const overheadCount = (oh.items?.length ?? 0) + 1
   for (let i = 0; i < overheadCount - 1; i++) {
     setStyle(ws, addr(rowi, 0), styleCell); setStyle(ws, addr(rowi, 1), styleCurrency)
     rowi++
@@ -414,9 +414,10 @@ function buildScopeSummarySheet(XLSX, rom, scope) {
   const totalHrs = SUMMARY_LABOR_GROUPS.reduce((s, g) =>
     s + g.catIds.reduce((ss, id) => ss + (hoursByCat[id] || 0), 0), 0)
 
-  const matUnloaded = rom.materialUnloadedFor(scope.id)
-  const shipping    = matUnloaded * (rom.material.shippingPct || 0)
-  const odcTotal    = t.trips + matUnloaded + shipping
+  const matUnloaded  = rom.materialUnloadedFor(scope.id)
+  const isFirstScope = rom.quoteCoaIds[0] === scope.id
+  const shipping     = matUnloaded * (rom.material.shippingPct || 0) + (isFirstScope ? (rom.material.shipperCost || 0) : 0)
+  const odcTotal     = t.trips + matUnloaded + shipping
 
   // Project info — two-column layout matching PDF
   // Columns A-B = left (Date, leads), Columns D-E = right (Sponsor, Building, Room, City)
@@ -643,11 +644,12 @@ function buildExcelJSSummarySheet(ws, workbook, logoId, rom, scope) {
   lines.forEach(l => { hoursByCat[l.laborCat] = (hoursByCat[l.laborCat] || 0) + (l.days || 0) * (l.hoursPerDay || 0) })
   const trvHrs2 = travelHrsByCat(rom, scope.id)
   Object.entries(trvHrs2).forEach(([cat, hrs]) => { hoursByCat[cat] = (hoursByCat[cat] || 0) + hrs })
-  const totalHrs    = SUMMARY_LABOR_GROUPS.reduce((s, g) => s + g.catIds.reduce((ss, id) => ss + (hoursByCat[id] || 0), 0), 0)
-  const matUnloaded = rom.materialUnloadedFor(scope.id)
-  const shipping    = matUnloaded * (rom.material.shippingPct || 0)
-  const odcTotal    = t.trips + matUnloaded + shipping
-  const dolFmt      = '"$"#,##0'
+  const totalHrs     = SUMMARY_LABOR_GROUPS.reduce((s, g) => s + g.catIds.reduce((ss, id) => ss + (hoursByCat[id] || 0), 0), 0)
+  const matUnloaded  = rom.materialUnloadedFor(scope.id)
+  const isFirstScope2 = rom.quoteCoaIds[0] === scope.id
+  const shipping     = matUnloaded * (rom.material.shippingPct || 0) + (isFirstScope2 ? (rom.material.shipperCost || 0) : 0)
+  const odcTotal     = t.trips + matUnloaded + shipping
+  const dolFmt       = '"$"#,##0'
 
   let curRow = piStart + piCount + 1 // blank spacer after PI
 

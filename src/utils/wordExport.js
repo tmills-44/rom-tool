@@ -296,8 +296,8 @@ function materialDetailTable(rom, scope, t) {
     <tr>
       <td>${esc(i.description || '')}</td>
       <td class="amt">${i.qty || 0}</td>
-      <td class="amt">${dollar(i.unitCost || 0)}</td>
-      <td class="amt">${dollar((i.qty || 0) * (i.unitCost || 0))}</td>
+      <td class="amt">${dollar(rom.bundleUnitCost(i))}</td>
+      <td class="amt">${dollar((i.qty || 0) * rom.bundleUnitCost(i))}</td>
     </tr>
   `).join('')
   return `
@@ -537,9 +537,10 @@ function buildScopeSummaryHTML(rom, scope, logo) {
   const totalHrs = SUMMARY_LABOR_GROUPS.reduce((s, g) =>
     s + g.catIds.reduce((ss, id) => ss + (hoursByCat[id] || 0), 0), 0)
 
-  const matUnloaded = rom.materialUnloadedFor(scope.id)
-  const shipping    = matUnloaded * (rom.material.shippingPct || 0)
-  const odcTotal    = t.trips + matUnloaded + shipping
+  const matUnloaded  = rom.materialUnloadedFor(scope.id)
+  const isFirstScope = rom.quoteCoaIds[0] === scope.id
+  const shipping     = matUnloaded * (rom.material.shippingPct || 0) + (isFirstScope ? (rom.material.shipperCost || 0) : 0)
+  const odcTotal     = t.trips + matUnloaded + shipping
 
   return `
     <table class="hdr" cellspacing="0" cellpadding="0"><tr>

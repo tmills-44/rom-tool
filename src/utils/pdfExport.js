@@ -261,7 +261,8 @@ function renderSummaryPage({ doc, rom, scope, autoTable, logoData, isFirstInDoc 
   y += 14
 
   const matUnloaded = rom.materialUnloadedFor(scope.id)
-  const shipping    = matUnloaded * (rom.material.shippingPct || 0)
+  const isFirstScope = rom.quoteCoaIds[0] === scope.id
+  const shipping    = matUnloaded * (rom.material.shippingPct || 0) + (isFirstScope ? (rom.material.shipperCost || 0) : 0)
   const odcTotal    = t.trips + matUnloaded + shipping
 
   ;[

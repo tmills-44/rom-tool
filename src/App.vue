@@ -603,7 +603,7 @@ const validationWarnings = computed(() => {
   if (rom.lineItems.length === 0)                w.push('No engineering labor entered.')
   if (rom.engineeringTotal === 0 && rom.lineItems.length > 0) w.push('Engineering lines exist but total is $0 — check rates and hours.')
   if (rom.totalLoadedCost === 0)                 w.push('Grand total is $0.')
-  if (rom.overhead.scrPct === 0)                 w.push('Support Cost Rate is 0%.')
+  if (rom.overhead?.overheadEnabled && rom.scrCost === 0) w.push('Support Cost Rate is 0%.')
   if (!rom.project.sponsor)                      w.push('Customer / Sponsor is blank.')
   return w
 })

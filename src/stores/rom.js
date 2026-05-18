@@ -1663,7 +1663,10 @@ export const useRomStore = defineStore('rom', () => {
   }
   function materialTotalFor(coaId) {
     const u = materialUnloadedFor(coaId)
-    return u + u * (material.shippingPct || 0) + (material.shipperCost || 0)
+    // shipperCost is a project-level flat fee — add it only for the first quoted scope
+    // so it appears exactly once regardless of how many COAs are in the quote.
+    const shipper = quoteCoaIds.value[0] === coaId ? (material.shipperCost || 0) : 0
+    return u + u * (material.shippingPct || 0) + shipper
   }
   function setManualMaterialAmount(coaId, value) {
     material.manualAmounts[coaId] = Math.max(0, Number(value) || 0)
@@ -2039,7 +2042,7 @@ export const useRomStore = defineStore('rom', () => {
         components: (it.components || []).map(c => ({ ...c, id: 'cp-' + uuid().slice(0, 8) })),
       })
     })
-    overheadByCoa[newId] = { ...(overheadByCoa[id] ?? defaultOverhead()) }
+    overheadByCoa[newId] = JSON.parse(JSON.stringify(overheadByCoa[id] ?? defaultOverhead()))
     activeCoaId.value = newId
   }
 
