@@ -146,7 +146,12 @@ function buildScopeSheet(XLSX, rom, scope) {
   } else {
     const items = Array.isArray(oh?.items) ? oh.items : []
     items.filter(it => it.enabled).forEach(it => {
-      const cost = it.base === 'withOverhead' ? t.withOh * (it.pct || 0) : t.unloaded * (it.pct || 0)
+      const base = it.base === 'withOverhead' ? t.withOh
+                 : it.base === 'labor'        ? t.labor
+                 : it.base === 'travel'       ? t.trips
+                 : it.base === 'material'     ? t.mat
+                 :                             t.unloaded
+      const cost = base * (it.pct || 0)
       const suffix = (it.pct || 0) > 0 ? ` (${pct(it.pct)})` : ''
       rows.push([(it.label || 'Overhead item') + suffix, cost])
     })

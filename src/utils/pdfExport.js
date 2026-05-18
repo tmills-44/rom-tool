@@ -40,9 +40,12 @@ function buildOverheadRows(oh, t) {
   return items
     .filter(it => it.enabled)
     .map(it => {
-      const cost = it.base === 'withOverhead'
-        ? t.withOh * (it.pct || 0)
-        : t.unloaded * (it.pct || 0)
+      const base = it.base === 'withOverhead' ? t.withOh
+                 : it.base === 'labor'        ? t.labor
+                 : it.base === 'travel'       ? t.trips
+                 : it.base === 'material'     ? t.mat
+                 :                             t.unloaded
+      const cost = base * (it.pct || 0)
       const label = it.label || 'Overhead item'
       const suffix = (it.pct || 0) > 0 ? ` (${pct(it.pct)})` : ''
       return [label + suffix, fmt(cost)]
