@@ -15,9 +15,9 @@
     <div class="oh-body">
 
       <!-- Labor escalation -->
-      <div class="oh-section oh-esc-section">
-        <span class="oh-esc-label">Labor Escalation</span>
-        <div class="oh-esc-row">
+      <div class="oh-section">
+        <div class="oh-section-head">Labor Escalation</div>
+        <div class="oh-esc-body">
           <input type="number" min="0" max="20" step="0.5" class="oh-esc-num"
             :value="rom.project.escalationPct"
             @input="rom.project.escalationPct = parseFloat($event.target.value) || 0" />
@@ -579,11 +579,9 @@ function placeholderFor(idx) {
 .totals-row--grand span:last-child { font-size: 16px; color: var(--rom-accent-dark); }
 
 /* Labor escalation section */
-.oh-esc-section { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.oh-esc-label { font-size: 12px; font-weight: 600; color: var(--rom-text-muted); white-space: nowrap; min-width: 110px; }
-.oh-esc-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.oh-esc-body { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 16px; }
 .oh-esc-badge {
-  padding: 2px 10px; border-radius: 12px; margin-left: 4px;
+  padding: 2px 10px; border-radius: 12px; margin-left: 6px;
   font-size: 11px; font-weight: 700;
   background: #fef3c7; color: #92400e;
   white-space: nowrap;
@@ -592,7 +590,7 @@ function placeholderFor(idx) {
 .oh-esc-num {
   width: 60px; padding: 5px 8px; font-size: 13px; text-align: right; font-family: inherit;
   border: 1px solid var(--rom-border); border-radius: var(--rom-radius);
-  background: var(--rom-surface); color: var(--rom-text);
+  background: var(--rom-bg); color: var(--rom-text);
 }
 .oh-esc-num--sm { width: 48px; }
 .oh-esc-num:focus { outline: 2px solid var(--rom-accent); outline-offset: -1px; border-color: transparent; }
